@@ -1,8 +1,9 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { LineChart, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import logoUrl from "@assets/generated_images/minimalist_blacktop_systems_logo.png";
 
 const plans = [
   {
@@ -60,12 +61,18 @@ const plans = [
 export default function Pricing() {
   return (
     <div className="min-h-screen bg-background">
-      <nav className="border-b px-6 py-4">
+      <nav className="border-b px-6 py-5 backdrop-blur-md bg-background/90">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/">
-            <div className="flex items-center gap-2 cursor-pointer">
-              <LineChart className="w-8 h-8 text-primary" />
-              <span className="text-xl font-semibold">ClarityOS</span>
+            <div className="flex items-center gap-3 group cursor-pointer">
+              <div className="relative w-9 h-9 flex items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 p-1.5 ring-1 ring-primary/20">
+                <img 
+                  src={logoUrl} 
+                  alt="BlackTop Systems" 
+                  className="w-full h-full object-contain transition-transform group-hover:scale-110" 
+                />
+              </div>
+              <span className="text-xl font-semibold tracking-tight">BlackTop Systems</span>
             </div>
           </Link>
           <div className="flex items-center gap-4">
@@ -128,9 +135,9 @@ export default function Pricing() {
         </div>
       </section>
 
-      <footer className="border-t px-6 py-8">
+      <footer className="border-t px-6 py-12">
         <div className="max-w-7xl mx-auto text-center text-sm text-muted-foreground">
-          <p>&copy; 2025 ClarityOS. All rights reserved.</p>
+          <p>&copy; 2025 BlackTop Systems. All rights reserved.</p>
         </div>
       </footer>
     </div>

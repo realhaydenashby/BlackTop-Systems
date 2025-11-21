@@ -75,7 +75,7 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <div className="flex items-center gap-3 px-3 py-6 border-b border-sidebar-border">
-            <div className="relative w-8 h-8 flex items-center justify-center">
+            <div className="relative w-8 h-8 flex items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 p-1.5 ring-1 ring-primary/20">
               <img 
                 src={logoUrl} 
                 alt="BlackTop Systems" 
