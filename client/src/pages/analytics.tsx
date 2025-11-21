@@ -11,8 +11,8 @@ import { ActionPlanModule, type ActionPlanItem } from "@/components/ActionPlanMo
 function ForecastingChart({ analytics }: { analytics: any }) {
   const [forecastHorizon, setForecastHorizon] = useState("6months");
   
-  const getForecastData = () => {
-    if (!analytics?.forecasting) return [];
+  const getChartData = () => {
+    if (!analytics?.forecasting) return { historical: [], forecast: [] };
     
     const { historicalData = [], currentMonth, forecast30Days = [], forecast90Days = [], forecast6Months = [] } = analytics.forecasting;
     
@@ -30,16 +30,20 @@ function ForecastingChart({ analytics }: { analytics: any }) {
         break;
     }
     
-    return [
+    const historical = [
       ...historicalData,
       ...(currentMonth ? [currentMonth] : []),
-      ...forecastData
     ];
+    
+    const forecast = forecastData.length > 0 && historical.length > 0
+      ? [historical[historical.length - 1], ...forecastData]
+      : forecastData;
+    
+    return { historical, forecast };
   };
   
-  const chartData = getForecastData();
-  const historicalCount = (analytics?.forecasting?.historicalData?.length || 0) + 
-    (analytics?.forecasting?.currentMonth ? 1 : 0);
+  const { historical, forecast } = getChartData();
+  const allData = [...historical, ...forecast.slice(1)];
   
   return (
     <Card>
@@ -66,67 +70,96 @@ function ForecastingChart({ analytics }: { analytics: any }) {
       <CardContent>
         <div className="mb-4 flex items-center gap-6 text-sm">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS[0] }} />
-            <span className="text-muted-foreground">Historical Data</span>
+            <div className="w-3 h-0.5 w-8 bg-current" style={{ color: CHART_COLORS[0] }} />
+            <span className="text-muted-foreground">Historical</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full border-2" style={{ borderColor: CHART_COLORS[0], borderStyle: 'dashed' }} />
+            <div className="flex gap-1">
+              <div className="w-1.5 h-0.5 bg-current" style={{ color: CHART_COLORS[0] }} />
+              <div className="w-1.5 h-0.5 bg-current" style={{ color: CHART_COLORS[0] }} />
+              <div className="w-1.5 h-0.5 bg-current" style={{ color: CHART_COLORS[0] }} />
+            </div>
             <span className="text-muted-foreground">Forecasted</span>
           </div>
         </div>
         <ResponsiveContainer width="100%" height={400}>
-          <AreaChart data={chartData}>
+          <AreaChart data={allData}>
             <CartesianGrid {...chartStyles.cartesianGrid} />
             <XAxis dataKey="month" {...chartStyles.xAxis} />
             <YAxis {...chartStyles.yAxis} />
             <Tooltip {...chartStyles.tooltip} />
             <Legend {...chartStyles.legend} />
             
-            <ReferenceLine 
-              x={chartData[historicalCount - 1]?.month} 
-              stroke="hsl(var(--muted-foreground))" 
-              strokeDasharray="3 3"
-              label={{ value: "Today", position: "top", fill: "hsl(var(--muted-foreground))" }}
-            />
+            {historical.length > 0 && (
+              <ReferenceLine 
+                x={historical[historical.length - 1]?.month} 
+                stroke="hsl(var(--muted-foreground))" 
+                strokeDasharray="3 3"
+                label={{ value: "Today", position: "top", fill: "hsl(var(--muted-foreground))" }}
+              />
+            )}
             
             <Area 
               type="monotone" 
               dataKey="revenue" 
-              stackId="1"
+              data={historical}
               stroke={CHART_COLORS[0]} 
               fill={CHART_COLORS[0]} 
-              name="Revenue" 
+              name="Revenue (Historical)" 
               {...areaStyles}
-              strokeDasharray={(dataPoint: any) => {
-                const index = chartData.indexOf(dataPoint);
-                return index >= historicalCount ? "5 5" : "0";
-              }}
+            />
+            <Area 
+              type="monotone" 
+              dataKey="revenue" 
+              data={forecast}
+              stroke={CHART_COLORS[0]} 
+              fill={CHART_COLORS[0]} 
+              fillOpacity={0.3}
+              name="Revenue (Forecast)" 
+              strokeDasharray="5 5"
+              {...areaStyles}
+            />
+            
+            <Area 
+              type="monotone" 
+              dataKey="expenses" 
+              data={historical}
+              stroke={CHART_COLORS[3]} 
+              fill={CHART_COLORS[3]} 
+              name="Expenses (Historical)" 
+              {...areaStyles}
             />
             <Area 
               type="monotone" 
               dataKey="expenses" 
-              stackId="2"
+              data={forecast}
               stroke={CHART_COLORS[3]} 
               fill={CHART_COLORS[3]} 
-              name="Expenses" 
+              fillOpacity={0.3}
+              name="Expenses (Forecast)" 
+              strokeDasharray="5 5"
               {...areaStyles}
-              strokeDasharray={(dataPoint: any) => {
-                const index = chartData.indexOf(dataPoint);
-                return index >= historicalCount ? "5 5" : "0";
-              }}
+            />
+            
+            <Area 
+              type="monotone" 
+              dataKey="profit" 
+              data={historical}
+              stroke={CHART_COLORS[1]} 
+              fill={CHART_COLORS[1]} 
+              name="Profit (Historical)" 
+              {...areaStyles}
             />
             <Area 
               type="monotone" 
               dataKey="profit" 
-              stackId="3"
+              data={forecast}
               stroke={CHART_COLORS[1]} 
               fill={CHART_COLORS[1]} 
-              name="Profit" 
+              fillOpacity={0.3}
+              name="Profit (Forecast)" 
+              strokeDasharray="5 5"
               {...areaStyles}
-              strokeDasharray={(dataPoint: any) => {
-                const index = chartData.indexOf(dataPoint);
-                return index >= historicalCount ? "5 5" : "0";
-              }}
             />
           </AreaChart>
         </ResponsiveContainer>
