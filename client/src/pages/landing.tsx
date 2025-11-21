@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { LineChart, TrendingUp, Target, Zap, Shield, Users, ArrowRight, BarChart3, Clock, AlertTriangle, DollarSign, FileText, BookOpen, Info } from "lucide-react";
+import { LineChart, TrendingUp, Target, Zap, Shield, Users, ArrowRight, BarChart3, Clock, AlertTriangle, DollarSign, FileText, BookOpen, Info, Calendar } from "lucide-react";
 import { motion } from "framer-motion";
 
 const fadeInUp = {
@@ -231,22 +231,22 @@ export default function Landing() {
           >
             {[
               {
-                icon: DollarSign,
-                title: "Reduce Software Burn",
-                description: "How to cut SaaS costs without breaking team workflows.",
-                tag: "5 min read"
-              },
-              {
-                icon: Target,
-                title: "Marketing Budget Structure",
-                description: "How to build a real marketing budget as a pre-seed startup.",
-                tag: "7 min read"
-              },
-              {
-                icon: FileText,
-                title: "Quarterly Vendor Audit",
-                description: "Run a complete vendor audit in 30 minutes or less.",
+                icon: Calendar,
+                title: "How to Make Finance Meetings Not Suck — A 20-Minute Monthly Routine",
+                description: "Finance meetings often feel tedious. Learn a simple 20-minute routine that keeps teams aligned without wasting time.",
                 tag: "4 min read"
+              },
+              {
+                icon: TrendingUp,
+                title: "Understanding Gross Margin — The Only Profit Metric That Actually Matters",
+                description: "Revenue alone doesn't determine business health. Learn why gross margin reveals whether your core business model works.",
+                tag: "4 min read"
+              },
+              {
+                icon: DollarSign,
+                title: "The SMB Spend Playbook",
+                description: "A comprehensive guide to gaining financial visibility and control. Learn to clean vendor lists, identify drift, and maintain discipline.",
+                tag: "8 min read"
               }
             ].map((resource, index) => (
               <motion.div
