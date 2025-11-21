@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Upload, FileText, X, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface UploadedFile {
   id: string;
@@ -66,7 +67,7 @@ export function FileUploader({
     return true;
   };
 
-  const uploadFile = async (file: File): Promise<void> => {
+  const uploadFile = async (file: File): Promise<UploadedFile> => {
     const fileId = `${Date.now()}-${file.name}`;
     const newFile: UploadedFile = {
       id: fileId,
@@ -78,18 +79,11 @@ export function FileUploader({
     setUploadedFiles((prev) => [...prev, newFile]);
 
     try {
-      // Get signed upload URL
-      const urlResponse = await fetch("/api/documents/upload-url", {
-        credentials: "include",
-      });
-      
-      if (!urlResponse.ok) {
-        throw new Error("Failed to get upload URL");
-      }
-
+      // Get signed upload URL using apiRequest
+      const urlResponse = await apiRequest("GET", "/api/documents/upload-url");
       const { url } = await urlResponse.json();
 
-      // Upload file to object storage
+      // Upload file to object storage (uses raw fetch for PUT to cloud storage)
       const uploadResponse = await fetch(url, {
         method: "PUT",
         body: file,
@@ -99,10 +93,10 @@ export function FileUploader({
       });
 
       if (!uploadResponse.ok) {
-        throw new Error("Failed to upload file");
+        throw new Error("Failed to upload file to storage");
       }
 
-      // Register document with backend
+      // Register document with backend using apiRequest
       setUploadedFiles((prev) =>
         prev.map((f) =>
           f.id === fileId ? { ...f, status: "processing" } : f
@@ -117,22 +111,11 @@ export function FileUploader({
         ? "invoice"
         : "receipt";
 
-      const docResponse = await fetch("/api/documents", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          fileUrl: url.split("?")[0], // Remove query params
-          type: fileType,
-          source,
-        }),
+      await apiRequest("POST", "/api/documents", {
+        fileUrl: url.split("?")[0], // Remove query params
+        type: fileType,
+        source,
       });
-
-      if (!docResponse.ok) {
-        throw new Error("Failed to register document");
-      }
 
       setUploadedFiles((prev) =>
         prev.map((f) =>
@@ -144,21 +127,27 @@ export function FileUploader({
         title: "Upload successful",
         description: `${file.name} has been uploaded and is being processed.`,
       });
+
+      return { ...newFile, status: "complete" };
     } catch (error: any) {
       console.error("Upload error:", error);
+      const errorMessage = error.message || "Failed to upload file";
+      
       setUploadedFiles((prev) =>
         prev.map((f) =>
           f.id === fileId
-            ? { ...f, status: "error", error: error.message }
+            ? { ...f, status: "error", error: errorMessage }
             : f
         )
       );
 
       toast({
         title: "Upload failed",
-        description: error.message || "Failed to upload file",
+        description: errorMessage,
         variant: "destructive",
       });
+
+      return { ...newFile, status: "error", error: errorMessage };
     }
   };
 
@@ -177,15 +166,15 @@ export function FileUploader({
 
       const validFiles = fileArray.filter(validateFile);
 
-      for (const file of validFiles) {
-        await uploadFile(file);
-      }
+      // Upload files in parallel and collect all results
+      const results = await Promise.all(validFiles.map((file) => uploadFile(file)));
 
-      if (onUploadComplete) {
-        onUploadComplete(uploadedFiles);
+      // Call completion callback with all results (including failures)
+      if (onUploadComplete && results.length > 0) {
+        onUploadComplete(results);
       }
     },
-    [uploadedFiles, maxFiles, onUploadComplete]
+    [uploadedFiles.length, maxFiles, onUploadComplete, validateFile, uploadFile]
   );
 
   const handleDrop = useCallback(

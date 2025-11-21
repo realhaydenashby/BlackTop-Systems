@@ -14,9 +14,33 @@ export default function Analytics() {
   const section = params?.section || "spend";
   const [timeRange, setTimeRange] = useState("30");
 
-  const { data: analytics } = useQuery<any>({
+  const { data: analytics, isLoading, error } = useQuery<any>({
     queryKey: [`/api/analytics?days=${timeRange}`],
   });
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-center text-destructive">
+              Failed to load analytics data. Please try again later.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const handleTabChange = (value: string) => {
     if (value === "spend") {
