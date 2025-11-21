@@ -15,7 +15,7 @@ export default function Analytics() {
   const [timeRange, setTimeRange] = useState("30");
 
   const { data: analytics } = useQuery<any>({
-    queryKey: ["/api/analytics", { days: timeRange }],
+    queryKey: [`/api/analytics?days=${timeRange}`],
   });
 
   const handleTabChange = (value: string) => {
@@ -179,12 +179,68 @@ export default function Analytics() {
 
       {section === "revenue" && (
         <div className="grid gap-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue Growth</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={analytics?.revenueGrowth || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} name="Revenue" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>MRR vs ARR</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={analytics?.mrrArr || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="mrr" stroke="hsl(var(--chart-1))" name="MRR" strokeWidth={2} />
+                    <Line type="monotone" dataKey="arr" stroke="hsl(var(--chart-2))" name="ARR" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Revenue Overview</CardTitle>
+              <CardTitle>Revenue by Source</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Revenue analytics coming soon...</p>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={analytics?.revenueSources || []}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {(analytics?.revenueSources || []).map((_: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         </div>
@@ -192,12 +248,69 @@ export default function Analytics() {
 
       {section === "profitability" && (
         <div className="grid gap-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Profit Margins</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={analytics?.profitability?.margins || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="gross" stroke="hsl(var(--chart-1))" name="Gross Margin %" strokeWidth={2} />
+                    <Line type="monotone" dataKey="operating" stroke="hsl(var(--chart-2))" name="Operating Margin %" strokeWidth={2} />
+                    <Line type="monotone" dataKey="net" stroke="hsl(var(--chart-3))" name="Net Margin %" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>EBITDA Trend</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={analytics?.profitability?.ebitda || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} name="EBITDA" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Profitability Metrics</CardTitle>
+              <CardTitle>Cost Structure</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Profitability analytics coming soon...</p>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={analytics?.profitability?.costStructure || []}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {(analytics?.profitability?.costStructure || []).map((_: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         </div>
@@ -207,12 +320,61 @@ export default function Analytics() {
         <div className="grid gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Financial Forecasting</CardTitle>
+              <CardTitle>12-Month Revenue Forecast</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Forecasting analytics coming soon...</p>
+              <ResponsiveContainer width="100%" height={400}>
+                <LineChart data={analytics?.forecasting?.forecast || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="actual" stroke="hsl(var(--primary))" name="Actual" strokeWidth={2} />
+                  <Line type="monotone" dataKey="predicted" stroke="hsl(var(--chart-2))" name="Predicted" strokeWidth={2} strokeDasharray="5 5" />
+                </LineChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Scenario Analysis</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={analytics?.forecasting?.scenarios || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="best" stroke="hsl(var(--chart-1))" name="Best Case" strokeWidth={2} />
+                    <Line type="monotone" dataKey="expected" stroke="hsl(var(--chart-2))" name="Expected" strokeWidth={2} />
+                    <Line type="monotone" dataKey="worst" stroke="hsl(var(--chart-3))" name="Worst Case" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Cash Runway</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={analytics?.forecasting?.cashRunway || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="cash" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} name="Cash Balance" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
     </div>
