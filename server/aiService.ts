@@ -214,3 +214,13 @@ Return a JSON object with this structure:
 
   return JSON.parse(response.content);
 }
+
+// Export a singleton instance for convenience
+export const aiService = {
+  callAI,
+  callOpenAI,
+  callGroq,
+  callGemini,
+  explainChart,
+  generateActionItems,
+};
