@@ -25,6 +25,7 @@ import {
   BookOpen,
   Settings,
   ChevronRight,
+  FileText,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,6 +42,11 @@ const menuItems = [
     title: "Transactions",
     url: "/transactions",
     icon: Receipt,
+  },
+  {
+    title: "Documents",
+    url: "/documents",
+    icon: FileText,
   },
   {
     title: "Cash Flow",
