@@ -83,7 +83,7 @@ export function generateMockAnalytics(days: number = 30) {
       date: format(subDays(new Date(), days - 1 - i), "MMM dd"),
       revenue: Math.floor(Math.random() * 20000) + 12000,
     })),
-    revenueGrowth: Array.from({ length: 6 }, (_, i) => ({
+    revenueByMonth: Array.from({ length: 6 }, (_, i) => ({
       month: format(new Date(2025, i, 1), "MMM"),
       revenue: Math.floor(Math.random() * 25000) + 75000 + (i * 5000),
     })),
