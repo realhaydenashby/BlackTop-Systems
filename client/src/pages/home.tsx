@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, BarChart3, Shield, Zap } from "lucide-react";
+import { ArrowRight, BarChart3, Shield, Zap, AlertCircle, Clock, FileQuestion, TrendingDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
@@ -23,7 +23,7 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            AI-powered insights that transform messy documents into actionable intelligence.
+            AI-powered insights that transform financials into actionable intelligence.
           </motion.p>
           <motion.div 
             className="flex gap-4 justify-center flex-wrap"
@@ -102,6 +102,68 @@ export default function Home() {
       </section>
 
       <section className="px-6 py-24">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="text-4xl font-bold mb-6">The Financial Chaos Founders Face</h2>
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              Early-stage startups and small businesses struggle daily with financial uncertainty. You're not alone.
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            {[
+              {
+                icon: FileQuestion,
+                title: "Drowning in Documents",
+                description: "Bank statements, invoices, receipts, and subscriptions scattered across email, drives, and folders. No single source of truth."
+              },
+              {
+                icon: Clock,
+                title: "No Time for Manual Work",
+                description: "You're building a company, not maintaining spreadsheets. Every hour spent on bookkeeping is an hour away from growth."
+              },
+              {
+                icon: AlertCircle,
+                title: "Flying Blind on Cash",
+                description: "When will you run out of money? Where is cash actually going? These questions keep you up at night without clear answers."
+              },
+              {
+                icon: TrendingDown,
+                title: "Reactive, Not Proactive",
+                description: "You only notice problems after they've already happened. By the time you see the burn rate spike, it's too late to course-correct."
+              }
+            ].map((painPoint, index) => (
+              <motion.div
+                key={painPoint.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+              >
+                <Card>
+                  <CardHeader>
+                    <painPoint.icon className="w-12 h-12 text-destructive mb-4" />
+                    <CardTitle className="text-xl">{painPoint.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="text-base">
+                      {painPoint.description}
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-6 py-24 bg-muted/30">
         <motion.div 
           className="max-w-4xl mx-auto text-center"
           initial={{ opacity: 0, y: 20 }}
