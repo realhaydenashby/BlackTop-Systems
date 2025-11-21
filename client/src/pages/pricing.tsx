@@ -85,7 +85,7 @@ const plans = [
   },
   {
     name: "SMB Intelligence",
-    price: "$249",
+    price: "$299",
     period: "month",
     title: "Full forecasting module",
     description: "10 seats with multi-department budgets and benchmarking",
