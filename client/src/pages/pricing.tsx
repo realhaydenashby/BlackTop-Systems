@@ -152,7 +152,7 @@ export default function Pricing() {
             {plans.map((plan) => (
               <Card 
                 key={plan.tier} 
-                className={`hover-elevate transition-all cursor-pointer ${plan.popular ? "border-primary" : ""}`}
+                className="hover-elevate transition-all cursor-pointer"
                 onClick={() => setSelectedPlan(plan)}
                 data-testid={`card-plan-${plan.tier}`}
               >
@@ -192,7 +192,7 @@ export default function Pricing() {
                   <a href="/api/login" className="w-full" onClick={(e) => e.stopPropagation()}>
                     <Button
                       className="w-full"
-                      variant={plan.popular ? "default" : "outline"}
+                      variant="default"
                       data-testid={`button-select-${plan.tier}`}
                     >
                       {plan.cta}
