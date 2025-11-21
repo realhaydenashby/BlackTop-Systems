@@ -22,7 +22,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
       <motion.nav 
-        className="border-b px-6 py-5 backdrop-blur-md bg-background/90 sticky top-0 z-50"
+        className="border-b pl-4 pr-6 py-5 backdrop-blur-md bg-background/90 sticky top-0 z-50"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
@@ -33,7 +33,7 @@ export default function Landing() {
               <img 
                 src="/logo.png" 
                 alt="BlackTop Systems" 
-                className="h-12 object-contain transition-transform group-hover:scale-105" 
+                className="h-10 object-contain transition-transform group-hover:scale-105" 
               />
             </div>
           </Link>

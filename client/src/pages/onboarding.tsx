@@ -136,7 +136,7 @@ export default function Onboarding() {
           <img 
             src="/logo.png" 
             alt="BlackTop Systems" 
-            className="h-16 object-contain" 
+            className="h-12 object-contain" 
           />
         </div>
 

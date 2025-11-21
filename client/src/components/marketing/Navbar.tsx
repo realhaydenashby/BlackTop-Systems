@@ -21,12 +21,12 @@ export function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 hover-elevate rounded-lg px-2 py-1 -ml-2">
+      <div className="container mx-auto pl-2 pr-4 h-16 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2 hover-elevate rounded-lg py-1 px-2">
           <img 
             src="/logo.png" 
             alt="BlackTop Systems" 
-            className="h-12 object-contain" 
+            className="h-10 object-contain" 
           />
         </Link>
 
