@@ -57,17 +57,14 @@ export default function Onboarding() {
 
   const createOrganizationMutation = useMutation({
     mutationFn: async (data: OnboardingForm) => {
-      return await apiRequest("/api/organizations", {
-        method: "POST",
-        body: JSON.stringify({
-          name: data.organizationName,
-          industry: data.industry,
-          employeeCount: data.employeeCount,
-          annualRevenue: data.annualRevenue,
-          monthlySpend: data.monthlySpend,
-          departments: data.departments,
-          goals: data.goals,
-        }),
+      return await apiRequest("POST", "/api/organizations", {
+        name: data.organizationName,
+        industry: data.industry,
+        employeeCount: data.employeeCount,
+        annualRevenue: data.annualRevenue,
+        monthlySpend: data.monthlySpend,
+        departments: data.departments,
+        goals: data.goals,
       });
     },
     onSuccess: () => {

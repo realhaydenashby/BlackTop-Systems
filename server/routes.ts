@@ -653,6 +653,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // AI endpoints
+  app.post("/api/ai/:provider", isAuthenticated, async (req, res) => {
+    try {
+      const provider = req.params.provider as "openai" | "groq" | "gemini";
+      
+      if (!["openai", "groq", "gemini"].includes(provider)) {
+        return res.status(400).json({ message: "Invalid AI provider" });
+      }
+
+      const { prompt, systemPrompt, maxTokens, temperature, jsonMode } = req.body;
+
+      if (!prompt) {
+        return res.status(400).json({ message: "Prompt is required" });
+      }
+
+      const { callAI } = await import("./aiService");
+      
+      const response = await callAI(provider, {
+        prompt,
+        systemPrompt,
+        maxTokens,
+        temperature,
+        jsonMode,
+      });
+
+      res.json(response);
+    } catch (error: any) {
+      console.error(`AI ${req.params.provider} error:`, error);
+      res.status(500).json({ 
+        message: error.message || "AI request failed",
+        provider: req.params.provider 
+      });
+    }
+  });
+
+  app.post("/api/ai/explain-chart", isAuthenticated, async (req, res) => {
+    try {
+      const { provider = "openai", chartData, chartType, context } = req.body;
+
+      if (!chartData || !chartType) {
+        return res.status(400).json({ message: "Chart data and type are required" });
+      }
+
+      const { explainChart } = await import("./aiService");
+      
+      const explanation = await explainChart(provider, chartData, chartType, context);
+
+      res.json({ explanation, provider });
+    } catch (error: any) {
+      console.error("Chart explanation error:", error);
+      res.status(500).json({ message: error.message || "Chart explanation failed" });
+    }
+  });
+
+  app.post("/api/ai/generate-actions", isAuthenticated, async (req, res) => {
+    try {
+      const { provider = "openai", insights, metrics } = req.body;
+
+      if (!insights || !metrics) {
+        return res.status(400).json({ message: "Insights and metrics are required" });
+      }
+
+      const { generateActionItems } = await import("./aiService");
+      
+      const result = await generateActionItems(provider, insights, metrics);
+
+      res.json({ ...result, provider });
+    } catch (error: any) {
+      console.error("Action generation error:", error);
+      res.status(500).json({ message: error.message || "Action generation failed" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

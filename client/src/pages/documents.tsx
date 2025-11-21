@@ -20,10 +20,7 @@ export default function Documents() {
 
   const uploadMutation = useMutation({
     mutationFn: async (data: { fileUrl: string; type: string }) => {
-      return await apiRequest("/api/documents", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/documents", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
@@ -42,9 +39,7 @@ export default function Documents() {
   });
 
   const getUploadUrl = async () => {
-    const response = await apiRequest("/api/documents/upload-url", {
-      method: "GET",
-    });
+    const response = await apiRequest("GET", "/api/documents/upload-url");
     const { url } = await response.json();
     return { method: "PUT" as const, url };
   };

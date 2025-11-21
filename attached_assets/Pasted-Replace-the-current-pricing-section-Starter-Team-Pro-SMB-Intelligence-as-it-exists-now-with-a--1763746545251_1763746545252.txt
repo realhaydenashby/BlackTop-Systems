@@ -1,0 +1,157 @@
+Replace the current pricing section (Starter / Team Pro / SMB Intelligence as it exists now) with a clean, conversion-ready pricing layout using the tiers below.
+
+Do NOT break navigation, theme, or layout grid. You are restructuring content, not redesigning the entire site.
+
+====================================================
+BRAND & STYLE REQUIREMENTS
+	•	Product name: BlackTop Systems
+	•	Theme: dark, modern, minimal, navy/gray/blue
+	•	Tone: clear, practical, financially serious, startup-friendly
+	•	Keep:
+	•	Existing card-based layout (3–4 columns or stacked on mobile)
+	•	Existing buttons and visual hierarchy for “Most Popular”
+	•	Update:
+	•	Plan names
+	•	Descriptions
+	•	Feature bullets
+	•	Prices
+	•	“Most popular” badge
+
+====================================================
+NEW PRICING TIERS
+
+Replace existing tiers with EXACTLY these four:
+
+⸻
+
+	1.	Founder Lite
+
+⸻
+
+Target: solo founders / teams 0–5 employees
+	•	Plan name: Founder Lite
+	•	Price: $39/month
+	•	Short tagline: “Early-stage financial clarity without the complexity.”
+	•	Feature bullets:
+	•	PDF & invoice ingestion
+	•	Automatic transaction normalization
+	•	Core spend diagnostics (burn, vendors, subscriptions)
+	•	Basic budget builder (single scenario)
+	•	3 monthly AI-generated action insights
+	•	CTA button text: “Start Free Trial”
+	•	Optional label (small text): “For solo founders and tiny teams”
+
+⸻
+
+	2.	Startup Clarity (Most Popular)
+
+⸻
+
+Target: venture-track startups with 5–20 employees
+
+This should be visually highlighted as Most Popular (keep or adapt the existing “Most Popular” badge styling).
+	•	Plan name: Startup Clarity
+	•	Price: $119/month
+	•	Short tagline: “Everything you need to see burn, runway, and where to cut or invest.”
+	•	Feature bullets:
+	•	Everything in Founder Lite, plus:
+	•	Full diagnostics suite (categories, vendors, trends)
+	•	Vendor & payroll checks
+	•	Multi-scenario budgets (lean, baseline, growth)
+	•	Runway calculations
+	•	Unlimited AI-generated action plans
+	•	Up to 3 team seats (founder, ops, finance helper)
+	•	CTA button text: “Start Free Trial”
+	•	Badge: “Most Popular”
+
+⸻
+
+	3.	SMB Intelligence
+
+⸻
+
+Target: 10–75 employee SMBs (agencies, services, ecom, etc.)
+	•	Plan name: SMB Intelligence
+	•	Price: $289/month
+	•	Short tagline: “Pre-CFO financial intelligence for growing teams.”
+	•	Feature bullets:
+	•	Everything in Startup Clarity, plus:
+	•	90-day cash flow forecasting module
+	•	Multi-department budgets & tracking
+	•	Project / client profitability views
+	•	Vendor benchmarking and high-cost alerts
+	•	Up to 10 user seats
+	•	CTA button text: “Talk to Sales” or “Request Demo”
+(choose one consistent with the rest of the site; if a demo/contact flow exists, link to it)
+
+⸻
+
+	4.	Fundraise-Ready Add-On
+
+⸻
+
+This is an add-on, not a standalone plan. Present it visually below the main plans or as a side card clearly labeled “Add-on.” It should be attachable to any tier.
+	•	Label: Fundraise-Ready Add-On
+	•	Price: Either:
+	•	“+$49 one-time” or
+	•	“+$19/month”
+(You can show both options as toggle or just list them together in the description.)
+	•	Short tagline: “Turn your numbers into an investor-ready story.”
+	•	Feature bullets:
+	•	Investor metrics dashboard (burn, runway, raise needs)
+	•	“How much should we raise?” scenario model
+	•	AI-generated investor prep packet (summary + charts)
+	•	Basic pitch review using your financials
+	•	Note line (small text): “Can be added to any plan.”
+
+====================================================
+LAYOUT & UX RULES
+	1.	Use a clear three-column layout for the main plans:
+	•	Column 1: Founder Lite
+	•	Column 2: Startup Clarity (Most Popular, visually emphasized)
+	•	Column 3: SMB Intelligence
+	2.	Place the Fundraise-Ready Add-On:
+	•	Either below the three main plans as a wide card
+	•	Or as a distinct side panel clearly labeled “Add-On”
+	3.	Maintain:
+	•	Plan names
+	•	Price in large font
+	•	Tagline in smaller font under the plan name
+	•	Feature bullets as a clean list
+	•	Single primary CTA button per plan
+	4.	No placeholder text like “Click to see full details →”.
+If there is a details page or modal, keep the link but adjust copy to something like “View plan details”.
+
+====================================================
+COPY TONE & CONSISTENCY
+	•	Avoid jargon like “next-gen”, “synergy”, “smart AI layer”.
+	•	Emphasize outcomes:
+	•	Know your burn and runway.
+	•	See where money is going.
+	•	Decide what to cut or double down on.
+	•	Show up prepared for investors.
+	•	Ensure all copy is consistent with the actual product:
+	•	Ingest → normalize → diagnostics → budget → action plan → (optional fundraise prep)
+
+====================================================
+MOBILE RESPONSIVENESS
+	•	On mobile:
+	•	Stack plans vertically in this order:
+	1.	Startup Clarity (Most Popular)
+	2.	Founder Lite
+	3.	SMB Intelligence
+	•	Add-on can appear after all three.
+	•	Ensure spacing, font sizes, and buttons stay clean and tappable.
+
+====================================================
+FINAL REQUIREMENTS
+	•	Remove the old “Starter / Team Pro / SMB Intelligence” content and any “Product A / Services” style leftover copy.
+	•	Replace with the exact four offerings above.
+	•	Keep styling consistent with the existing BlackTop Systems theme.
+	•	Do not break existing nav, footer, or routing.
+
+You are producing a real, investor-ready pricing page that clearly sells BlackTop Systems to:
+	•	solo founders,
+	•	growing startups,
+	•	and SMBs,
+with a fundraise-focused add-on.

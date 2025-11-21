@@ -414,3 +414,10 @@ export type IntegrationConnection = typeof integrationConnections.$inferSelect;
 export type InsertIntegrationConnection = z.infer<typeof insertIntegrationConnectionSchema>;
 export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
 export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+
+// Extended types with relations
+export type TransactionWithRelations = Transaction & {
+  vendor?: Vendor | null;
+  category?: Category | null;
+  department?: Department | null;
+};

@@ -2,124 +2,83 @@ import { Link } from "wouter";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Check, X } from "lucide-react";
+import { Check, Rocket } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
-const plans = [
+const mainPlans = [
   {
-    name: "Starter",
-    price: "$49",
+    name: "Founder Lite",
+    price: "$39",
     period: "month",
-    title: "Founder clarity fast",
-    description: "PDF & invoice ingestion with core spend diagnostics",
+    tagline: "Early-stage financial clarity without the complexity.",
+    label: "For solo founders and tiny teams",
     features: [
       "PDF & invoice ingestion",
-      "Core spend diagnostics",
-      "Basic budget builder",
-      "3 action insights",
-      "Founder clarity fast",
+      "Automatic transaction normalization",
+      "Core spend diagnostics (burn, vendors, subscriptions)",
+      "Basic budget builder (single scenario)",
+      "3 monthly AI-generated action insights",
     ],
-    detailedFeatures: {
-      included: [
-        "Upload and process PDF invoices and bank statements",
-        "Core spending pattern diagnostics to identify trends",
-        "Build basic monthly budgets with category tracking",
-        "Receive 3 AI-powered action insights each month",
-        "Fast clarity dashboard for solo founders",
-        "Email support",
-      ],
-      notIncluded: [
-        "Team collaboration (3+ users)",
-        "Vendor benchmarking",
-        "Payroll analysis",
-        "Scenario planning",
-        "Forecasting module",
-      ],
-    },
     cta: "Start Free Trial",
-    tier: "starter",
+    tier: "founder-lite",
   },
   {
-    name: "Team Pro",
-    price: "$129",
+    name: "Startup Clarity",
+    price: "$119",
     period: "month",
-    title: "Full diagnostics suite",
-    description: "3 team seats with vendor checks and unlimited action plans",
+    tagline: "Everything you need to see burn, runway, and where to cut or invest.",
+    label: "",
     features: [
-      "Everything in Starter, plus:",
-      "Full diagnostics suite",
+      "Everything in Founder Lite, plus:",
+      "Full diagnostics suite (categories, vendors, trends)",
       "Vendor & payroll checks",
-      "Scenario budgets + runway",
-      "Unlimited action plans",
-      "3 team seats",
+      "Multi-scenario budgets (lean, baseline, growth)",
+      "Runway calculations",
+      "Unlimited AI-generated action plans",
+      "Up to 3 team seats (founder, ops, finance helper)",
     ],
-    detailedFeatures: {
-      included: [
-        "Everything in Starter, plus:",
-        "Full financial diagnostics with advanced analytics",
-        "Vendor spending analysis and duplicate detection",
-        "Payroll expense tracking and optimization",
-        "Build multiple scenario budgets (best/worst/expected case)",
-        "Runway calculations and burn rate tracking",
-        "Unlimited AI-powered action plans and insights",
-        "3 collaborative team seats (founder, ops, accountant)",
-        "Priority email support",
-      ],
-      notIncluded: [
-        "More than 3 user seats",
-        "Multi-department budgets",
-        "Advanced 12-month forecasting",
-        "Vendor benchmarking against industry peers",
-      ],
-    },
     cta: "Start Free Trial",
-    tier: "team-pro",
+    tier: "startup-clarity",
     popular: true,
   },
   {
     name: "SMB Intelligence",
-    price: "$299",
+    price: "$289",
     period: "month",
-    title: "Full forecasting module",
-    description: "10 seats with multi-department budgets and benchmarking",
+    tagline: "Pre-CFO financial intelligence for growing teams.",
+    label: "",
     features: [
-      "Everything in Team Pro, plus:",
-      "Full forecasting module",
-      "Multi-department budgets",
-      "Vendor benchmarking",
-      "Advanced action plans",
-      "10 user seats",
+      "Everything in Startup Clarity, plus:",
+      "90-day cash flow forecasting module",
+      "Multi-department budgets & tracking",
+      "Project / client profitability views",
+      "Vendor benchmarking and high-cost alerts",
+      "Up to 10 user seats",
     ],
-    detailedFeatures: {
-      included: [
-        "Everything in Team Pro, plus:",
-        "Complete financial forecasting with 12-month projections",
-        "Multi-department budget allocation and tracking",
-        "Vendor spend benchmarking against industry averages",
-        "Advanced action plans with priority scoring and dependencies",
-        "10 collaborative user seats across your organization",
-        "Department-level cost center tracking",
-        "Custom financial dashboards",
-        "Dedicated account manager",
-        "Phone & Slack support",
-      ],
-      notIncluded: [],
-    },
-    cta: "Start Free Trial",
+    cta: "Talk to Sales",
     tier: "smb-intelligence",
   },
 ];
 
-export default function Pricing() {
-  const [selectedPlan, setSelectedPlan] = useState<typeof plans[0] | null>(null);
+const addon = {
+  name: "Fundraise-Ready Add-On",
+  priceOptions: [
+    { amount: "$49", type: "one-time" },
+    { amount: "$19", type: "month" },
+  ],
+  tagline: "Turn your numbers into an investor-ready story.",
+  note: "Can be added to any plan.",
+  features: [
+    "Investor metrics dashboard (burn, runway, raise needs)",
+    '"How much should we raise?" scenario model',
+    "AI-generated investor prep packet (summary + charts)",
+    "Basic pitch review using your financials",
+  ],
+  cta: "Add to Plan",
+  tier: "fundraise-addon",
+};
 
+export default function Pricing() {
   return (
     <div className="min-h-screen bg-background">
       <nav className="border-b px-6 py-5 backdrop-blur-md bg-background/90">
@@ -140,60 +99,68 @@ export default function Pricing() {
       </nav>
 
       <section className="px-6 py-16">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold mb-4">Simple, Transparent Pricing</h1>
-            <p className="text-lg text-muted-foreground">
-              Choose the plan that fits your business needs. Click any plan to learn more.
+            <h1 className="text-4xl font-bold mb-4" data-testid="heading-pricing">
+              Simple, Transparent Pricing
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Know your burn and runway. See where money is going. Decide what to cut or double down on. 
+              Show up prepared for investors.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {plans.map((plan) => (
+          <div className="grid md:grid-cols-3 gap-8 mb-12">
+            {mainPlans.map((plan) => (
               <Card 
                 key={plan.tier} 
-                className="hover-elevate transition-all cursor-pointer flex flex-col"
-                onClick={() => setSelectedPlan(plan)}
+                className={`hover-elevate transition-all flex flex-col relative ${
+                  plan.popular ? "border-primary shadow-lg" : ""
+                }`}
                 data-testid={`card-plan-${plan.tier}`}
               >
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>{plan.name}</CardTitle>
-                    {plan.popular && (
-                      <Badge data-testid={`badge-popular-${plan.tier}`}>Most Popular</Badge>
-                    )}
+                {plan.popular && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <Badge className="px-4 py-1 bg-primary text-primary-foreground" data-testid="badge-most-popular">
+                      Most Popular
+                    </Badge>
                   </div>
-                  <CardDescription>{plan.description}</CardDescription>
-                  <div className="mt-4">
-                    <span className="text-4xl font-bold">{plan.price}</span>
-                    <span className="text-muted-foreground">/{plan.period}</span>
+                )}
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-2xl" data-testid={`text-plan-name-${plan.tier}`}>
+                    {plan.name}
+                  </CardTitle>
+                  <div className="mt-4 mb-2">
+                    <span className="text-4xl font-bold" data-testid={`text-price-${plan.tier}`}>
+                      {plan.price}
+                    </span>
+                    <span className="text-muted-foreground text-lg">/{plan.period}</span>
                   </div>
+                  <CardDescription className="text-base" data-testid={`text-tagline-${plan.tier}`}>
+                    {plan.tagline}
+                  </CardDescription>
+                  {plan.label && (
+                    <p className="text-xs text-muted-foreground mt-2" data-testid={`text-label-${plan.tier}`}>
+                      {plan.label}
+                    </p>
+                  )}
                 </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                  <ul className="space-y-3 flex-1">
+                <CardContent className="flex-1 pb-6">
+                  <ul className="space-y-3">
                     {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
+                      <li key={idx} className="flex items-start gap-2" data-testid={`feature-${plan.tier}-${idx}`}>
                         <Check className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                         <span className="text-sm">{feature}</span>
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-4 pt-4 border-t">
-                    <Button 
-                      variant="ghost" 
-                      className="w-full text-sm"
-                      data-testid={`button-learn-more-${plan.tier}`}
-                    >
-                      Click to see full details →
-                    </Button>
-                  </div>
                 </CardContent>
                 <CardFooter>
-                  <a href="/api/login" className="w-full" onClick={(e) => e.stopPropagation()}>
+                  <a href="/api/login" className="w-full">
                     <Button
                       className="w-full"
-                      variant="default"
-                      data-testid={`button-select-${plan.tier}`}
+                      variant={plan.popular ? "default" : "outline"}
+                      data-testid={`button-cta-${plan.tier}`}
                     >
                       {plan.cta}
                     </Button>
@@ -202,77 +169,66 @@ export default function Pricing() {
               </Card>
             ))}
           </div>
+
+          <div className="max-w-3xl mx-auto">
+            <Card className="hover-elevate transition-all border-accent" data-testid="card-addon-fundraise">
+              <CardHeader>
+                <div className="flex items-center gap-3 mb-2">
+                  <Rocket className="h-6 w-6 text-accent" />
+                  <Badge variant="outline" className="border-accent text-accent" data-testid="badge-addon">
+                    Add-On
+                  </Badge>
+                </div>
+                <CardTitle className="text-2xl" data-testid="text-addon-name">
+                  {addon.name}
+                </CardTitle>
+                <div className="mt-4 mb-2 flex items-baseline gap-3">
+                  <div>
+                    <span className="text-3xl font-bold" data-testid="text-addon-price-onetime">
+                      {addon.priceOptions[0].amount}
+                    </span>
+                    <span className="text-muted-foreground"> {addon.priceOptions[0].type}</span>
+                  </div>
+                  <span className="text-muted-foreground">or</span>
+                  <div>
+                    <span className="text-3xl font-bold" data-testid="text-addon-price-monthly">
+                      {addon.priceOptions[1].amount}
+                    </span>
+                    <span className="text-muted-foreground">/{addon.priceOptions[1].type}</span>
+                  </div>
+                </div>
+                <CardDescription className="text-base" data-testid="text-addon-tagline">
+                  {addon.tagline}
+                </CardDescription>
+                <p className="text-xs text-muted-foreground mt-2" data-testid="text-addon-note">
+                  {addon.note}
+                </p>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {addon.features.map((feature, idx) => (
+                    <li key={idx} className="flex items-start gap-2" data-testid={`feature-addon-${idx}`}>
+                      <Check className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                      <span className="text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+              <CardFooter>
+                <a href="/api/login" className="w-full">
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    data-testid="button-cta-addon"
+                  >
+                    {addon.cta}
+                  </Button>
+                </a>
+              </CardFooter>
+            </Card>
+          </div>
         </div>
       </section>
-
-      <Dialog open={!!selectedPlan} onOpenChange={(open) => !open && setSelectedPlan(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="dialog-plan-details">
-          {selectedPlan && (
-            <>
-              <DialogHeader>
-                <div className="flex items-center justify-between mb-2">
-                  <DialogTitle className="text-3xl">{selectedPlan.name}</DialogTitle>
-                  {selectedPlan.popular && <Badge>Most Popular</Badge>}
-                </div>
-                <div className="flex items-baseline gap-2 my-4">
-                  <span className="text-5xl font-bold">{selectedPlan.price}</span>
-                  <span className="text-xl text-muted-foreground">/{selectedPlan.period}</span>
-                </div>
-                <DialogDescription className="text-base">
-                  {selectedPlan.title}
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-6 mt-6">
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">What's included:</h3>
-                  <ul className="space-y-3">
-                    {selectedPlan.detailedFeatures.included.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-3">
-                        <Check className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                        <span className="text-base">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Not included:</h3>
-                  <ul className="space-y-3">
-                    {selectedPlan.detailedFeatures.notIncluded.length > 0 ? (
-                      selectedPlan.detailedFeatures.notIncluded.map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-3">
-                          <X className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-                          <span className="text-base text-muted-foreground">{feature}</span>
-                        </li>
-                      ))
-                    ) : (
-                      <li className="flex items-start gap-3">
-                        <X className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-                        <span className="text-base text-muted-foreground">
-                          This is our most comprehensive plan. Contact sales for custom add-ons or enterprise needs.
-                        </span>
-                      </li>
-                    )}
-                  </ul>
-                </div>
-
-                <div className="pt-4 border-t">
-                  <a href="/api/login" className="block">
-                    <Button 
-                      className="w-full" 
-                      size="lg" 
-                      data-testid="button-select-plan-dialog"
-                    >
-                      {selectedPlan.cta}
-                    </Button>
-                  </a>
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
 
       <footer className="border-t px-6 py-12">
         <div className="max-w-7xl mx-auto text-center text-sm text-muted-foreground">

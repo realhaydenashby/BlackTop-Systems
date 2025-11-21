@@ -39,7 +39,9 @@ export async function batchProcessPrompts(
             if (isRateLimitError(error)) {
               throw error;
             }
-            throw new pRetry.AbortError(error);
+            const abortError = new Error(error.message);
+            (abortError as any).name = 'AbortError';
+            throw abortError;
           }
         },
         {
