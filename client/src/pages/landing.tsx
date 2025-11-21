@@ -2,15 +2,16 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { LineChart, TrendingUp, Target, Zap, Shield, Users, ArrowRight } from "lucide-react";
+import logoUrl from "@assets/generated_images/blacktop_systems_company_logo.png";
 
 export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
       <nav className="border-b px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <LineChart className="w-8 h-8 text-primary" />
-            <span className="text-xl font-semibold">ClarityOS</span>
+          <div className="flex items-center gap-3">
+            <img src={logoUrl} alt="BlackTop Systems" className="w-10 h-10" />
+            <span className="text-xl font-semibold">BlackTop Systems</span>
           </div>
           <div className="flex items-center gap-4">
             <Link href="/pricing">
@@ -127,7 +128,7 @@ export default function Landing() {
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl font-bold mb-6">Ready to Get Started?</h2>
           <p className="text-lg text-muted-foreground mb-8">
-            Join startups and SMBs using ClarityOS to make smarter financial decisions.
+            Join startups and SMBs using BlackTop Systems to make smarter financial decisions.
           </p>
           <a href="/api/login">
             <Button size="lg" data-testid="button-start-now">
@@ -139,7 +140,7 @@ export default function Landing() {
 
       <footer className="border-t px-6 py-8">
         <div className="max-w-7xl mx-auto text-center text-sm text-muted-foreground">
-          <p>&copy; 2025 ClarityOS. All rights reserved.</p>
+          <p>&copy; 2025 BlackTop Systems. All rights reserved.</p>
         </div>
       </footer>
     </div>

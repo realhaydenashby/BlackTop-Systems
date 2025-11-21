@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
+import logoUrl from "@assets/generated_images/blacktop_systems_company_logo.png";
 
 const menuItems = [
   {
@@ -73,7 +74,10 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>ClarityOS</SidebarGroupLabel>
+          <div className="flex items-center gap-2 px-2 py-4">
+            <img src={logoUrl} alt="BlackTop Systems" className="w-8 h-8" />
+            <SidebarGroupLabel className="text-base font-semibold">BlackTop Systems</SidebarGroupLabel>
+          </div>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
