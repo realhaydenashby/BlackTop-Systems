@@ -169,8 +169,8 @@ export default function Pricing() {
                     <span className="text-muted-foreground">/{plan.period}</span>
                   </div>
                 </CardHeader>
-                <CardContent className="flex-1">
-                  <ul className="space-y-3">
+                <CardContent className="flex-1 flex flex-col">
+                  <ul className="space-y-3 flex-1">
                     {plan.features.map((feature, idx) => (
                       <li key={idx} className="flex items-start gap-2">
                         <Check className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
