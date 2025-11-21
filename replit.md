@@ -105,8 +105,12 @@ Preferred communication style: Simple, everyday language.
 - **Neon Database**: Serverless PostgreSQL for all application data
 - **Replit AI Integrations**: OpenAI API access for GPT-5 model
 
-**Third-Party Integrations (Planned):**
+**Third-Party Integrations:**
+- **Gmail**: Email integration via Replit connector for reading and sending emails (OAuth2-based)
 - **Stripe**: Payment and subscription data synchronization
+- **Google Document AI**: Service account for document parsing and text extraction
+
+**Third-Party Integrations (Planned):**
 - **Plaid**: Bank account transaction feeds
 - **QuickBooks**: Accounting software export capabilities
 
