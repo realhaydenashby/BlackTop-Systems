@@ -725,16 +725,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If no revenue data, provide sample data so charts don't appear broken
       const hasRevenueData = revenueGrowth.length > 0;
       const finalRevenueGrowth = hasRevenueData ? revenueGrowth : [
-        { month: "2024-10", revenue: 15000 },
-        { month: "2024-11", revenue: 18000 },
-        { month: "2024-12", revenue: 22000 },
-        { month: "2025-01", revenue: 25000 },
+        { month: "2024-05", revenue: 8500 },
+        { month: "2024-06", revenue: 12200 },
+        { month: "2024-07", revenue: 15800 },
+        { month: "2024-08", revenue: 18400 },
+        { month: "2024-09", revenue: 22100 },
+        { month: "2024-10", revenue: 26500 },
+        { month: "2024-11", revenue: 31200 },
+        { month: "2024-12", revenue: 35800 },
+        { month: "2025-01", revenue: 42300 },
       ];
       const finalMrrArr = mrrArr.length > 0 ? mrrArr : [
-        { month: "2024-10", mrr: 3500, arr: 42000 },
-        { month: "2024-11", mrr: 4200, arr: 50400 },
-        { month: "2024-12", mrr: 5000, arr: 60000 },
-        { month: "2025-01", mrr: 5800, arr: 69600 },
+        { month: "2024-05", mrr: 2800, arr: 33600 },
+        { month: "2024-06", mrr: 3400, arr: 40800 },
+        { month: "2024-07", mrr: 4100, arr: 49200 },
+        { month: "2024-08", mrr: 4800, arr: 57600 },
+        { month: "2024-09", mrr: 5600, arr: 67200 },
+        { month: "2024-10", mrr: 6400, arr: 76800 },
+        { month: "2024-11", mrr: 7300, arr: 87600 },
+        { month: "2024-12", mrr: 8200, arr: 98400 },
+        { month: "2025-01", mrr: 9500, arr: 114000 },
       ];
 
       res.json({
