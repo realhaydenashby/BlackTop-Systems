@@ -9,7 +9,7 @@ export function Footer() {
             <img 
               src="/logo.png" 
               alt="BlackTop Systems" 
-              className="h-8 object-contain mb-4" 
+              className="h-6 object-contain mb-4" 
             />
             <p className="text-sm text-muted-foreground">
               Financial Clarity. Instantly.

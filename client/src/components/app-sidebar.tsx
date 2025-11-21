@@ -109,11 +109,11 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <div className="flex items-center gap-2 pl-2 pr-2 py-6 border-b border-sidebar-border">
+          <div className="flex items-center gap-2 pl-0 pr-2 py-6 border-b border-sidebar-border">
             <img 
               src="/logo.png" 
               alt="BlackTop Systems" 
-              className="h-8 object-contain" 
+              className="h-6 object-contain" 
             />
           </div>
           <SidebarGroupContent className="pt-2">

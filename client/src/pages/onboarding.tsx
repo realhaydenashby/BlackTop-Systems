@@ -132,11 +132,11 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-2xl space-y-6">
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-start mb-8">
           <img 
             src="/logo.png" 
             alt="BlackTop Systems" 
-            className="h-12 object-contain" 
+            className="h-6 object-contain" 
           />
         </div>
 
