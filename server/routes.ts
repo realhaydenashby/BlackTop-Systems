@@ -298,60 +298,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  async function processDocument(
-    documentId: string,
-    fileUrl: string,
-    documentType: string,
-    organizationId: string
-  ) {
-    try {
-      await storage.updateDocument(documentId, { status: "processing" });
-
-      const objectFile = await objectStorageService.getObjectEntityFile(fileUrl);
-      const [fileBuffer] = await objectFile.download();
-
-      let parsedText = "";
-
-      if (fileUrl.endsWith(".pdf")) {
-        const pdfData = await (pdfParse as any).default(fileBuffer);
-        parsedText = pdfData.text;
-      } else if (fileUrl.endsWith(".csv")) {
-        const csvText = fileBuffer.toString("utf-8");
-        parsedText = csvText;
-      } else {
-        parsedText = fileBuffer.toString("utf-8");
-      }
-
-      await storage.updateDocument(documentId, { parsedText });
-
-      const extracted = await extractTransactionsFromDocument(parsedText, documentType);
-
-      if (extracted.transactions && extracted.transactions.length > 0) {
-        for (const txn of extracted.transactions) {
-          const vendor = await storage.findOrCreateVendor(organizationId, txn.vendor);
-          const category = await storage.findOrCreateCategory(organizationId, txn.category || "Misc");
-
-          await storage.createTransaction({
-            organizationId,
-            documentId,
-            date: new Date(txn.date),
-            amount: txn.amount.toString(),
-            vendorId: vendor.id,
-            categoryId: category.id,
-            description: txn.description || "",
-          });
-        }
-      }
-
-      await storage.updateDocument(documentId, {
-        status: "processed",
-        extractionConfidence: extracted.confidence?.toString() || "0.8",
-      });
-    } catch (error) {
-      console.error("Document processing error:", error);
-      await storage.updateDocument(documentId, { status: "error" });
-    }
-  }
 
   app.get("/api/documents", isAuthenticated, async (req, res) => {
     try {
@@ -610,7 +556,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: subDays(new Date(), 90),
       });
 
-      const suggestions = await generateBudgetSuggestions(txns, org);
+      // Use intelligence service to generate budget
+      const { intelligenceService } = await import("./intelligenceService");
+      const categories = await storage.getOrganizationCategories(org.id);
+      const suggestions = await intelligenceService.generateBudget(txns, categories, org);
 
       const now = new Date();
       const periodStart = startOfMonth(addMonths(now, 1));
@@ -702,12 +651,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         count: month.count,
       }));
 
+      // Calculate revenue from positive transactions (income)
+      const revenueTxns = txns.filter((txn) => parseFloat(txn.amount) > 0);
+      const totalRevenue = revenueTxns.reduce((sum, txn) => sum + parseFloat(txn.amount), 0);
+
+      // Group revenue by month for growth chart
+      const revenueByMonth: Record<string, { month: string; revenue: number }> = {};
+      revenueTxns.forEach((txn) => {
+        const txnDate = new Date(txn.date);
+        const monthKey = `${txnDate.getFullYear()}-${String(txnDate.getMonth() + 1).padStart(2, "0")}`;
+        
+        if (!revenueByMonth[monthKey]) {
+          revenueByMonth[monthKey] = {
+            month: monthKey,
+            revenue: 0,
+          };
+        }
+        revenueByMonth[monthKey].revenue += parseFloat(txn.amount);
+      });
+
+      const revenueGrowth = Object.values(revenueByMonth)
+        .sort((a, b) => a.month.localeCompare(b.month))
+        .map((item) => ({
+          month: item.month,
+          revenue: Math.round(item.revenue),
+        }));
+
+      // Calculate MRR (Monthly Recurring Revenue) from recurring income
+      const recurringRevenueTxns = revenueTxns.filter((txn) => txn.isRecurring);
+      const mrr = recurringRevenueTxns.reduce((sum, txn) => sum + parseFloat(txn.amount), 0);
+      const arr = mrr * 12;
+
+      // Revenue sources (categorize positive transactions)
+      const revenueSources: Record<string, number> = {};
+      revenueTxns.forEach((txn) => {
+        if (txn.categoryId) {
+          const category = categories.find((c) => c.id === txn.categoryId);
+          const categoryName = category?.name || "Other Revenue";
+          revenueSources[categoryName] = (revenueSources[categoryName] || 0) + parseFloat(txn.amount);
+        }
+      });
+
+      const revenueSourcesArray = Object.entries(revenueSources)
+        .map(([name, value]) => ({ name, value: Math.round(value) }))
+        .sort((a, b) => b.value - a.value);
+
       res.json({
         spendTrend,
         categoryDistribution,
         departmentSpending: [], // TODO: Implement department tracking
         topVendors,
         monthlyComparison,
+        revenue: {
+          totalRevenue: Math.round(totalRevenue),
+          revenueGrowth,
+          mrr: Math.round(mrr),
+          arr: Math.round(arr),
+          revenueSources: revenueSourcesArray.length > 0 ? revenueSourcesArray : [
+            { name: "No revenue data", value: 0 }
+          ],
+        },
         metrics: {
           totalExpenses: txns.reduce((sum, txn) => sum + Math.abs(parseFloat(txn.amount)), 0),
           transactionCount: txns.length,
@@ -768,7 +771,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: subDays(new Date(), 90),
       });
 
-      const generated = await generateActionPlan(insights, budgets, txns);
+      // Use intelligence service to generate action plan
+      const { intelligenceService } = await import("./intelligenceService");
+      const generated = await intelligenceService.generateActionPlan(insights, budgets, txns);
 
       const now = new Date();
       const periodStart = startOfMonth(addMonths(now, 1));
