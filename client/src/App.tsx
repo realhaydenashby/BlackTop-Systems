@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { TopBar } from "@/components/top-bar";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
@@ -14,9 +15,12 @@ import Dashboard from "@/pages/dashboard";
 import Documents from "@/pages/documents";
 import Transactions from "@/pages/transactions";
 import Analytics from "@/pages/analytics";
+import CashFlow from "@/pages/cash-flow";
 import Budgets from "@/pages/budgets";
 import ActionPlans from "@/pages/action-plans";
+import Resources from "@/pages/resources";
 import Integrations from "@/pages/integrations";
+import Settings from "@/pages/settings";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -49,9 +53,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1">
-          <header className="flex items-center p-3 border-b">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-          </header>
+          <TopBar />
           <main className="flex-1 overflow-auto">
             {children}
           </main>
@@ -79,10 +81,14 @@ function ProtectedRouter() {
         <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
         <Route path="/documents" component={() => <ProtectedRoute component={Documents} />} />
         <Route path="/transactions" component={() => <ProtectedRoute component={Transactions} />} />
+        <Route path="/cash-flow" component={() => <ProtectedRoute component={CashFlow} />} />
         <Route path="/analytics" component={() => <ProtectedRoute component={Analytics} />} />
+        <Route path="/analytics/:section" component={() => <ProtectedRoute component={Analytics} />} />
         <Route path="/budgets" component={() => <ProtectedRoute component={Budgets} />} />
         <Route path="/action-plans" component={() => <ProtectedRoute component={ActionPlans} />} />
+        <Route path="/resources" component={() => <ProtectedRoute component={Resources} />} />
         <Route path="/integrations" component={() => <ProtectedRoute component={Integrations} />} />
+        <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

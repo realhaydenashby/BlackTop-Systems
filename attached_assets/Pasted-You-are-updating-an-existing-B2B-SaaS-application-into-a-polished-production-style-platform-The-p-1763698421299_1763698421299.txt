@@ -1,0 +1,300 @@
+You are updating an existing B2B SaaS application into a polished, production-style platform.
+
+The product is now called BlackTop Systems. Apply this name, logo placeholder, and theme consistently across:
+	•	Public marketing pages
+	•	Auth screens
+	•	App shell (sidebar, top bar, footer)
+	•	Dashboards and analytics pages
+	•	PDFs/exports (if any)
+
+Do NOT delete or break any existing functionality.
+Do NOT remove existing routes, models, or components that already work.
+Extend everything non-destructively.
+
+====================================================
+PRODUCT SUMMARY
+
+BlackTop Systems is a financial diagnostics + action platform for SMBs and startups.
+
+Core functions:
+	1.	Ingest messy financial inputs (statements, invoices, receipts, CSVs, payroll summaries, subscription emails).
+	2.	Normalize and structure the data into clean transactions.
+	3.	Provide advanced analytics (spend, revenue, profitability, cash flow).
+	4.	Generate budgets and action plans that operators can execute without a full finance team.
+
+This is:
+	•	B2B-only
+	•	A pre-accounting / pre-FP&A intelligence layer, not bookkeeping
+	•	Designed for founders, ops managers, accountants, fractional CFOs
+
+The app already includes (DO NOT DELETE—ONLY EXPAND):
+	•	Auth
+	•	Multi-tenant orgs
+	•	Onboarding
+	•	Document upload + extraction
+	•	Transactions dashboard
+	•	Data validation
+	•	Spend analytics
+	•	Insights
+	•	Budget builder
+	•	Action plan generator
+	•	Stripe billing
+	•	Integrations page
+	•	Public marketing site
+	•	Sidebar + top bar
+
+Your job is to transform this into a premium, branded, enterprise-quality SaaS platform.
+
+====================================================
+BRAND & THEME
+
+Brand name: BlackTop Systems
+
+Use everywhere:
+	•	Navbar + sidebar
+	•	Footer
+	•	Marketing pages
+	•	App metadata
+	•	PDF/report exports
+	•	Login screens
+
+Colors (dark theme):
+	•	Background navy: #020617
+	•	Primary blue: #1D4ED8
+	•	Accent teal: #22D3EE
+	•	Cards: #0F172A, #111827, #1F2933
+	•	Text primary: #F9FAFB
+	•	Text secondary: #9CA3AF
+
+Animations:
+	•	Page fade-in
+	•	Card hover lift (2–3px translateY)
+	•	Smooth nav transitions
+	•	Skeleton loaders for analytics
+	•	Animated chart loading
+
+Typography: Inter or similar modern sans-serif.
+
+====================================================
+ADDITIONAL REQUIRED FEATURES (ADD THESE)
+
+1. Multi-org permission system enhancement
+
+Add page-level access control:
+	•	Founder: full access
+	•	Ops: can upload docs, edit transactions, manage budgets
+	•	Accountant/CFO: read/write analytics + budgets
+	•	Viewer: read-only
+
+2. Audit Log
+
+Add a new entity AuditLog with:
+	•	user_id
+	•	org_id
+	•	action
+	•	target_type
+	•	target_id
+	•	timestamp
+
+Log:
+	•	budget changes
+	•	document uploads
+	•	transaction edits
+	•	integration connections
+	•	action plan status changes
+
+Add “Audit Log” view under Settings (for founders & admins).
+
+⸻
+
+3. Exports & Reporting
+
+Add export buttons across:
+	•	Transactions → CSV
+	•	Vendors → CSV
+	•	Budgets → CSV
+	•	Action Plans → PDF
+	•	Monthly Diagnostic Report → PDF
+
+Implement PDF generation using existing backend stack.
+
+⸻
+
+4. Email & in-app Notifications
+
+Add notifications for:
+	•	New insights available
+	•	Budget overruns
+	•	Subscription creep detected
+	•	Document processing complete
+	•	Action plan due
+
+Channels:
+	•	In-app bell icon
+	•	Email notification (simple template)
+
+⸻
+
+5. Explain buttons
+
+On every chart/KPI, add a small “Explain” icon.
+
+On click:
+	•	Call AI: explainMetric(metricId)
+	•	Return a 2–4 sentence explanation + recommended next step
+	•	Display in a right-side slide-over panel
+
+⸻
+
+6. Vendor Hub
+
+Add a full Vendors page with:
+	•	Vendor list
+	•	Total spend
+	•	Recurring flag
+	•	Subscription cost
+	•	Renewal dates (optional)
+	•	AI-extracted contract summary
+
+⸻
+
+7. Collaboration Tools
+
+Add comments on:
+	•	Transactions
+	•	Budgets
+	•	Action items
+
+Support:
+	•	@mentions
+	•	Activity feed per org
+
+⸻
+
+8. Monthly Close Workflow
+
+Add a built-in checklist:
+	1.	Upload statements
+	2.	Validate transactions
+	3.	Review anomalies
+	4.	Check subscriptions
+	5.	Approve budget variances
+	6.	Generate action plan
+	7.	Export month-end report
+
+Store progress state per month.
+
+⸻
+
+9. Demo Mode
+
+Add button: “Enter Demo Mode.”
+
+Load:
+	•	Fake org
+	•	Fake transactions
+	•	Fake revenue
+	•	Fake insights
+	•	Fake forecasts
+
+This is for pitching + testing.
+
+⸻
+
+10. Trust Pages
+
+Add pages:
+	•	Security
+	•	Privacy
+	•	Data Retention
+	•	AI Usage Explanation
+	•	Definitions of Key Metrics
+
+Expose these in footer.
+
+====================================================
+ADVANCED ANALYTICS MODULE
+
+Add data fields to Transactions:
+	•	product_or_service
+	•	client_or_account
+	•	geography
+	•	channel
+	•	project_id
+	•	is_recurring (if missing)
+
+Add RevenueRecord entity:
+	•	date
+	•	amount
+	•	product
+	•	client
+	•	channel
+	•	geography
+	•	project_id
+
+Add analytics dashboards:
+
+Spend
+Already exists—enhance visuals + add “Explain.”
+
+Revenue
+	•	Revenue over time
+	•	Revenue by product
+	•	Revenue by client
+	•	Revenue by geography or channel
+	•	Top clients
+
+Profitability
+	•	Department P&L
+	•	Client profitability
+	•	Project profitability
+	•	Vendor ROI
+
+Forecasting
+	•	Hiring capacity (based on projected cash)
+	•	Runway analysis (3 scenarios)
+	•	Expansion planner
+
+⸻
+
+Cash Flow Module
+
+Add standalone page with:
+Next 90 Days Cash Flow Predictor
+
+Inputs:
+	•	historical spend
+	•	historical revenue
+	•	planned hires
+	•	seasonality (AI-derived)
+	•	known vendor commitments
+
+Outputs:
+	•	Cash line chart with confidence bands
+	•	Summary of runway
+	•	AI interpretation
+
+====================================================
+RESOURCES / GUIDES SYSTEM
+
+Add a Guides table:
+	•	title
+	•	slug
+	•	summary
+	•	body
+	•	tags
+
+Seed with:
+	1.	Reduce software burn
+	2.	Structure a marketing budget
+	3.	Quarterly vendor audit guide
+
+Expose under:
+	•	Public Resources page
+	•	App → Resources
+
+====================================================
+AI INTEGRATION (USE GROQ API)
+
+Use Groq as the primary LLM provider.
+Add a config file:

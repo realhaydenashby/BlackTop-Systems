@@ -1,0 +1,347 @@
+You are updating an existing B2B SaaS app into a polished, production-style platform.
+
+The product is now called **BlackTop Systems**. Apply this name, logo placeholder, and theme consistently across:
+
+- Public marketing pages
+- Auth screens
+- App shell (sidebar, top bar, footer)
+- Dashboards and analytics pages
+- PDFs/exports if they exist
+
+====================================================
+PRODUCT SUMMARY
+====================================================
+
+BlackTop Systems is a financial diagnostics and action platform for SMBs and startups.
+
+Core functions:
+1. Ingest messy financial inputs (statements, invoices, receipts, CSVs, payroll summaries, subscription emails).
+2. Normalize and structure the data into clean transactions.
+3. Provide advanced analytics (spend, revenue, profitability, cash flow).
+4. Generate budgets and action plans that operators and founders can execute without a full finance team.
+
+It is:
+- B2B-only (for SMBs and startups).
+- A **pre-accounting, pre-FP&A financial intelligence layer**.
+- Focused on clarity, insights, and decision-making.
+
+The app already includes (do NOT delete, only extend):
+- User authentication (Replit Auth: email/password + OAuth)
+- Multi-tenant organizations/workspaces with roles (founder, ops, accountant, CFO)
+- Onboarding with company profile (size, revenue, industry, departments, goals)
+- Document upload (drag-and-drop PDFs, CSVs, images)
+- AI-powered extraction of transactions
+- Transaction management dashboard with filters
+- Data validation UI with confidence scores
+- Spend analytics dashboard (basic KPIs and charts)
+- AI-generated financial insights (spend drift, subscription creep, anomalies)
+- Budget builder with AI-suggested allocations
+- AI-powered action plan generator
+- Action item tracker with statuses
+- Stripe integration for subscription billing
+- Integrations page (bank/payment placeholders)
+- Public site with landing, pricing, features, and about
+- Left sidebar navigation and top bar
+
+Your job is to:
+- Apply a unified **BlackTop Systems** brand.
+- Upgrade the UI to a clean, modern, animated dark theme.
+- Add the specified analytics and sections below.
+- Keep it a comprehensive, functional SaaS platform.
+
+====================================================
+THEME & VISUAL DESIGN
+====================================================
+
+Brand:
+- Product name: **BlackTop Systems**
+- Use this name in:
+  - Logo placeholder (text logo is fine)
+  - Navbar
+  - Footers
+  - Page titles
+  - SEO/meta titles and descriptions
+
+Dark theme:
+- Background: very dark navy
+  - e.g., #020617 or #020617 / #050816
+- Primary accent: deep blue
+  - e.g., #1D4ED8
+- Secondary accent: teal/cyan
+  - e.g., #22D3EE
+- Surfaces / cards: dark grays
+  - e.g., #0F172A, #111827, #1F2933
+- Text:
+  - Primary: #F9FAFB
+  - Secondary: #9CA3AF
+- Borders/dividers: subtle, low-opacity light lines.
+
+Typography:
+- Modern sans-serif (Inter or similar).
+- Slightly larger headings for analytics.
+- Comfortable line height for resources/guides.
+
+Animations & transitions:
+- Smooth page fade-in for route changes.
+- Subtle hover transitions on cards, buttons, and nav items.
+- Animated loading states for uploads and analytics.
+- Use tasteful motion, not excessive.
+
+Make all new AND existing pages conform to this theme and animation style.
+
+====================================================
+NEW SECTIONS & CONTENT STRUCTURE
+====================================================
+
+Unify and enhance navigation with these sections:
+
+**Public site:**
+- Home
+- Features
+- Pricing
+- About
+- Resources
+- Login / Sign up
+
+**Authenticated app:**
+- Dashboard
+- Transactions
+- Analytics
+  - Spend
+  - Revenue
+  - Profitability
+  - Forecasting
+- Budgets
+- Action Plans
+- Documents
+- Integrations
+- Resources (in-app)
+- Settings / Billing
+- Admin (if user is internal admin)
+
+====================================================
+RESOURCES SECTION (TACTICAL GUIDES)
+====================================================
+
+Add a **Resources** system with a “Guides” database/table.
+
+Each guide should have:
+- title
+- slug
+- short_description
+- body (rich text or markdown)
+- audience tags (founder, ops, finance, etc.)
+
+Seed it with at least these three guides:
+
+1. “How to reduce software burn without breaking team workflows”
+2. “How to structure a real marketing budget as a pre-seed startup”
+3. “How to run a quarterly vendor audit in 30 minutes”
+
+Expose these:
+- On the public Resources page.
+- Inside the app under a “Resources” tab (so users can learn how to act on insights).
+
+====================================================
+ADVANCED ANALYTICS & DATA DIMENSIONS
+====================================================
+
+Extend the data model and UI to support advanced analytics. If the current schema doesn’t have these fields, add them as optional where needed:
+
+Transaction-level extensions:
+- product_or_service (string)
+- client_or_account (string)
+- geography (string or region/country code)
+- channel (e.g., “Paid Search”, “Organic”, “Partner”, “Direct Sales”)
+- project_id (optional)
+- department_id (already exists or should be added)
+- is_recurring (bool)
+
+Revenue records:
+- Create a `RevenueRecord` entity or equivalent:
+  - date
+  - amount
+  - currency
+  - product_or_service
+  - client_or_account
+  - geography
+  - channel
+  - project_id (optional)
+
+Vendor metadata:
+- Extend Vendor entity to track:
+  - category (SaaS, infrastructure, labor, marketing, etc.)
+  - is_subscription (bool)
+  - perceived_value_score (numeric, for ROI analytics)
+
+====================================================
+ANALYTICS MODULES
+====================================================
+
+1. **Revenue Analytics**
+Add an “Analytics → Revenue” section with:
+- Chart: Revenue over time (line).
+- Chart: Revenue by product/service (bar or pie).
+- Chart: Revenue by client/account.
+- Chart: Revenue by geography OR channel (pick whichever has more data).
+- Table: Top clients by revenue.
+
+2. **Profitability Analytics**
+Add “Analytics → Profitability” with:
+
+- **Department-Level P&L**
+  - Show revenue (if applicable), direct costs, and net contribution by department.
+  - Quick visual: which departments are over/under budget.
+
+- **Project or Client Profitability**
+  - For each project/client: revenue minus direct spend (including employee overtime, contractor invoices, subscriptions).
+
+- **Vendor ROI**
+  - For recurring vendors tagged as SaaS or tools:
+    - Show cost vs associated usage or revenue impact if tagged.
+    - At minimum, surface “high-cost, low-utilization” vendors.
+
+3. **Forecasting & Growth Planning**
+Add “Analytics → Forecasting” with:
+
+- **Hiring Capacity Planner**
+  - Based on projected cash and burn:
+    - Suggest how many hires can be added safely.
+    - Show impact on runway when adding X hires at Y average fully loaded cost.
+
+- **Runway Analysis**
+  - Show months of operation remaining under:
+    - current burn rate
+    - conservative scenario (higher spend)
+    - efficient scenario (post-action plan savings)
+
+- **Expansion Impact**
+  - Simple planner for:
+    - New location OR new product line:
+      - Input: expected monthly cost, expected revenue ramp, start date.
+      - Output: projected impact on runway and profitability over 6–12 months.
+
+====================================================
+CASH FLOW FORECASTING MODULE
+====================================================
+
+Create a dedicated **Cash Flow** page with a marquee feature:
+
+**“Next 90 Days Cash Flow Predictor”**
+
+Inputs (collected from existing data + simple form):
+- historical spend (from Transactions)
+- historical revenue (from RevenueRecords)
+- planned hires (list of roles + monthly cost)
+- seasonal trends (estimate or AI-derived from history)
+- known vendor commitments (e.g., contracts, prepaid expenses)
+
+Outputs:
+- Daily cash balance forecast for the next 90 days.
+- Confidence bands: low / expected / high trajectories.
+- Line chart with:
+  - x-axis: date (next 90 days)
+  - y-axis: projected cash balance
+- Summary card:
+  - “Under current assumptions, runway is approximately X months.”
+  - “High-spend scenario: Y months.”
+  - “Lean scenario: Z months.”
+
+Use the existing AI integration (Groq/OpenAI wrapper) to:
+- Interpret patterns from historical data.
+- Adjust for seasonality.
+- Build the projected series.
+- Generate a brief explanation of the forecast.
+
+====================================================
+ACTIONABILITY & EXPLANATIONS
+====================================================
+
+For **every major analytic widget** (charts, KPIs, diagnostic cards), add:
+
+- A small “Explain” button or icon.
+- Click triggers an AI call that:
+  - reads the underlying data slice
+  - returns a 2–4 sentence explanation:
+    - what is happening
+    - why it matters
+    - which levers can be pulled.
+
+Back this with structured AI functions like:
+- explainMetric(metricId)
+- explainForecast()
+- explainDepartmentPnl(departmentId)
+- explainClientProfitability(clientId)
+
+Use the app’s AI backend integration, not placeholders.
+
+====================================================
+APP SHELL & UX POLISH
+====================================================
+
+1. **Branding**
+   - Replace any generic names with “BlackTop Systems”.
+   - Update titles and metadata in the public site.
+   - Add a simple text-based logo in the top-left of the app shell.
+
+2. **Sidebar & Top Bar**
+   - Sidebar:
+     - BlackTop logo + name
+     - Navigation groups:
+       - Overview: Dashboard
+       - Financials: Transactions, Budgets, Cash Flow
+       - Analytics: Spend, Revenue, Profitability, Forecasting
+       - Actions: Action Plans
+       - Resources
+       - Integrations
+       - Settings
+   - Top bar:
+     - Current Organization
+     - User profile dropdown
+     - Notifications
+     - AI assistant/chat launch button
+
+3. **Transitions & Microinteractions**
+   - Page load: subtle fade-in + slight upward motion.
+   - Card hover: background lighten by a small amount, smooth transform.
+   - Button hover: color shift and scale up by ~1–3%.
+   - Skeleton loaders for analytics while data/AI responses are loading.
+
+====================================================
+SUPPORTING PAGES & TRUST
+====================================================
+
+Add or refine the following:
+
+- **Security & Privacy** section (can be a combined page):
+  - Brief description of:
+    - data storage
+    - encryption at rest/in transit (if applicable)
+    - commitment to privacy
+  - Even if technically minimal, present it clearly.
+
+- **Help / FAQ**
+  - Define key metrics:
+    - “Spend Drift”
+    - “Subscription Creep”
+    - “Runway”
+    - “Department P&L”
+    - “Client/Project Profitability”
+  - Explain at a high-level how AI is used.
+
+====================================================
+IMPLEMENTATION RULES
+====================================================
+
+- Extend the existing codebase: do not delete or massively restructure working features.
+- Wire all new UI to real data models (even if seeded with sample data).
+- Use the existing AI integration layer (Groq/OpenAI) for:
+  - document extraction
+  - insights
+  - budget recommendations
+  - action plan generation
+  - explanations and forecasting.
+- Maintain full responsiveness on desktop and tablet; mobile can be simplified but should not be broken.
+- Ensure all navigation links work and are consistent with page names.
+
+Your goal: transform the current app into a **cohesive, branded, dark-themed, animated SaaS platform called BlackTop Systems**, with advanced analytics and forecasting strong enough to demo as a serious, paid product.

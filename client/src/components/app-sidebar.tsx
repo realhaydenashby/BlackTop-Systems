@@ -7,22 +7,30 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
-  FileText,
   Receipt,
+  TrendingDown,
   Target,
   ListTodo,
   TrendingUp,
   Link2,
   LogOut,
+  BookOpen,
+  Settings,
+  ChevronRight,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import logoUrl from "@assets/generated_images/minimalist_blacktop_systems_logo.png";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useState } from "react";
 
 const menuItems = [
   {
@@ -31,19 +39,14 @@ const menuItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "Documents",
-    url: "/documents",
-    icon: FileText,
-  },
-  {
     title: "Transactions",
     url: "/transactions",
     icon: Receipt,
   },
   {
-    title: "Analytics",
-    url: "/analytics",
-    icon: TrendingUp,
+    title: "Cash Flow",
+    url: "/cash-flow",
+    icon: TrendingDown,
   },
   {
     title: "Budgets",
@@ -56,15 +59,33 @@ const menuItems = [
     icon: ListTodo,
   },
   {
+    title: "Resources",
+    url: "/resources",
+    icon: BookOpen,
+  },
+  {
     title: "Integrations",
     url: "/integrations",
     icon: Link2,
   },
+  {
+    title: "Settings",
+    url: "/settings",
+    icon: Settings,
+  },
+];
+
+const analyticsItems = [
+  { title: "Spend", url: "/analytics" },
+  { title: "Revenue", url: "/analytics/revenue" },
+  { title: "Profitability", url: "/analytics/profitability" },
+  { title: "Forecasting", url: "/analytics/forecasting" },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
+  const [analyticsOpen, setAnalyticsOpen] = useState(location.startsWith("/analytics"));
 
   const userInitials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`
@@ -88,12 +109,56 @@ export function AppSidebar() {
           </div>
           <SidebarGroupContent className="pt-2">
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {menuItems.slice(0, 3).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
                     isActive={location === item.url}
-                    data-testid={`link-sidebar-${item.title.toLowerCase().replace(/ /g, '-')}`}
+                    data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <Link href={item.url}>
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+              
+              <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton data-testid="nav-analytics">
+                      <TrendingUp className="w-4 h-4" />
+                      <span>Analytics</span>
+                      <ChevronRight className={`ml-auto w-4 h-4 transition-transform ${analyticsOpen ? 'rotate-90' : ''}`} />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {analyticsItems.map((item) => (
+                        <SidebarMenuSubItem key={item.title}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={location === item.url}
+                            data-testid={`nav-analytics-${item.title.toLowerCase()}`}
+                          >
+                            <Link href={item.url}>
+                              <span>{item.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+
+              {menuItems.slice(3).map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location === item.url}
+                    data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
                   >
                     <Link href={item.url}>
                       <item.icon className="w-4 h-4" />
