@@ -83,7 +83,7 @@ export default function Security() {
                 Our infrastructure is designed to protect your sensitive financial information at every layer.
               </p>
               <p>
-                Have security questions? Contact our team at security@blacktop.systems
+                Have security questions? Contact our team at blacktopsystems@gmail.com
               </p>
             </div>
           </motion.div>

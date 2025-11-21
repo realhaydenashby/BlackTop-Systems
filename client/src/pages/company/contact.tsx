@@ -28,20 +28,20 @@ export default function Contact() {
               {
                 icon: Mail,
                 title: "Email Us",
-                description: "hello@blacktop.systems",
-                link: "mailto:hello@blacktop.systems"
+                description: "blacktopsystems@gmail.com",
+                link: "mailto:blacktopsystems@gmail.com"
               },
               {
                 icon: MessageSquare,
                 title: "Sales Inquiries",
-                description: "sales@blacktop.systems",
-                link: "mailto:sales@blacktop.systems"
+                description: "blacktopsystems@gmail.com",
+                link: "mailto:blacktopsystems@gmail.com"
               },
               {
                 icon: HelpCircle,
                 title: "Support",
-                description: "support@blacktop.systems",
-                link: "mailto:support@blacktop.systems"
+                description: "blacktopsystems@gmail.com",
+                link: "mailto:blacktopsystems@gmail.com"
               }
             ].map((contact, index) => (
               <motion.div
