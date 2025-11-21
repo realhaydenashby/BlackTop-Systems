@@ -21,6 +21,7 @@ import Dashboard from "@/pages/dashboard";
 import Documents from "@/pages/documents";
 import Transactions from "@/pages/transactions";
 import Analytics from "@/pages/analytics";
+import Fundraising from "@/pages/fundraising";
 import CashFlow from "@/pages/cash-flow";
 import Budgets from "@/pages/budgets";
 import ActionPlans from "@/pages/action-plans";
@@ -97,6 +98,8 @@ function ProtectedRouter() {
         <Route path="/cash-flow" component={() => <ProtectedRoute component={CashFlow} />} />
         <Route path="/analytics" component={() => <ProtectedRoute component={Analytics} />} />
         <Route path="/analytics/:section" component={() => <ProtectedRoute component={Analytics} />} />
+        <Route path="/fundraising" component={() => <ProtectedRoute component={Fundraising} />} />
+        <Route path="/fundraising/:section" component={() => <ProtectedRoute component={Fundraising} />} />
         <Route path="/budgets" component={() => <ProtectedRoute component={Budgets} />} />
         <Route path="/action-plans" component={() => <ProtectedRoute component={ActionPlans} />} />
         <Route path="/app/resources" component={() => <ProtectedRoute component={Resources} />} />

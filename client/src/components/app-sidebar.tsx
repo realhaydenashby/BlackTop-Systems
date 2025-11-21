@@ -26,6 +26,7 @@ import {
   Settings,
   ChevronRight,
   FileText,
+  Rocket,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
@@ -87,10 +88,18 @@ const analyticsItems = [
   { title: "Forecasting", url: "/analytics/forecasting" },
 ];
 
+const fundraisingItems = [
+  { title: "Burn", url: "/fundraising" },
+  { title: "Runway", url: "/fundraising/runway" },
+  { title: "Raise", url: "/fundraising/raise" },
+  { title: "Hiring", url: "/fundraising/hiring" },
+];
+
 export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
   const [analyticsOpen, setAnalyticsOpen] = useState(location.startsWith("/analytics"));
+  const [fundraisingOpen, setFundraisingOpen] = useState(location.startsWith("/fundraising"));
 
   const userInitials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`
@@ -141,6 +150,35 @@ export function AppSidebar() {
                             asChild
                             isActive={location === item.url}
                             data-testid={`nav-analytics-${item.title.toLowerCase()}`}
+                          >
+                            <Link href={item.url}>
+                              <span>{item.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+
+              <Collapsible open={fundraisingOpen} onOpenChange={setFundraisingOpen}>
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton data-testid="nav-fundraising-prep">
+                      <Rocket className="w-4 h-4" />
+                      <span>Fundraising Prep</span>
+                      <ChevronRight className={`ml-auto w-4 h-4 transition-transform ${fundraisingOpen ? 'rotate-90' : ''}`} />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {fundraisingItems.map((item) => (
+                        <SidebarMenuSubItem key={item.title}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={location === item.url}
+                            data-testid={`nav-fundraising-${item.title.toLowerCase()}`}
                           >
                             <Link href={item.url}>
                               <span>{item.title}</span>

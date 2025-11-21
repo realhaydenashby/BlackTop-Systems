@@ -371,6 +371,174 @@ export function generateMockAnalytics(days: number = 30) {
     },
   ];
 
+  // Fundraising Prep mock data
+  const mockFundraisingData = {
+    // Burn Rate Analyzer
+    burn: {
+      currentMonthlyBurn: 85000,
+      lastMonthBurn: 82000,
+      twoMonthsAgoBurn: 78000,
+      payrollBurn: 58000,
+      nonPayrollBurn: 27000,
+      burnDrift: {
+        last3Months: 8.9,
+        percentageChange: "+8.9%",
+      },
+      saasCreep: {
+        newTools: 4,
+        monthlyCost: 2400,
+        tools: [
+          { name: "Linear", cost: 800, addedDate: "Oct 2024" },
+          { name: "Notion AI", cost: 600, addedDate: "Oct 2024" },
+          { name: "Figma Pro", cost: 500, addedDate: "Nov 2024" },
+          { name: "Loom", cost: 500, addedDate: "Nov 2024" },
+        ],
+      },
+      burnTrend: Array.from({ length: 6 }, (_, i) => ({
+        month: format(new Date(2024, 5 + i, 1), "MMM yyyy"),
+        totalBurn: 75000 + (i * 2000) + Math.random() * 3000,
+        payroll: 50000 + (i * 1500),
+        nonPayroll: 25000 + (i * 500) + Math.random() * 2000,
+      })),
+    },
+    // Runway Estimator
+    runway: {
+      currentCash: 1530000,
+      currentRunway: 18,
+      bestCaseRunway: 24,
+      worstCaseRunway: 14,
+      runwayAfterCuts: 22,
+      runwayAfterRevenue: 26,
+      runwayProjections: Array.from({ length: 24 }, (_, i) => ({
+        month: format(new Date(2024, 11 + i, 1), "MMM yyyy"),
+        current: Math.max(0, 1530000 - (i * 85000)),
+        bestCase: Math.max(0, 1530000 - (i * 64000)),
+        worstCase: Math.max(0, 1530000 - (i * 109000)),
+        withCuts: Math.max(0, 1530000 - (i * 70000)),
+        withRevenue: Math.max(0, 1530000 - (i * 59000)),
+      })),
+      scenarioDetails: {
+        current: { monthlyBurn: 85000, assumptions: "Current spending patterns continue" },
+        bestCase: { monthlyBurn: 64000, assumptions: "10% cost reduction + 20% revenue growth" },
+        worstCase: { monthlyBurn: 109000, assumptions: "15% burn increase, no revenue growth" },
+        withCuts: { monthlyBurn: 70000, assumptions: "Cut discretionary spend by $15K/mo" },
+        withRevenue: { monthlyBurn: 59000, assumptions: "Add $26K/mo recurring revenue" },
+      },
+    },
+    // How Much Should You Raise?
+    raise: {
+      recommendedRange: {
+        min: 1800000,
+        max: 2500000,
+        sweet: 2200000,
+      },
+      calculations: {
+        currentBurn: 85000,
+        projectedBurn: 105000,
+        targetRunway: 24,
+        buffer: 20,
+      },
+      scenarios: [
+        {
+          strategy: "Lean",
+          raise: 1800000,
+          runway: 18,
+          assumptions: "Minimal hiring, focus on efficiency",
+          outcomes: "Reach profitability faster, less dilution",
+        },
+        {
+          strategy: "Baseline",
+          raise: 2200000,
+          runway: 24,
+          assumptions: "Balanced growth, 3-4 key hires",
+          outcomes: "Sustainable growth, hit next milestone",
+        },
+        {
+          strategy: "Aggressive",
+          raise: 2500000,
+          runway: 26,
+          assumptions: "Rapid hiring, expand to new markets",
+          outcomes: "Fast growth, higher risk & dilution",
+        },
+      ],
+      milestones: [
+        { milestone: "Product-Market Fit", months: 6, cost: 500000 },
+        { milestone: "$50K MRR", months: 12, cost: 1000000 },
+        { milestone: "$100K MRR", months: 18, cost: 1500000 },
+        { milestone: "Profitability", months: 24, cost: 2100000 },
+      ],
+    },
+    // Headcount Planner
+    hiring: {
+      currentHeadcount: 12,
+      plannedHires: [
+        {
+          role: "Senior Engineer",
+          month: 2,
+          salary: 150000,
+          fullyLoadedCost: 195000,
+          onboardingCost: 15000,
+        },
+        {
+          role: "Product Designer",
+          month: 3,
+          salary: 120000,
+          fullyLoadedCost: 156000,
+          onboardingCost: 12000,
+        },
+        {
+          role: "Sales Lead",
+          month: 5,
+          salary: 140000,
+          fullyLoadedCost: 182000,
+          onboardingCost: 14000,
+        },
+        {
+          role: "Customer Success",
+          month: 7,
+          salary: 90000,
+          fullyLoadedCost: 117000,
+          onboardingCost: 10000,
+        },
+        {
+          role: "Engineer",
+          month: 9,
+          salary: 130000,
+          fullyLoadedCost: 169000,
+          onboardingCost: 13000,
+        },
+      ],
+      fullyLoadedMultiplier: 1.3,
+      payrollProjection: Array.from({ length: 12 }, (_, i) => {
+        const basePayroll = 58000;
+        let additionalCost = 0;
+        const hires = [
+          { month: 2, cost: 16250 },
+          { month: 3, cost: 13000 },
+          { month: 5, cost: 15167 },
+          { month: 7, cost: 9750 },
+          { month: 9, cost: 14083 },
+        ];
+        hires.forEach(hire => {
+          if (i >= hire.month) {
+            additionalCost += hire.cost;
+          }
+        });
+        return {
+          month: format(new Date(2025, i, 1), "MMM yyyy"),
+          payroll: basePayroll + additionalCost,
+          headcount: 12 + hires.filter(h => i >= h.month).length,
+        };
+      }),
+      runwayImpact: {
+        withoutHiring: 18,
+        withPlannedHiring: 14,
+        costPerHire: 13000,
+        totalHiringCost: 64000,
+      },
+    },
+  };
+
   return {
     spendTrend: mockSpendTrend,
     categoryDistribution: mockCategoryDistribution,
@@ -385,6 +553,7 @@ export function generateMockAnalytics(days: number = 30) {
     profitabilityActionPlan,
     forecasting: mockForecastingData,
     forecastingActionPlan,
+    fundraising: mockFundraisingData,
   };
 }
 
