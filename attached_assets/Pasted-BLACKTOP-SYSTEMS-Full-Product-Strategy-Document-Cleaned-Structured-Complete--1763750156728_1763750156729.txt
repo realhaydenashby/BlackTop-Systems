@@ -1,0 +1,515 @@
+BLACKTOP SYSTEMS
+Full Product + Strategy Document (Cleaned, Structured, Complete)
+————————————————————————
+
+1. One-Sentence Definition
+
+BlackTop Systems is the AI financial copilot for SMBs and startups that converts messy financial inputs into clean insights, a smart budget, and a simple monthly action plan — without needing a CFO.
+
+You are not accounting.
+You are not FP&A lite.
+You are the pre-accounting / pre-FP&A intelligence layer.
+
+————————————————————————
+
+2. Problem
+
+SMBs operate financially blind because their data is scattered across:
+	•	Bank statements
+	•	Invoices
+	•	Subscription emails
+	•	Payroll reports
+	•	Receipts
+	•	Ad dashboards
+	•	Random spreadsheets
+
+They only learn the truth:
+	•	At month-end
+	•	When cash runs low
+	•	Or when the accountant calls
+
+The real pain:
+Founders cannot answer “What should we spend next month — and why?”
+No tool gives them clarity + direction from raw inputs.
+
+————————————————————————
+
+3. Solution (What BlackTop Does)
+
+BlackTop performs three core functions:
+
+3.1 Ingestion & Normalization
+
+Transforms chaotic inputs into structured data:
+	•	PDFs → extracted transactions
+	•	Invoices → vendor mapping
+	•	Emails → recurring spend detection
+	•	Bank statements → categorized entries
+	•	Receipts → expense tagging
+	•	CSVs → standardized fields
+
+All unified into one clean schema.
+
+3.2 Diagnostics (The Financial MRI)
+
+Automatically identifies:
+	•	Category & department spend
+	•	Recurring vendor burn
+	•	Subscription creep
+	•	Vendor overbilling
+	•	Payroll overtime drift
+	•	Trend anomalies
+	•	Month-over-month & QoQ changes
+	•	“Here’s what changed and why” analysis
+
+3.3 Budget Builder + Action Plan
+
+The true wedge.
+
+Budget Builder outputs:
+	•	Recommended monthly budget
+	•	Dept-level allocations
+	•	Vendor-level caps
+	•	+10% / –10% scenario budgets
+	•	Cash runway projections
+
+Action Plan outputs:
+	•	“Cut these duplicate subscriptions”
+	•	“These 3 vendors exceeded industry benchmarks”
+	•	“Marketing drift is +22%; here’s why”
+	•	“Overtime added $3,100; adjust schedules”
+
+Playbooks (Resources):
+	•	Reduce software burn
+	•	Build a real marketing budget
+	•	Run a vendor audit in 30 minutes
+	•	90-day cash forecasting
+	•	Improve gross margin
+	•	Startup budget templates
+
+You deliver clarity + direction, not compliance.
+
+————————————————————————
+
+4. Key Features (MVP + Near-Term)
+
+Core MVP
+	•	Single user
+	•	Single entity
+	•	Ingest → normalize → dashboard → budget → action plan
+
+MVP Feature Breakdown
+
+Ingestion
+Upload PDFs, CSVs, images, email forwarding.
+
+Normalization
+Vendor table, category mapping, subscription detection, trend detection.
+
+Dashboard
+	•	Cash in/out
+	•	Category heatmap
+	•	Vendor distribution
+	•	Anomaly cards
+	•	Top changes
+
+Budget Builder
+	•	Revenue input
+	•	Goals
+	•	Team size
+	•	Seasonality
+	•	Recommended budget ranges
+	•	Runway calculations
+
+Action Plan
+A simple list of the 5–10 things the SMB should do this month.
+
+————————————————————————
+
+5. Target Customer (ICP)
+
+SMBs and startups with 0–75 employees:
+	•	Agencies
+	•	E-commerce brands
+	•	Construction
+	•	Real estate operators
+	•	Boutiques / small manufacturers
+	•	Service companies
+	•	Early startups
+
+Traits:
+	•	Messy inputs
+	•	No finance team
+	•	Cannot interpret financials
+	•	Want clarity and direction
+	•	Hate spreadsheets
+
+This is a segment Ramp/Brex ignore.
+
+————————————————————————
+
+6. Competitive Landscape & Positioning
+
+Where everyone else sits:
+
+Accounting (QBO/Xero): Compliance and bookkeeping — assume clean data.
+FP&A (Mosaic, Pry, Jirav): Structured data → models — require a finance person.
+Spend management (Ramp/Brex): Control spend — only see spend through their rails.
+AI bookkeeping (Vic.ai, Kick): AP automation — focused on accounting workflows.
+Bench/Pilot: Service-heavy bookkeeping + tax.
+
+Your whitespace:
+
+Messy inputs → clarity → budget → action plan.
+No one else is doing this for tiny companies as a product.
+
+————————————————————————
+
+7. Competitive Advantages (Moats)
+
+Real moats you can actually build:
+	1.	Data normalization across unstructured sources
+	2.	Budget + action plan engine (no competitor offers this)
+	3.	Cross-source intelligence (bank + docs + email + CRM)
+	4.	Vendor knowledge graph
+	5.	Company-specific financial fingerprints
+	6.	Workflow lock-in
+If decisions are made inside BlackTop, the product becomes sticky.
+
+————————————————————————
+
+8. TAM / SAM / SOM (U.S. Only)
+
+Assumptions:
+	•	6.2M employer SMBs
+	•	Exclude >75 employees → 4.7M SMBs
+	•	~70% have no CFO → 3.3M pre-finance SMBs
+	•	Expected adoption for financial intelligence tools: 3–6%
+
+TAM
+4.7M × $1,000 ACV
+→ $4.7B
+
+SAM
+Tech-forward 25% of those SMBs:
+1.17M × $1,000
+→ $1.17B
+
+SOM (5-year realistic)
+1–2% penetration of SAM:
+11,700–23,400 customers
+→ $12M–$24M
+
+The market is real, large, and underserved.
+
+————————————————————————
+
+9. Pricing Strategy
+
+Launch Pricing
+	•	$49/mo — Solo founder
+	•	$129/mo — Small team (3 seats)
+	•	$249/mo — SMB (10 seats + forecasting)
+
+Add-ons
+	•	Forecasting module: $29–$49/mo
+	•	Multi-entity: $19/entity
+	•	Insight Packs (AI-generated reports): $9/report
+	•	Additional seats: $12/seat
+
+Later (Enterprise)
+	•	$500–$1,200/mo
+	•	SSO, audit logs, multi-entity, SLAs
+
+Pricing logic:
+Must be cheap enough for founders to impulse-buy, but serious enough to justify handling financial data.
+
+————————————————————————
+
+10. Go-To-Market Strategy
+
+Recommended Initial Motion: Direct-to-SMB/Startup
+
+Because:
+	•	They feel the pain
+	•	Fast adoption cycles
+	•	Easy credit card swipe
+	•	No CFO friction
+	•	Demo mode makes virality easy
+
+Secondary Channel (Later): Fractional CFOs
+
+Let them use BlackTop with their clients for distribution scale.
+
+————————————————————————
+
+11. What Still Needs to Be Built
+
+Here is the clear engineering checklist extracted from your note:
+
+A. Ingestion Layer (Required for MVP)
+	•	Bank statement PDF → parser
+	•	CSV ingestion pipeline
+	•	Invoice/receipt image OCR (Google / Gemini / Groq)
+	•	Email forwarding → structured extraction
+	•	Minimal vendor + category mapping schema
+	•	Basic error handling (invalid files, retries, logging)
+
+B. Normalization Layer
+	•	Vendor table
+	•	Category table
+	•	Subscription detection
+	•	Recurring spend logic
+	•	Trend identification
+
+C. Core Intelligence Layer
+	•	Cash in/out
+	•	Top vendors
+	•	Category distribution
+	•	Month-over-month changes
+	•	Anomaly flags
+
+D. Budget Builder Engine
+
+Inputs:
+	•	Historic spend
+	•	Revenue
+	•	Team size
+	•	Goals
+
+Outputs:
+	•	Monthly budget
+	•	Department allocations
+	•	Vendor caps
+	•	Runway estimate
+	•	±10% scenarios
+
+E. Action Plan Generator
+
+Outputs:
+	•	Top cuts
+	•	Waste areas
+	•	Spending drifts
+	•	Subscription creep
+	•	Vendor renegotiation opportunities
+	•	“Do this in order” list
+
+F. SaaS Infrastructure
+	•	Stripe billing
+	•	Auth0 (roles, MFA, API protection)
+	•	Multi-tenant org structure
+	•	Role-based access
+
+G. Frontend / UX
+
+Theme: dark, navy, teal, minimalist, Space Grotesk
+Pages needed:
+	•	Home
+	•	Features
+	•	Resources
+	•	Pricing
+	•	App onboarding flow
+	•	Dashboard
+	•	Budget Builder
+	•	Action Plan page
+	•	Demo Mode
+
+H. CRM Integration (Post-MVP)
+
+Only need:
+	•	Client names
+	•	Revenue per client
+	•	Closed/won dates
+	•	Project mapping
+
+
+You already have:
+	•	Pricing page, resources page, home, login
+	•	Templates with metrics/perf dashboard
+	•	Stripe wired
+	•	Google + Groq wired
+	•	Need Plaid
+
+So stack-wise you’re in decent shape. You don’t need “more APIs” just to collect logos. You need a minimal, end-to-end flow that proves:
+
+Ingest docs + connect bank + read email → normalize → analytics → budget → action plan
+
+
+1. Core APIs You Actually Need
+
+1. Plaid (non-negotiable)
+
+Purpose: bank data ingestion.
+
+You use it for:
+	•	Pulling transactions (last 3–6 months)
+	•	Pulling balances
+	•	Maybe account metadata
+
+That alone + your docs upload gives you plenty of signal.
+
+Do NOT also add Yodlee / MX / whatever right now. One aggregator is enough.
+
+⸻
+
+2. Stripe (you already have it)
+
+Purpose: subscription & billing.
+
+That’s enough for monetization. You do not need Stripe Issuing, Treasury, etc. You’re not Ramp.
+
+Just make sure:
+	•	Plans & webhooks are wired
+	•	Org plan_tier actually updates in your DB
+
+⸻
+
+3. Google (Document AI / Drive / OAuth)
+
+You already have Google & Groq; the minimum useful combo is:
+	•	Google Document AI (or equivalent) for:
+	•	OCR on PDFs (statements, invoices, receipts)
+	•	Basic field / table extraction
+
+That gives you:
+	•	Non-bank docs → structured text → your transaction schema.
+
+You don’t need 5 different OCR vendors. One is fine.
+
+⸻
+
+4. Groq (LLM inference)
+
+Groq should be used only for:
+	•	Insight text generation
+	•	Budget explanation
+	•	Action plans
+	•	“Explain this chart” style AI
+
+Do not use it for:
+	•	Raw parsing of bank data
+	•	Anything requiring deterministic math
+
+⸻
+
+2. Optional / “Later” APIs (not for MVP)
+
+Only after you have one full flow working:
+	1.	Email integration
+	•	Gmail API / Outlook Graph API
+	•	For subscription emails, invoices, etc.
+	•	MVP substitute: “forward emails to this special address” and manually parse later.
+	2.	Accounting integration (QuickBooks / Xero)
+	•	Useful for upsell & stickiness.
+	•	Not required for v1.
+	•	You can hardcode a “coming soon” block on Integrations.
+	3.	Auth provider (if you outgrow Replit Auth)
+	•	Auth0 / Clerk / Supabase Auth
+	•	Only if Replit Auth starts choking on multi-tenant / roles.
+
+⸻
+
+3. Security / Compliance Layer (not “APIs” but required discipline)
+
+That Comet blob you pasted is basically saying:
+	•	Use:
+	•	OAuth2
+	•	TLS
+	•	Encryption at rest
+	•	Role-based access
+	•	Secret management
+	•	Logging
+
+You do not “add APIs” for that. You:
+	•	Store keys in environment variables / secrets manager
+	•	Never send raw PAN / credentials to Groq
+	•	Limit Plaid scopes to transactions / balances
+	•	Implement org isolation in your DB
+	•	Add basic audit logging (“who accessed which org’s data when”)
+
+That’s architecture, not more vendors.
+
+⸻
+
+4. Reality check: what you’re missing right now
+
+Given what you told me, your missing pieces are not “more APIs,” they’re:
+	1.	A real ingestion pipeline
+	•	From:
+	•	Plaid transactions
+	•	CSV upload
+	•	PDF → Google Document AI
+	•	To:
+	•	transactions table in your DB with:
+org_id, date, amount, vendor, category, department (optional), is_recurring
+	2.	A normalization layer
+	•	Vendor normalization (simple mapping dict or table)
+	•	Category rules
+	•	Subscription detection (recurring vendor + descriptor pattern)
+	3.	AI orchestration
+	•	A service/function that:
+	•	Pulls last 90 days of normalized transactions
+	•	Builds a compact JSON summary
+	•	Sends that to Groq
+	•	Gets back:
+	•	insights[]
+	•	budget object
+	•	action_items[]
+	•	Saves all that in your DB
+	4.	Demo company
+	•	Seed database with:
+	•	6 months of fake but realistic Plaid-style transactions
+	•	Precomputed insights, budgets, action plans
+	•	Demo mode button routes you into that org as a read-only user.
+
+⸻
+
+5. Direct answer to your question
+
+“What other APIs do I need?”
+
+For a serious v1 of BlackTop, this is the list:
+
+Must-have:
+	•	Stripe (you have it)
+	•	Plaid (you need to add this next)
+	•	Google Document AI or similar (for OCR, you basically have this)
+	•	Groq (LLM, you have it)
+
+Nice-to-have later:
+	•	Gmail / Outlook API (email ingestion)
+	•	QuickBooks/Xero (accounting sync)
+	•	Better auth (Auth0/Clerk) if Replit Auth becomes a problem
+
+Before you build a deck
+
+You need actual numbers.
+
+Before you talk to investors
+
+You need a coherent financial story.
+
+Before a cap table matters
+
+You need to know:
+	•	burn
+	•	runway
+	•	spend patterns
+	•	what to cut
+	•	what’s repeatable revenue
+	•	whether your business is viable
+
+Before due diligence
+
+You need normalized data, documents, diagnostics.
+
+Before fundraising
+
+You need to know how much to raise and why.
+
+Before scaling
+
+You need to know which parts of your spend are trash.
+
+Nobody serves this layer.
+It’s the “pre-CFO, pre-FP&A, pre-founder-enablement” layer.
