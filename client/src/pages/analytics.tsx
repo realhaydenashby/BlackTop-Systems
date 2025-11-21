@@ -1,12 +1,139 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area } from "recharts";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area, ReferenceLine } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { CHART_COLORS, chartStyles, lineStyles, areaStyles, barStyles } from "@/lib/chartTheme";
 import { ActionPlanModule, type ActionPlanItem } from "@/components/ActionPlanModule";
+
+function ForecastingChart({ analytics }: { analytics: any }) {
+  const [forecastHorizon, setForecastHorizon] = useState("6months");
+  
+  const getForecastData = () => {
+    if (!analytics?.forecasting) return [];
+    
+    const { historicalData = [], currentMonth, forecast30Days = [], forecast90Days = [], forecast6Months = [] } = analytics.forecasting;
+    
+    let forecastData = [];
+    switch (forecastHorizon) {
+      case "30days":
+        forecastData = forecast30Days;
+        break;
+      case "90days":
+        forecastData = forecast90Days;
+        break;
+      case "6months":
+      default:
+        forecastData = forecast6Months;
+        break;
+    }
+    
+    return [
+      ...historicalData,
+      ...(currentMonth ? [currentMonth] : []),
+      ...forecastData
+    ];
+  };
+  
+  const chartData = getForecastData();
+  const historicalCount = (analytics?.forecasting?.historicalData?.length || 0) + 
+    (analytics?.forecasting?.currentMonth ? 1 : 0);
+  
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <CardTitle>Financial Forecast</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Historical performance vs. projected growth
+            </p>
+          </div>
+          <Select value={forecastHorizon} onValueChange={setForecastHorizon}>
+            <SelectTrigger className="w-48" data-testid="select-forecast-horizon">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="30days">30 Days Forecast</SelectItem>
+              <SelectItem value="90days">90 Days Forecast</SelectItem>
+              <SelectItem value="6months">6 Months Forecast</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4 flex items-center gap-6 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS[0] }} />
+            <span className="text-muted-foreground">Historical Data</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full border-2" style={{ borderColor: CHART_COLORS[0], borderStyle: 'dashed' }} />
+            <span className="text-muted-foreground">Forecasted</span>
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={400}>
+          <AreaChart data={chartData}>
+            <CartesianGrid {...chartStyles.cartesianGrid} />
+            <XAxis dataKey="month" {...chartStyles.xAxis} />
+            <YAxis {...chartStyles.yAxis} />
+            <Tooltip {...chartStyles.tooltip} />
+            <Legend {...chartStyles.legend} />
+            
+            <ReferenceLine 
+              x={chartData[historicalCount - 1]?.month} 
+              stroke="hsl(var(--muted-foreground))" 
+              strokeDasharray="3 3"
+              label={{ value: "Today", position: "top", fill: "hsl(var(--muted-foreground))" }}
+            />
+            
+            <Area 
+              type="monotone" 
+              dataKey="revenue" 
+              stackId="1"
+              stroke={CHART_COLORS[0]} 
+              fill={CHART_COLORS[0]} 
+              name="Revenue" 
+              {...areaStyles}
+              strokeDasharray={(dataPoint: any) => {
+                const index = chartData.indexOf(dataPoint);
+                return index >= historicalCount ? "5 5" : "0";
+              }}
+            />
+            <Area 
+              type="monotone" 
+              dataKey="expenses" 
+              stackId="2"
+              stroke={CHART_COLORS[3]} 
+              fill={CHART_COLORS[3]} 
+              name="Expenses" 
+              {...areaStyles}
+              strokeDasharray={(dataPoint: any) => {
+                const index = chartData.indexOf(dataPoint);
+                return index >= historicalCount ? "5 5" : "0";
+              }}
+            />
+            <Area 
+              type="monotone" 
+              dataKey="profit" 
+              stackId="3"
+              stroke={CHART_COLORS[1]} 
+              fill={CHART_COLORS[1]} 
+              name="Profit" 
+              {...areaStyles}
+              strokeDasharray={(dataPoint: any) => {
+                const index = chartData.indexOf(dataPoint);
+                return index >= historicalCount ? "5 5" : "0";
+              }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Analytics() {
   const [, params] = useRoute("/analytics/:section");
@@ -407,49 +534,7 @@ export default function Analytics() {
 
       {section === "forecasting" && (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle>12-Month Financial Forecast</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <AreaChart data={analytics?.forecasting?.forecast12Months || []}>
-                  <CartesianGrid {...chartStyles.cartesianGrid} />
-                  <XAxis dataKey="month" {...chartStyles.xAxis} />
-                  <YAxis {...chartStyles.yAxis} />
-                  <Tooltip {...chartStyles.tooltip} />
-                  <Legend {...chartStyles.legend} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="revenue" 
-                    stackId="1"
-                    stroke={CHART_COLORS[0]} 
-                    fill={CHART_COLORS[0]} 
-                    name="Revenue" 
-                    {...areaStyles}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="expenses" 
-                    stackId="2"
-                    stroke={CHART_COLORS[3]} 
-                    fill={CHART_COLORS[3]} 
-                    name="Expenses" 
-                    {...areaStyles}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="profit" 
-                    stackId="3"
-                    stroke={CHART_COLORS[1]} 
-                    fill={CHART_COLORS[1]} 
-                    name="Profit" 
-                    {...areaStyles}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          <ForecastingChart analytics={analytics} />
 
           <div className="grid gap-6 md:grid-cols-2">
             <Card>

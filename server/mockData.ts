@@ -142,18 +142,82 @@ export function generateMockAnalytics(days: number = 30) {
     ],
   };
 
-  // Forecasting analytics mock data
+  // Forecasting analytics mock data - historical + projections
+  const today = new Date();
+  const historicalMonths = 6;
+  const forecastHorizons = {
+    days30: 1,
+    days90: 3,
+    months6: 6,
+  };
+  
+  // Generate historical data (past 6 months)
+  const baseRevenue = 45000;
+  const baseExpenses = 30000;
+  const growthRate = 1.08; // 8% monthly growth
+  
+  const historicalData = Array.from({ length: historicalMonths }, (_, i) => {
+    const monthsAgo = historicalMonths - 1 - i;
+    const month = new Date(today.getFullYear(), today.getMonth() - monthsAgo, 1);
+    const revenue = Math.floor(baseRevenue * Math.pow(growthRate, i) * (0.92 + Math.random() * 0.16));
+    const expenses = Math.floor(baseExpenses * Math.pow(1.05, i) * (0.94 + Math.random() * 0.12));
+    return {
+      month: format(month, "MMM yyyy"),
+      revenue,
+      expenses,
+      profit: revenue - expenses,
+      isHistorical: true,
+    };
+  });
+  
+  // Current month (partial)
+  const currentMonth = {
+    month: format(today, "MMM yyyy"),
+    revenue: Math.floor(historicalData[historicalData.length - 1].revenue * 1.08),
+    expenses: Math.floor(historicalData[historicalData.length - 1].expenses * 1.05),
+    profit: 0,
+    isHistorical: true,
+    isPartial: true,
+  };
+  currentMonth.profit = currentMonth.revenue - currentMonth.expenses;
+  
+  // Generate forecast data for different horizons
+  const generateForecast = (months: number) => {
+    const lastHistorical = currentMonth;
+    return Array.from({ length: months }, (_, i) => {
+      const futureMonth = new Date(today.getFullYear(), today.getMonth() + i + 1, 1);
+      const revenue = Math.floor(lastHistorical.revenue * Math.pow(growthRate, i + 1) * (0.95 + Math.random() * 0.1));
+      const expenses = Math.floor(lastHistorical.expenses * Math.pow(1.05, i + 1) * (0.96 + Math.random() * 0.08));
+      return {
+        month: format(futureMonth, "MMM yyyy"),
+        revenue,
+        expenses,
+        profit: revenue - expenses,
+        isHistorical: false,
+      };
+    });
+  };
+  
   const mockForecastingData = {
     forecastedRevenue: 625000,
     forecastedExpenses: 425000,
     forecastedProfit: 200000,
     confidence: 85,
-    forecast12Months: Array.from({ length: 12 }, (_, i) => ({
-      month: format(new Date(2025, i, 1), "MMM yyyy"),
-      revenue: Math.floor(Math.random() * 50000) + 40000,
-      expenses: Math.floor(Math.random() * 35000) + 28000,
-      profit: Math.floor(Math.random() * 20000) + 10000,
-    })),
+    
+    // Combined historical + forecast data
+    historicalData,
+    currentMonth,
+    forecast30Days: generateForecast(forecastHorizons.days30),
+    forecast90Days: generateForecast(forecastHorizons.days90),
+    forecast6Months: generateForecast(forecastHorizons.months6),
+    
+    // Legacy format for backward compatibility
+    forecast12Months: [
+      ...historicalData,
+      currentMonth,
+      ...generateForecast(6)
+    ],
+    
     scenarioAnalysis: [
       { scenario: "Best Case", revenue: 750000, expenses: 400000, profit: 350000 },
       { scenario: "Base Case", revenue: 625000, expenses: 425000, profit: 200000 },
