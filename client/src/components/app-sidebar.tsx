@@ -74,11 +74,19 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <div className="flex items-center gap-2 px-2 py-4">
-            <img src={logoUrl} alt="BlackTop Systems" className="w-8 h-8" />
-            <SidebarGroupLabel className="text-base font-semibold">BlackTop Systems</SidebarGroupLabel>
+          <div className="flex items-center gap-3 px-3 py-6 border-b border-sidebar-border">
+            <div className="relative w-8 h-8 flex items-center justify-center">
+              <img 
+                src={logoUrl} 
+                alt="BlackTop Systems" 
+                className="w-full h-full object-contain" 
+              />
+            </div>
+            <SidebarGroupLabel className="text-base font-semibold tracking-tight">
+              BlackTop Systems
+            </SidebarGroupLabel>
           </div>
-          <SidebarGroupContent>
+          <SidebarGroupContent className="pt-2">
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>

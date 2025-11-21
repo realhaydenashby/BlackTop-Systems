@@ -23,16 +23,24 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
       <motion.nav 
-        className="border-b px-6 py-4 backdrop-blur-sm bg-background/80 sticky top-0 z-50"
+        className="border-b px-6 py-5 backdrop-blur-md bg-background/90 sticky top-0 z-50"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={logoUrl} alt="BlackTop Systems" className="w-10 h-10" />
-            <span className="text-xl font-semibold">BlackTop Systems</span>
-          </div>
+          <Link href="/">
+            <div className="flex items-center gap-3 group cursor-pointer">
+              <div className="relative w-9 h-9 flex items-center justify-center">
+                <img 
+                  src={logoUrl} 
+                  alt="BlackTop Systems" 
+                  className="w-full h-full object-contain transition-transform group-hover:scale-105" 
+                />
+              </div>
+              <span className="text-xl font-semibold tracking-tight">BlackTop Systems</span>
+            </div>
+          </Link>
           <div className="flex items-center gap-4">
             <Link href="/pricing">
               <Button variant="ghost" data-testid="link-pricing">Pricing</Button>
