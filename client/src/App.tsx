@@ -1,15 +1,21 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, Router as WouterRouter, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TopBar } from "@/components/top-bar";
+import { MarketingLayout } from "@/layouts/MarketingLayout";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
-import Landing from "@/pages/landing";
+import Home from "@/pages/home";
+import Features from "@/pages/features";
 import Pricing from "@/pages/pricing";
+import ResourcesPublic from "@/pages/resources-public";
+import About from "@/pages/company/about";
+import Security from "@/pages/company/security";
+import Contact from "@/pages/company/contact";
 import Onboarding from "@/pages/onboarding";
 import Dashboard from "@/pages/dashboard";
 import Documents from "@/pages/documents";
@@ -65,11 +71,18 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
 function PublicRouter() {
   return (
-    <Switch>
-      <Route path="/" component={Landing} />
-      <Route path="/pricing" component={Pricing} />
-      <Route component={NotFound} />
-    </Switch>
+    <MarketingLayout>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/features" component={Features} />
+        <Route path="/pricing" component={Pricing} />
+        <Route path="/resources" component={ResourcesPublic} />
+        <Route path="/company/about" component={About} />
+        <Route path="/company/security" component={Security} />
+        <Route path="/company/contact" component={Contact} />
+        <Route component={NotFound} />
+      </Switch>
+    </MarketingLayout>
   );
 }
 
@@ -86,7 +99,7 @@ function ProtectedRouter() {
         <Route path="/analytics/:section" component={() => <ProtectedRoute component={Analytics} />} />
         <Route path="/budgets" component={() => <ProtectedRoute component={Budgets} />} />
         <Route path="/action-plans" component={() => <ProtectedRoute component={ActionPlans} />} />
-        <Route path="/resources" component={() => <ProtectedRoute component={Resources} />} />
+        <Route path="/app/resources" component={() => <ProtectedRoute component={Resources} />} />
         <Route path="/integrations" component={() => <ProtectedRoute component={Integrations} />} />
         <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
         <Route component={NotFound} />
@@ -95,8 +108,21 @@ function ProtectedRouter() {
   );
 }
 
-function Router() {
+function RouterInner() {
   const { user, isLoading } = useAuth();
+  const [location] = useLocation();
+
+  const cleanLocation = location.split('?')[0].split('#')[0];
+
+  const isMarketingRoute = [
+    "/",
+    "/features",
+    "/pricing",
+    "/resources",
+    "/company/about",
+    "/company/security",
+    "/company/contact"
+  ].some(route => cleanLocation === route || cleanLocation.startsWith(route + "/"));
 
   if (isLoading) {
     return (
@@ -108,7 +134,19 @@ function Router() {
     );
   }
 
+  if (isMarketingRoute) {
+    return <PublicRouter />;
+  }
+
   return user ? <ProtectedRouter /> : <PublicRouter />;
+}
+
+function Router() {
+  return (
+    <WouterRouter>
+      <RouterInner />
+    </WouterRouter>
+  );
 }
 
 function App() {

@@ -60,7 +60,7 @@ const menuItems = [
   },
   {
     title: "Resources",
-    url: "/resources",
+    url: "/app/resources",
     icon: BookOpen,
   },
   {
