@@ -1,5 +1,3 @@
-import { Link } from "wouter";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Check, Rocket } from "lucide-react";
@@ -81,23 +79,6 @@ const addon = {
 export default function Pricing() {
   return (
     <div className="min-h-screen bg-background">
-      <nav className="border-b px-6 py-5 backdrop-blur-md bg-background/90">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/">
-            <img 
-              src="/logo.png" 
-              alt="BlackTop Systems" 
-              className="h-8 object-contain hover:scale-105 transition-transform cursor-pointer" 
-            />
-          </Link>
-          <div className="flex items-center gap-4">
-            <a href="/api/login">
-              <Button data-testid="button-login">Sign In</Button>
-            </a>
-          </div>
-        </div>
-      </nav>
-
       <section className="px-6 py-16">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
