@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
-import logoUrl from "@assets/generated_images/blacktop_systems_company_logo.png";
+import logoUrl from "@assets/generated_images/minimalist_blacktop_systems_logo.png";
 
 const menuItems = [
   {
