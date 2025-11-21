@@ -33,7 +33,7 @@ export default function Landing() {
               <img 
                 src="/logo.png" 
                 alt="BlackTop Systems" 
-                className="h-8 object-contain transition-transform group-hover:scale-110" 
+                className="h-12 object-contain transition-transform group-hover:scale-105" 
               />
             </div>
           </Link>

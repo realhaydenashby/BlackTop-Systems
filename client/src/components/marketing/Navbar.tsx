@@ -26,7 +26,7 @@ export function Navbar() {
           <img 
             src="/logo.png" 
             alt="BlackTop Systems" 
-            className="h-8 object-contain" 
+            className="h-12 object-contain" 
           />
         </Link>
 

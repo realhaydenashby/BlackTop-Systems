@@ -113,7 +113,7 @@ export function AppSidebar() {
             <img 
               src="/logo.png" 
               alt="BlackTop Systems" 
-              className="h-6 object-contain" 
+              className="h-10 object-contain" 
             />
           </div>
           <SidebarGroupContent className="pt-2">
