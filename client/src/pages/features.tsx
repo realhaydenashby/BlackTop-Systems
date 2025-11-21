@@ -20,52 +20,52 @@ export default function Features() {
   const features = [
     {
       icon: BarChart3,
-      title: "Category Spend",
+      title: "Product A",
       description: "Track spending across software, marketing, operations, and more."
     },
     {
       icon: Users,
-      title: "Department Spend",
+      title: "Product B",
       description: "See which teams are spending what—and where to optimize."
     },
     {
       icon: Clock,
-      title: "Recurring Vendor Burn",
+      title: "Product C",
       description: "Identify monthly commitments draining your runway."
     },
     {
       icon: TrendingUp,
-      title: "Subscription Creep",
+      title: "Services",
       description: "Catch forgotten SaaS tools costing you thousands."
     },
     {
       icon: Target,
-      title: "Marketing Drift",
+      title: "Product A",
       description: "Spot when campaigns exceed budget before it's too late."
     },
     {
       icon: Users,
-      title: "Payroll Overtime Drift",
+      title: "Product B",
       description: "Monitor unexpected spikes in labor costs."
     },
     {
       icon: AlertTriangle,
-      title: "Vendor Overbilling",
+      title: "Product C",
       description: "AI flags suspicious charges and duplicate invoices."
     },
     {
       icon: LineChart,
-      title: "Trend Anomalies",
+      title: "Services",
       description: "Detect unusual spending patterns before they become problems."
     },
     {
       icon: BarChart3,
-      title: "Quarter-over-Quarter",
+      title: "Product A",
       description: "Compare QoQ performance with detailed period analysis."
     },
     {
       icon: Info,
-      title: "What Changed & Why",
+      title: "Product B",
       description: "AI explains every variance with context and recommendations."
     }
   ];
