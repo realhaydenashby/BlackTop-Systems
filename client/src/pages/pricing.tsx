@@ -152,7 +152,7 @@ export default function Pricing() {
             {plans.map((plan) => (
               <Card 
                 key={plan.tier} 
-                className="hover-elevate transition-all cursor-pointer"
+                className="hover-elevate transition-all cursor-pointer flex flex-col"
                 onClick={() => setSelectedPlan(plan)}
                 data-testid={`card-plan-${plan.tier}`}
               >
@@ -169,7 +169,7 @@ export default function Pricing() {
                     <span className="text-muted-foreground">/{plan.period}</span>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1">
                   <ul className="space-y-3">
                     {plan.features.map((feature, idx) => (
                       <li key={idx} className="flex items-start gap-2">
