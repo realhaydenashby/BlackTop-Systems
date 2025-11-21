@@ -1,0 +1,137 @@
+You built a real product now, so kill the “Product A / Product B / Services” clown show.
+
+Here’s a prompt you can paste into Replit / your AI builder to rewrite the Products page into something that actually matches BlackTop:
+
+⸻
+
+You are updating the Products / Features page for a B2B SaaS app called BlackTop Systems.
+
+Context
+
+Current page content (messy and redundant):
+
+Analytics that actually matter
+Stop guessing. Start knowing. Our AI diagnoses your spend and shows you what changed and why.
+
+Product A
+Track spending across software, marketing, operations, and more.
+Product B
+See which teams are spending what—and where to optimize.
+Product C
+Identify monthly commitments draining your runway.
+Services
+Catch forgotten SaaS tools costing you thousands.
+Product A
+Spot when campaigns exceed budget before it’s too late.
+Product B
+Monitor unexpected spikes in labor costs.
+Product C
+AI flags suspicious charges and duplicate invoices.
+Services
+Detect unusual spending patterns before they become problems.
+Product A
+Compare QoQ performance with detailed period analysis.
+Product B
+AI explains every variance with context and recommendations.
+
+Delete all of that and replace it with a clean, structured Products / What We Do page that accurately reflects BlackTop’s real product.
+
+⸻
+
+1. Product Positioning
+
+Use this positioning clearly at the top:
+
+Headline:
+BlackTop Systems: The AI Finance Copilot for Startups & SMBs
+
+Subheadline:
+Ingest your financial chaos, see your real burn and runway, and get a budget + action plan you can actually execute.
+
+⸻
+
+2. Page Structure
+
+Rebuild the Products page into 3 main sections, no “Product A/B/C” nonsense:
+
+Section 1: Ingest & Normalize
+
+Explain that BlackTop:
+	•	Connects to bank / card feeds (via Plaid/Yodlee or file uploads)
+	•	Ingests PDFs, CSVs, invoices, receipts, subscription emails
+	•	Normalizes everything into clean transactions with:
+	•	vendor
+	•	category
+	•	department
+	•	recurring vs one-time
+	•	tags/subscriptions
+
+Add a short feature list, for example:
+	•	“Bank, card, and document ingestion in one place”
+	•	“Automatic vendor and category classification”
+	•	“Subscription and duplicate spend detection”
+
+Keep copy concise, professional, and concrete.
+
+Section 2: Diagnose What’s Really Happening
+
+This is the analytics layer. Show the core things BlackTop does, not generic “analytics”:
+
+Split into two subsections:
+	1.	For startups preparing to fundraise:
+
+	•	Burn rate analytics (payroll vs non-payroll)
+	•	Runway estimates under multiple scenarios
+	•	Raise planning (“how much should we raise?”)
+	•	Headcount / hiring planning impact on runway
+
+	2.	For SMBs:
+
+	•	Spend by category, department, and vendor
+	•	Subscription creep and vendor overbilling
+	•	Month-over-month and quarter-over-quarter trends
+	•	Cash flow trends and early runway warnings
+
+Make it clear this is decision-support, not just pretty charts.
+
+Section 3: Plan & Act (Budgets + Action Plans)
+
+This is your wedge. Spell it out:
+	•	AI-generated budget based on actual historical spend
+	•	Department-level allocations & vendor caps
+	•	Runway impact of different budget choices
+	•	Monthly Action Plan:
+	•	“Cut these subscriptions”
+	•	“Cap this campaign at $X”
+	•	“This vendor drifted +22% vs last quarter”
+	•	“These changes extend runway by Y months”
+
+Include a visual description like “Budget + Action Plan” cards instead of random “Services” blocks.
+
+⸻
+
+3. Design & Copy Requirements
+	•	No placeholder labels like “Product A / Product B / Services.”
+	•	Use clear, descriptive section titles:
+	•	“Ingest & Normalize”
+	•	“Diagnose Your Spend”
+	•	“Budgets & Action Plans”
+	•	Tone: clear, confident, practical. No buzzword salad.
+	•	Keep paragraphs short, with supporting bullet lists.
+	•	Match the dark, modern BlackTop theme (navy / gray / blue / teal) but don’t change layout structure beyond this page.
+
+⸻
+
+4. Tie Back To Outcomes
+
+At the bottom of the page, add a short “Why teams use BlackTop” band with 3 outcome tiles, such as:
+	•	“Know your real burn & runway in minutes”
+	•	“Show up to investors with clean, defensible numbers”
+	•	“Extend runway without guessing where to cut”
+
+Make sure all text aligns with what the app actually does:
+Ingest → Normalize → Analyze → Budget → Action Plan.
+
+⸻
+
+Apply all of this to the existing Products page, replacing the messy content with a focused, product-accurate, startup- and SMB-ready description of BlackTop.
