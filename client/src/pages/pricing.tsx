@@ -156,13 +156,13 @@ export default function Pricing() {
                 onClick={() => setSelectedPlan(plan)}
                 data-testid={`card-plan-${plan.tier}`}
               >
-                {plan.popular && (
-                  <div className="px-6 pt-4">
-                    <Badge className="mb-2" data-testid={`badge-popular-${plan.tier}`}>Most Popular</Badge>
-                  </div>
-                )}
                 <CardHeader>
-                  <CardTitle>{plan.name}</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>{plan.name}</CardTitle>
+                    {plan.popular && (
+                      <Badge data-testid={`badge-popular-${plan.tier}`}>Most Popular</Badge>
+                    )}
+                  </div>
                   <CardDescription>{plan.description}</CardDescription>
                   <div className="mt-4">
                     <span className="text-4xl font-bold">{plan.price}</span>
