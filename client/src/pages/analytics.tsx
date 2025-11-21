@@ -5,8 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
-
-const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+import { CHART_COLORS, chartStyles, lineStyles, areaStyles, barStyles } from "@/lib/chartTheme";
+import { ActionPlanModule, type ActionPlanItem } from "@/components/ActionPlanModule";
 
 export default function Analytics() {
   const [, params] = useRoute("/analytics/:section");
@@ -107,12 +107,18 @@ export default function Analytics() {
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={analytics?.spendTrend || []}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="amount" stroke="hsl(var(--primary))" name="Spending" strokeWidth={2} />
+                  <CartesianGrid {...chartStyles.cartesianGrid} />
+                  <XAxis dataKey="date" {...chartStyles.xAxis} />
+                  <YAxis {...chartStyles.yAxis} />
+                  <Tooltip {...chartStyles.tooltip} />
+                  <Legend {...chartStyles.legend} />
+                  <Line 
+                    type="monotone" 
+                    dataKey="amount" 
+                    stroke={CHART_COLORS[0]} 
+                    name="Spending" 
+                    {...lineStyles}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -132,14 +138,13 @@ export default function Analytics() {
                     labelLine={false}
                     label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                     outerRadius={100}
-                    fill="#8884d8"
                     dataKey="value"
                   >
                     {(analytics?.categoryDistribution || []).map((_: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip {...chartStyles.tooltip} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
@@ -152,11 +157,11 @@ export default function Analytics() {
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={analytics?.departmentSpending || []}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="hsl(var(--primary))" />
+                  <CartesianGrid {...chartStyles.cartesianGrid} />
+                  <XAxis dataKey="name" {...chartStyles.xAxis} />
+                  <YAxis {...chartStyles.yAxis} />
+                  <Tooltip {...chartStyles.tooltip} />
+                  <Bar dataKey="value" fill={CHART_COLORS[0]} {...barStyles} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -169,11 +174,11 @@ export default function Analytics() {
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={analytics?.topVendors || []} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={100} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="hsl(var(--accent))" />
+                  <CartesianGrid {...chartStyles.cartesianGrid} />
+                  <XAxis type="number" {...chartStyles.xAxis} />
+                  <YAxis dataKey="name" type="category" width={100} {...chartStyles.yAxis} />
+                  <Tooltip {...chartStyles.tooltip} />
+                  <Bar dataKey="value" fill={CHART_COLORS[1]} {...barStyles} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -187,22 +192,28 @@ export default function Analytics() {
           <CardContent>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={analytics?.monthlyComparison || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="current" fill="hsl(var(--primary))" name="This Year" />
-                <Bar dataKey="previous" fill="hsl(var(--muted))" name="Last Year" />
+                <CartesianGrid {...chartStyles.cartesianGrid} />
+                <XAxis dataKey="month" {...chartStyles.xAxis} />
+                <YAxis {...chartStyles.yAxis} />
+                <Tooltip {...chartStyles.tooltip} />
+                <Legend {...chartStyles.legend} />
+                <Bar dataKey="current" fill={CHART_COLORS[0]} name="This Year" {...barStyles} />
+                <Bar dataKey="previous" fill={CHART_COLORS[2]} name="Last Year" {...barStyles} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
+
+        <ActionPlanModule 
+          title="AI-Generated Action Plan"
+          description="Actionable insights based on your spend data"
+          items={analytics?.spendActionPlan || []}
+        />
       </>
       )}
 
       {section === "revenue" && (
-        <div className="grid gap-6">
+        <>
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
@@ -210,12 +221,19 @@ export default function Analytics() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={analytics?.revenueGrowth || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} name="Revenue" />
+                  <AreaChart data={analytics?.revenue?.revenueGrowth || []}>
+                    <CartesianGrid {...chartStyles.cartesianGrid} />
+                    <XAxis dataKey="month" {...chartStyles.xAxis} />
+                    <YAxis {...chartStyles.yAxis} />
+                    <Tooltip {...chartStyles.tooltip} />
+                    <Area 
+                      type="monotone" 
+                      dataKey="revenue" 
+                      stroke={CHART_COLORS[0]} 
+                      fill={CHART_COLORS[0]} 
+                      name="Revenue" 
+                      {...areaStyles}
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -227,14 +245,26 @@ export default function Analytics() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={analytics?.mrrArr || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="mrr" stroke="hsl(var(--chart-1))" name="MRR" strokeWidth={2} />
-                    <Line type="monotone" dataKey="arr" stroke="hsl(var(--chart-2))" name="ARR" strokeWidth={2} />
+                  <LineChart data={analytics?.revenue?.mrrArr || []}>
+                    <CartesianGrid {...chartStyles.cartesianGrid} />
+                    <XAxis dataKey="month" {...chartStyles.xAxis} />
+                    <YAxis {...chartStyles.yAxis} />
+                    <Tooltip {...chartStyles.tooltip} />
+                    <Legend {...chartStyles.legend} />
+                    <Line 
+                      type="monotone" 
+                      dataKey="mrr" 
+                      stroke={CHART_COLORS[0]} 
+                      name="MRR" 
+                      {...lineStyles}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="arr" 
+                      stroke={CHART_COLORS[1]} 
+                      name="ARR" 
+                      {...lineStyles}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -249,29 +279,34 @@ export default function Analytics() {
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
-                    data={analytics?.revenueSources || []}
+                    data={analytics?.revenue?.revenueSources || []}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
                     label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                     outerRadius={100}
-                    fill="#8884d8"
                     dataKey="value"
                   >
-                    {(analytics?.revenueSources || []).map((_: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    {(analytics?.revenue?.revenueSources || []).map((_: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip {...chartStyles.tooltip} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </div>
+
+          <ActionPlanModule 
+            title="Revenue Growth Action Plan"
+            description="Strategic insights to accelerate revenue growth"
+            items={analytics?.revenueActionPlan || []}
+          />
+        </>
       )}
 
       {section === "profitability" && (
-        <div className="grid gap-6">
+        <>
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
@@ -280,14 +315,32 @@ export default function Analytics() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={analytics?.profitability?.margins || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="gross" stroke="hsl(var(--chart-1))" name="Gross Margin %" strokeWidth={2} />
-                    <Line type="monotone" dataKey="operating" stroke="hsl(var(--chart-2))" name="Operating Margin %" strokeWidth={2} />
-                    <Line type="monotone" dataKey="net" stroke="hsl(var(--chart-3))" name="Net Margin %" strokeWidth={2} />
+                    <CartesianGrid {...chartStyles.cartesianGrid} />
+                    <XAxis dataKey="month" {...chartStyles.xAxis} />
+                    <YAxis {...chartStyles.yAxis} />
+                    <Tooltip {...chartStyles.tooltip} />
+                    <Legend {...chartStyles.legend} />
+                    <Line 
+                      type="monotone" 
+                      dataKey="gross" 
+                      stroke={CHART_COLORS[0]} 
+                      name="Gross Margin %" 
+                      {...lineStyles}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="operating" 
+                      stroke={CHART_COLORS[1]} 
+                      name="Operating Margin %" 
+                      {...lineStyles}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="net" 
+                      stroke={CHART_COLORS[2]} 
+                      name="Net Margin %" 
+                      {...lineStyles}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -295,16 +348,23 @@ export default function Analytics() {
 
             <Card>
               <CardHeader>
-                <CardTitle>EBITDA Trend</CardTitle>
+                <CardTitle>Net Income Trend</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={analytics?.profitability?.ebitda || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} name="EBITDA" />
+                  <AreaChart data={analytics?.profitability?.netIncome || []}>
+                    <CartesianGrid {...chartStyles.cartesianGrid} />
+                    <XAxis dataKey="month" {...chartStyles.xAxis} />
+                    <YAxis {...chartStyles.yAxis} />
+                    <Tooltip {...chartStyles.tooltip} />
+                    <Area 
+                      type="monotone" 
+                      dataKey="income" 
+                      stroke={CHART_COLORS[0]} 
+                      fill={CHART_COLORS[0]} 
+                      name="Net Income" 
+                      {...areaStyles}
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -325,38 +385,68 @@ export default function Analytics() {
                     labelLine={false}
                     label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                     outerRadius={100}
-                    fill="#8884d8"
                     dataKey="value"
                   >
                     {(analytics?.profitability?.costStructure || []).map((_: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip {...chartStyles.tooltip} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </div>
+
+          <ActionPlanModule 
+            title="Profitability Action Plan"
+            description="Optimize margins and reduce costs"
+            items={analytics?.profitabilityActionPlan || []}
+          />
+        </>
       )}
 
       {section === "forecasting" && (
-        <div className="grid gap-6">
+        <>
           <Card>
             <CardHeader>
-              <CardTitle>12-Month Revenue Forecast</CardTitle>
+              <CardTitle>12-Month Financial Forecast</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={analytics?.forecasting?.forecast || []}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="actual" stroke="hsl(var(--primary))" name="Actual" strokeWidth={2} />
-                  <Line type="monotone" dataKey="predicted" stroke="hsl(var(--chart-2))" name="Predicted" strokeWidth={2} strokeDasharray="5 5" />
-                </LineChart>
+                <AreaChart data={analytics?.forecasting?.forecast12Months || []}>
+                  <CartesianGrid {...chartStyles.cartesianGrid} />
+                  <XAxis dataKey="month" {...chartStyles.xAxis} />
+                  <YAxis {...chartStyles.yAxis} />
+                  <Tooltip {...chartStyles.tooltip} />
+                  <Legend {...chartStyles.legend} />
+                  <Area 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stackId="1"
+                    stroke={CHART_COLORS[0]} 
+                    fill={CHART_COLORS[0]} 
+                    name="Revenue" 
+                    {...areaStyles}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="expenses" 
+                    stackId="2"
+                    stroke={CHART_COLORS[3]} 
+                    fill={CHART_COLORS[3]} 
+                    name="Expenses" 
+                    {...areaStyles}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="profit" 
+                    stackId="3"
+                    stroke={CHART_COLORS[1]} 
+                    fill={CHART_COLORS[1]} 
+                    name="Profit" 
+                    {...areaStyles}
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -368,16 +458,16 @@ export default function Analytics() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={analytics?.forecasting?.scenarios || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="best" stroke="hsl(var(--chart-1))" name="Best Case" strokeWidth={2} />
-                    <Line type="monotone" dataKey="expected" stroke="hsl(var(--chart-2))" name="Expected" strokeWidth={2} />
-                    <Line type="monotone" dataKey="worst" stroke="hsl(var(--chart-3))" name="Worst Case" strokeWidth={2} />
-                  </LineChart>
+                  <BarChart data={analytics?.forecasting?.scenarioAnalysis || []}>
+                    <CartesianGrid {...chartStyles.cartesianGrid} />
+                    <XAxis dataKey="scenario" {...chartStyles.xAxis} />
+                    <YAxis {...chartStyles.yAxis} />
+                    <Tooltip {...chartStyles.tooltip} />
+                    <Legend {...chartStyles.legend} />
+                    <Bar dataKey="revenue" fill={CHART_COLORS[0]} name="Revenue" {...barStyles} />
+                    <Bar dataKey="expenses" fill={CHART_COLORS[3]} name="Expenses" {...barStyles} />
+                    <Bar dataKey="profit" fill={CHART_COLORS[1]} name="Profit" {...barStyles} />
+                  </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
@@ -386,20 +476,31 @@ export default function Analytics() {
               <CardHeader>
                 <CardTitle>Cash Runway</CardTitle>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={analytics?.forecasting?.cashRunway || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="cash" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} name="Cash Balance" />
-                  </AreaChart>
-                </ResponsiveContainer>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Runway</p>
+                    <p className="text-2xl font-bold">{analytics?.forecasting?.cashRunway?.months || 0} mo</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Burn Rate</p>
+                    <p className="text-2xl font-bold">${((analytics?.forecasting?.cashRunway?.burnRate || 0) / 1000).toFixed(0)}k</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Cash</p>
+                    <p className="text-2xl font-bold">${((analytics?.forecasting?.cashRunway?.currentCash || 0) / 1000).toFixed(0)}k</p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
-        </div>
+
+          <ActionPlanModule 
+            title="Forecasting Action Plan"
+            description="Strategic planning for future growth"
+            items={analytics?.forecastingActionPlan || []}
+          />
+        </>
       )}
     </div>
   );
