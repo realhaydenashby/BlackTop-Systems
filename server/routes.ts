@@ -605,15 +605,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Analytics
   app.get("/api/analytics", isAuthenticated, async (req, res) => {
     try {
-      // Always return comprehensive mock data for all analytics sections
-      const { days = "30" } = req.query;
-      const daysNum = parseInt(days as string);
-      return res.json(generateMockAnalytics(daysNum));
-
-      // Original code commented out for mock data
-      /*
       const user = req.user as any;
       const userId = user.claims.sub;
+      const { days = "30" } = req.query;
+      const daysNum = parseInt(days as string);
 
       const orgs = await storage.getUserOrganizations(userId);
       if (orgs.length === 0) {
@@ -623,67 +618,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const startDate = subDays(new Date(), daysNum);
 
+      // Fetch real data from database
       const txns = await storage.getOrganizationTransactions(organizationId, {
         startDate,
       });
 
+      // If no data yet, return mock data
+      if (txns.length === 0) {
+        return res.json(generateMockAnalytics(daysNum));
+      }
+
+      // Get categories and vendors for analytics
+      const categories = await storage.getOrganizationCategories(organizationId);
+      const vendors = await storage.getOrganizationVendors(organizationId);
+
+      // Use analytics service for calculations
+      const { analyticsService } = await import("./analyticsService");
+      const monthlyTrends = analyticsService.calculateMonthlyTrends(txns, categories, 6);
+      const spendingPatterns = analyticsService.analyzeSpendingPatterns(txns, vendors, categories);
+      const burnAnalysis = analyticsService.calculateBurnRate(txns, 50000);
+
+      // Format spend trend for chart
       const spendTrend = txns.reduce((acc: any[], txn) => {
         const date = new Date(txn.date).toISOString().split("T")[0];
         const existing = acc.find((item) => item.date === date);
+        const amount = Math.abs(parseFloat(txn.amount));
         if (existing) {
-          existing.amount += parseFloat(txn.amount);
+          existing.amount += amount;
         } else {
-          acc.push({ date, amount: parseFloat(txn.amount) });
+          acc.push({ date, amount });
         }
         return acc;
-      }, []);
+      }, []).sort((a, b) => a.date.localeCompare(b.date));
 
-      const categoryDistribution = txns.reduce((acc: any[], txn) => {
-        const catName = txn.category?.name || "Uncategorized";
-        const existing = acc.find((item) => item.name === catName);
-        if (existing) {
-          existing.value += parseFloat(txn.amount);
-        } else {
-          acc.push({ name: catName, value: parseFloat(txn.amount) });
-        }
-        return acc;
-      }, []);
+      // Category distribution from spending patterns
+      const categoryDistribution = spendingPatterns.topCategories.map((cat) => ({
+        name: cat.categoryName,
+        value: cat.total,
+        percentage: cat.percentage,
+      }));
 
-      const departmentSpending = txns.reduce((acc: any[], txn) => {
-        if (txn.department) {
-          const deptName = txn.department.name;
-          const existing = acc.find((item) => item.name === deptName);
-          if (existing) {
-            existing.value += parseFloat(txn.amount);
-          } else {
-            acc.push({ name: deptName, value: parseFloat(txn.amount) });
-          }
-        }
-        return acc;
-      }, []);
+      // Top vendors
+      const topVendors = spendingPatterns.topVendors.slice(0, 10).map((v) => ({
+        name: v.vendorName,
+        value: v.total,
+        count: v.count,
+      }));
 
-      const topVendors = txns.reduce((acc: any[], txn) => {
-        if (txn.vendor) {
-          const vendorName = txn.vendor.name;
-          const existing = acc.find((item) => item.name === vendorName);
-          if (existing) {
-            existing.value += parseFloat(txn.amount);
-          } else {
-            acc.push({ name: vendorName, value: parseFloat(txn.amount) });
-          }
-        }
-        return acc;
-      }, []).sort((a, b) => b.value - a.value).slice(0, 10);
+      // Monthly comparison
+      const monthlyComparison = monthlyTrends.map((month) => ({
+        month: month.month,
+        amount: month.total,
+        count: month.count,
+      }));
 
       res.json({
         spendTrend,
         categoryDistribution,
-        departmentSpending,
+        departmentSpending: [], // TODO: Implement department tracking
         topVendors,
-        monthlyComparison: [],
+        monthlyComparison,
+        metrics: {
+          totalExpenses: txns.reduce((sum, txn) => sum + Math.abs(parseFloat(txn.amount)), 0),
+          transactionCount: txns.length,
+          avgMonthlyBurn: burnAnalysis.avgMonthlyBurn,
+          burnTrend: burnAnalysis.burnTrend,
+          runway: burnAnalysis.runway,
+          recurringTotal: spendingPatterns.recurringTotal,
+          oneTimeTotal: spendingPatterns.oneTimeTotal,
+        },
       });
-      */
     } catch (error: any) {
+      console.error("Analytics error:", error);
       res.status(500).json({ message: error.message });
     }
   });
