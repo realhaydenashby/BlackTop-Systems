@@ -28,7 +28,6 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
-import logoUrl from "@assets/generated_images/minimalist_blacktop_systems_logo.png";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useState } from "react";
 
@@ -95,17 +94,12 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <div className="flex items-center gap-3 px-3 py-6 border-b border-sidebar-border">
-            <div className="relative w-8 h-8 flex items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 p-1.5 ring-1 ring-primary/20">
-              <img 
-                src={logoUrl} 
-                alt="BlackTop Systems" 
-                className="w-full h-full object-contain" 
-              />
-            </div>
-            <SidebarGroupLabel className="text-base font-semibold tracking-tight">
-              BlackTop Systems
-            </SidebarGroupLabel>
+          <div className="flex items-center gap-2 px-3 py-6 border-b border-sidebar-border">
+            <img 
+              src="/logo.png" 
+              alt="BlackTop Systems" 
+              className="h-6 object-contain" 
+            />
           </div>
           <SidebarGroupContent className="pt-2">
             <SidebarMenu>

@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import logoUrl from "@assets/generated_images/minimalist_blacktop_systems_logo.png";
 
 const plans = [
   {
@@ -64,16 +63,11 @@ export default function Pricing() {
       <nav className="border-b px-6 py-5 backdrop-blur-md bg-background/90">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/">
-            <div className="flex items-center gap-3 group cursor-pointer">
-              <div className="relative w-9 h-9 flex items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 p-1.5 ring-1 ring-primary/20">
-                <img 
-                  src={logoUrl} 
-                  alt="BlackTop Systems" 
-                  className="w-full h-full object-contain transition-transform group-hover:scale-110" 
-                />
-              </div>
-              <span className="text-xl font-semibold tracking-tight">BlackTop Systems</span>
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="BlackTop Systems" 
+              className="h-8 object-contain hover:scale-105 transition-transform cursor-pointer" 
+            />
           </Link>
           <div className="flex items-center gap-4">
             <a href="/api/login">

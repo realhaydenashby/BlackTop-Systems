@@ -67,7 +67,7 @@ export default function Onboarding() {
     },
     onSuccess: () => {
       toast({
-        title: "Welcome to ClarityOS!",
+        title: "Welcome to BlackTop Systems!",
         description: "Your organization has been set up successfully.",
       });
       setLocation("/dashboard");
@@ -87,13 +87,21 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
-      <Card className="w-full max-w-2xl">
-        <CardHeader>
-          <CardTitle>Welcome to ClarityOS</CardTitle>
-          <CardDescription>
-            Let's set up your organization profile to get started
-          </CardDescription>
-        </CardHeader>
+      <div className="w-full max-w-2xl space-y-6">
+        <div className="flex justify-center mb-4">
+          <img 
+            src="/logo.png" 
+            alt="BlackTop Systems" 
+            className="h-12 object-contain" 
+          />
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Welcome to BlackTop Systems</CardTitle>
+            <CardDescription>
+              Let's set up your organization profile to get started
+            </CardDescription>
+          </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -303,7 +311,8 @@ export default function Onboarding() {
             </form>
           </Form>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

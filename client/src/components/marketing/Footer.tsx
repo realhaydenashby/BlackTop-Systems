@@ -1,5 +1,4 @@
 import { Link } from "wouter";
-import logoUrl from "@assets/generated_images/minimalist_blacktop_systems_logo.png";
 
 export function Footer() {
   return (
@@ -7,16 +6,11 @@ export function Footer() {
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="relative w-8 h-8 flex items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 p-1.5 ring-1 ring-primary/20">
-                <img 
-                  src={logoUrl} 
-                  alt="BlackTop Systems" 
-                  className="w-full h-full object-contain" 
-                />
-              </div>
-              <span className="font-bold">BlackTop Systems</span>
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="BlackTop Systems" 
+              className="h-8 object-contain mb-4" 
+            />
             <p className="text-sm text-muted-foreground">
               Financial Clarity. Instantly.
             </p>

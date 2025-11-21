@@ -9,7 +9,6 @@ import {
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
 import { ChevronDown } from "lucide-react";
-import logoUrl from "@assets/generated_images/minimalist_blacktop_systems_logo.png";
 
 export function Navbar() {
   const [location] = useLocation();
@@ -23,15 +22,12 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3 hover-elevate rounded-lg px-2 py-1 -ml-2">
-          <div className="relative w-8 h-8 flex items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 p-1.5 ring-1 ring-primary/20">
-            <img 
-              src={logoUrl} 
-              alt="BlackTop Systems" 
-              className="w-full h-full object-contain" 
-            />
-          </div>
-          <span className="font-bold text-lg">BlackTop Systems</span>
+        <Link href="/" className="flex items-center gap-2 hover-elevate rounded-lg px-2 py-1 -ml-2">
+          <img 
+            src="/logo.png" 
+            alt="BlackTop Systems" 
+            className="h-8 object-contain" 
+          />
         </Link>
 
         <div className="flex items-center gap-6">
