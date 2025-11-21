@@ -170,9 +170,9 @@ In the end, financial clarity is not a complex problem. It begins with visibilit
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-[600px] pr-4">
-                  <div className="prose prose-sm max-w-none dark:prose-invert" data-testid="article-content">
+                  <div className="prose prose-lg max-w-none prose-[--tw-prose-body:hsl(var(--card-foreground))] prose-p:leading-loose prose-p:mb-6" data-testid="article-content">
                     {selectedResource.content.split('\n\n').map((paragraph, idx) => (
-                      <p key={idx} className="mb-4 text-base leading-relaxed">
+                      <p key={idx}>
                         {paragraph}
                       </p>
                     ))}
