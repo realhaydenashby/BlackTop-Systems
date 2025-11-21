@@ -1,6 +1,5 @@
 // Google Document AI service for OCR and document processing
 import { DocumentProcessorServiceClient } from "@google-cloud/documentai";
-import { storage as cloudStorage } from "./objectStorage";
 
 interface DocumentAIConfig {
   projectId: string;
@@ -62,8 +61,9 @@ class DocumentAIService {
 
   /**
    * Process a document (PDF or image) and extract text
+   * @param fileBuffer - The file content as a Buffer (already fetched from storage)
    */
-  async processDocument(fileUrl: string): Promise<{
+  async processDocument(fileBuffer: Buffer): Promise<{
     rawText: string;
     confidence: number;
     entities: any[];
@@ -73,10 +73,7 @@ class DocumentAIService {
     }
 
     try {
-      // Download file content from cloud storage
-      const response = await fetch(fileUrl);
-      const fileBuffer = await response.arrayBuffer();
-      const content = Buffer.from(fileBuffer);
+      const content = fileBuffer;
 
       // Configure the process request
       const name = `projects/${this.config.projectId}/locations/${this.config.location}/processors/${this.config.processorId}`;
@@ -175,9 +172,10 @@ If you cannot extract transactions, return an empty transactions array.`;
 
   /**
    * Process a document end-to-end: OCR → extract transactions
+   * @param fileBuffer - The file content as a Buffer
    */
   async processAndExtractTransactions(
-    fileUrl: string,
+    fileBuffer: Buffer,
     documentType: "bank_statement" | "invoice" | "receipt" = "bank_statement"
   ): Promise<{
     rawText: string;
@@ -185,7 +183,7 @@ If you cannot extract transactions, return an empty transactions array.`;
     transactions: ExtractedTransaction[];
   }> {
     // Step 1: OCR the document
-    const { rawText, confidence } = await this.processDocument(fileUrl);
+    const { rawText, confidence } = await this.processDocument(fileBuffer);
 
     // Step 2: Extract transactions using AI
     const transactions = await this.extractTransactions(rawText, documentType);

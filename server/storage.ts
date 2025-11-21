@@ -128,20 +128,24 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async upsertUser(userData: UpsertUser): Promise<User> {
+    if (!userData.id) {
+      throw new Error("User ID is required for upsert");
+    }
+    
     const existing = await db.query.users.findFirst({
-      where: eq(users.id, userData.id!),
+      where: eq(users.id, userData.id),
     });
 
     if (existing) {
       const [updated] = await db
         .update(users)
         .set({ ...userData, updatedAt: new Date() })
-        .where(eq(users.id, userData.id!))
+        .where(eq(users.id, userData.id))
         .returning();
       return updated;
     }
 
-    const [user] = await db.insert(users).values(userData).returning();
+    const [user] = await db.insert(users).values(userData as any).returning();
     return user;
   }
 

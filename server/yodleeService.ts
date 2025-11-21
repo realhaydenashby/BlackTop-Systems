@@ -88,48 +88,105 @@ class YodleeService {
   }
 
   /**
-   * Get authenticated headers
+   * Get authenticated headers with cobrand session
    */
-  private async getHeaders(): Promise<Record<string, string>> {
-    const token = await this.getAccessToken();
+  private async getCobrandHeaders(): Promise<Record<string, string>> {
+    const cobSession = await this.getCobrandToken();
     return {
       "Content-Type": "application/json",
       "Api-Version": "1.1",
-      Authorization: `Bearer ${token}`,
+      Authorization: `cobSession=${cobSession}`,
     };
   }
 
   /**
-   * Generate FastLink URL for user to connect their bank accounts
-   * This creates a session for the user to authenticate with their bank
+   * Get authenticated headers with both cobrand and user session
    */
-  async generateFastLink(userId: string): Promise<{ accessToken: string; fastLinkUrl: string }> {
-    try {
-      const headers = await this.getHeaders();
+  private getUserHeaders(userSession: string, cobSession: string): Record<string, string> {
+    return {
+      "Content-Type": "application/json",
+      "Api-Version": "1.1",
+      Authorization: `cobSession=${cobSession},userSession=${userSession}`,
+    };
+  }
 
-      // Create or get Yodlee user
-      const userResponse = await this.client.post(
-        "/user/register",
+  /**
+   * Register or login a Yodlee user and return their session token
+   */
+  private async getOrCreateYodleeUser(userId: string): Promise<string> {
+    const cobSession = await this.getCobrandToken();
+    const headers = await this.getCobrandHeaders();
+    
+    const loginName = `user_${userId}`;
+    const password = `pwd_${userId}_${process.env.YODLEE_SECRET?.substring(0, 8)}`;
+
+    try {
+      // Try to login first
+      const loginResponse = await this.client.post(
+        "/user/login",
         {
           user: {
-            loginName: `user_${userId}`,
-            email: `user_${userId}@blacktopsystems.com`,
+            loginName,
+            password,
           },
         },
         { headers }
       );
 
-      const userAccessToken = userResponse.data.user.accessTokens?.[0]?.value;
+      return loginResponse.data.user.session.userSession;
+    } catch (loginError: any) {
+      // If login fails, try to register
+      if (loginError.response?.status === 401 || loginError.response?.status === 404) {
+        try {
+          const registerResponse = await this.client.post(
+            "/user/register",
+            {
+              user: {
+                loginName,
+                password,
+                email: `${loginName}@blacktopsystems.app`,
+              },
+            },
+            { headers }
+          );
 
-      if (!userAccessToken) {
-        throw new Error("Failed to get user access token");
+          return registerResponse.data.user.session.userSession;
+        } catch (registerError: any) {
+          // Handle duplicate user (409)
+          if (registerError.response?.status === 409) {
+            // User exists but wrong password - try login again
+            const retryLogin = await this.client.post(
+              "/user/login",
+              {
+                user: {
+                  loginName,
+                  password,
+                },
+              },
+              { headers }
+            );
+            return retryLogin.data.user.session.userSession;
+          }
+          throw registerError;
+        }
       }
+      throw loginError;
+    }
+  }
+
+  /**
+   * Generate FastLink URL for user to connect their bank accounts
+   */
+  async generateFastLink(userId: string): Promise<{ userSession: string; fastLinkUrl: string }> {
+    try {
+      const cobSession = await this.getCobrandToken();
+      const userSession = await this.getOrCreateYodleeUser(userId);
 
       // Generate FastLink URL
-      const fastLinkUrl = `${YODLEE_BASE_URL}/fastlink/v4?accessToken=${userAccessToken}`;
+      const fastLinkUrl = `${YODLEE_BASE_URL}/fastlink/v4?channelAppName=blacktopsystems&cobSession=${cobSession}&userSession=${userSession}`;
 
       return {
-        accessToken: userAccessToken,
+        userSession,
         fastLinkUrl,
       };
     } catch (error: any) {
@@ -141,14 +198,11 @@ class YodleeService {
   /**
    * Get all connected accounts for a user
    */
-  async getAccounts(userAccessToken: string): Promise<YodleeAccount[]> {
+  async getAccounts(userSession: string): Promise<YodleeAccount[]> {
     try {
+      const cobSession = await this.getCobrandToken();
       const response = await this.client.get("/accounts", {
-        headers: {
-          "Content-Type": "application/json",
-          "Api-Version": "1.1",
-          Authorization: `Bearer ${userAccessToken}`,
-        },
+        headers: this.getUserHeaders(userSession, cobSession),
       });
 
       return response.data.account || [];
@@ -160,22 +214,19 @@ class YodleeService {
 
   /**
    * Get transactions for a user's accounts
-   * @param userAccessToken - User's Yodlee access token
+   * @param userSession - User's Yodlee session token
    * @param fromDate - Start date (YYYY-MM-DD)
    * @param toDate - End date (YYYY-MM-DD)
    */
   async getTransactions(
-    userAccessToken: string,
+    userSession: string,
     fromDate: string,
     toDate: string
   ): Promise<YodleeTransaction[]> {
     try {
+      const cobSession = await this.getCobrandToken();
       const response = await this.client.get("/transactions", {
-        headers: {
-          "Content-Type": "application/json",
-          "Api-Version": "1.1",
-          Authorization: `Bearer ${userAccessToken}`,
-        },
+        headers: this.getUserHeaders(userSession, cobSession),
         params: {
           fromDate,
           toDate,
@@ -195,13 +246,13 @@ class YodleeService {
    */
   async syncTransactions(
     organizationId: string,
-    userAccessToken: string,
+    userSession: string,
     days: number = 90
   ): Promise<any[]> {
     const toDate = new Date().toISOString().split("T")[0];
     const fromDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    const transactions = await this.getTransactions(userAccessToken, fromDate, toDate);
+    const transactions = await this.getTransactions(userSession, fromDate, toDate);
 
     // Normalize into our transaction schema
     // Note: vendorName and categoryName will be resolved to IDs by the caller
