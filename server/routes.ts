@@ -3,12 +3,6 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
-import {
-  extractTransactionsFromDocument,
-  generateInsights,
-  generateBudgetSuggestions,
-  generateActionPlan,
-} from "./openai";
 import { z } from "zod";
 import { User, insertOrganizationSchema, insertDocumentSchema, insertTransactionSchema } from "@shared/schema";
 import * as pdfParse from "pdf-parse";
@@ -72,19 +66,38 @@ async function processDocument(
       
       const transactions = await documentAIService.extractTransactions(pdfData.text, aiDocType);
       
-      // Create transaction records from AI extraction
+      // Import normalization service for AI-powered vendor/category classification
+      const { normalizationService } = await import("./normalizationService");
+      
+      // Create transaction records from AI extraction with normalization
       for (const txn of transactions) {
         if (!txn.date || !txn.amount) {
           continue;
         }
 
-        const vendor = txn.vendor
-          ? await storage.findOrCreateVendor(organizationId, txn.vendor)
-          : null;
+        // Use AI to normalize vendor name and classify category
+        let vendorName = txn.vendor || "Unknown";
+        let categoryName = txn.category || "Operations & Misc";
+        let isRecurring = false;
 
-        const category = txn.category
-          ? await storage.findOrCreateCategory(organizationId, txn.category)
-          : null;
+        if (txn.vendor) {
+          const vendorResult = await normalizationService.normalizeVendorName(txn.vendor);
+          vendorName = vendorResult.cleanName;
+          isRecurring = normalizationService.isLikelySubscription(vendorName);
+        }
+
+        if (!txn.category || txn.category === "Uncategorized") {
+          const categoryResult = await normalizationService.classifyCategory(
+            vendorName,
+            txn.description || "",
+            txn.amount
+          );
+          categoryName = categoryResult.category;
+        }
+
+        // Find or create vendor and category
+        const vendor = await storage.findOrCreateVendor(organizationId, vendorName);
+        const category = await storage.findOrCreateCategory(organizationId, categoryName);
 
         await storage.createTransaction({
           organizationId,
@@ -92,10 +105,10 @@ async function processDocument(
           date: new Date(txn.date),
           amount: txn.amount.toString(),
           currency: "USD",
-          vendorId: vendor?.id || null,
-          categoryId: category?.id || null,
+          vendorId: vendor.id,
+          categoryId: category.id,
           description: txn.description || null,
-          isRecurring: false,
+          isRecurring,
         });
       }
       
@@ -123,21 +136,38 @@ async function processDocument(
       extractionConfidence: result.confidence.toString(),
     });
 
-    // Create transaction records
+    // Import normalization service for AI-powered vendor/category classification
+    const { normalizationService } = await import("./normalizationService");
+    
+    // Create transaction records with normalization
     for (const txn of result.transactions) {
       if (!txn.date || !txn.amount) {
         continue; // Skip invalid transactions
       }
 
-      // Find or create vendor
-      const vendor = txn.vendor
-        ? await storage.findOrCreateVendor(organizationId, txn.vendor)
-        : null;
+      // Use AI to normalize vendor name and classify category
+      let vendorName = txn.vendor || "Unknown";
+      let categoryName = txn.category || "Operations & Misc";
+      let isRecurring = false;
 
-      // Find or create category
-      const category = txn.category
-        ? await storage.findOrCreateCategory(organizationId, txn.category)
-        : null;
+      if (txn.vendor) {
+        const vendorResult = await normalizationService.normalizeVendorName(txn.vendor);
+        vendorName = vendorResult.cleanName;
+        isRecurring = normalizationService.isLikelySubscription(vendorName);
+      }
+
+      if (!txn.category || txn.category === "Uncategorized") {
+        const categoryResult = await normalizationService.classifyCategory(
+          vendorName,
+          txn.description || "",
+          txn.amount
+        );
+        categoryName = categoryResult.category;
+      }
+
+      // Find or create vendor and category
+      const vendor = await storage.findOrCreateVendor(organizationId, vendorName);
+      const category = await storage.findOrCreateCategory(organizationId, categoryName);
 
       // Create transaction
       await storage.createTransaction({
@@ -146,10 +176,10 @@ async function processDocument(
         date: new Date(txn.date),
         amount: txn.amount.toString(),
         currency: "USD",
-        vendorId: vendor?.id || null,
-        categoryId: category?.id || null,
+        vendorId: vendor.id,
+        categoryId: category.id,
         description: txn.description || null,
-        isRecurring: false, // Will be detected later
+        isRecurring,
       });
     }
 
