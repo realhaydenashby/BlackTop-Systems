@@ -1,0 +1,207 @@
+Here’s the clean, brute-force prompt you can paste directly into Replit AI so it wires up your APIs, activates them, builds the routes, and connects everything into the UI.
+
+Short, commanding, and built to force Replit to actually implement the stack.
+
+Copy/paste this exactly:
+
+⸻
+
+REPLIT SYSTEM INTEGRATION PROMPT
+
+(Paste directly into Replit AI / “Generate” sidebar)
+
+You are updating a full-stack SaaS app called BlackTop Systems.
+All API keys are already stored in Replit Secrets.
+Your job is to activate every API by wiring it into backend routes and connecting the UI to real data.
+
+APIs that are already in Replit Secrets
+	•	GROQ_API_KEY
+	•	GEMINI_API_KEY
+	•	GMAIL_CLIENT_SECRET
+	•	GMAIL_CLIENT_ID
+	•	GMAIL_REDIRECT_URI
+	•	GOOGLE_DOC_AI_KEY
+	•	GOOGLE_CLIENT_ID
+	•	GOOGLE_CLIENT_SECRET
+	•	YODLEE_CLIENT_ID
+	•	YODLEE_SECRET
+	•	STRIPE_SECRET_KEY
+
+Your tasks
+
+You must implement each of the following as WORKING backend + frontend integrations:
+
+⸻
+
+1. GROQ + GEMINI AI ACTIVATION
+
+Create /api/ai/groq and /api/ai/gemini routes:
+	•	Initialize the Groq SDK with process.env.GROQ_API_KEY
+	•	Initialize the Gemini SDK with process.env.GEMINI_API_KEY
+	•	Each endpoint must accept { prompt } in POST
+	•	Return completion.text or equivalent
+	•	Add centralized error handling
+
+Then connect these to the UI:
+	•	All “Action Plan,” “Explain this chart,” and “Diagnostics” buttons must call these endpoints.
+	•	Replace mock data with real AI responses.
+
+⸻
+
+2. GMAIL API ACTIVATION
+
+Implement full OAuth flow using Google API Client:
+
+Create routes:
+	•	GET /auth/google — generate OAuth URL
+	•	GET /auth/google/callback — exchange code for tokens
+	•	Store tokens per user in the database
+	•	GET /api/gmail/messages — fetch last 10 emails
+
+Create Gmail client:
+
+import { google } from "googleapis";
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GMAIL_CLIENT_ID,
+  process.env.GMAIL_CLIENT_SECRET,
+  process.env.GMAIL_REDIRECT_URI
+);
+
+Integrate into UI:
+	•	Under “Integrations,” add a Gmail card with Connect button
+	•	After connection, show recent subscription emails automatically
+
+⸻
+
+3. GOOGLE DOCUMENT AI
+
+Create /api/ingest/document-ai that:
+	•	Accepts PDF or image uploads
+	•	Sends them to Google Document AI using GOOGLE_DOC_AI_KEY
+	•	Extracts text + table data (vendor, date, amount)
+	•	Normalizes into a unified Transaction model
+	•	Responds with structured JSON
+
+Wire into the UI so uploaded PDFs use this instead of mock parsing.
+
+⸻
+
+4. YODLEE BANKING INTEGRATION
+
+You must enable the Yodlee sandbox integration.
+
+Backend:
+	•	Initialize Yodlee client using YODLEE_CLIENT_ID + YODLEE_SECRET
+	•	Create endpoints:
+	•	/api/yodlee/login
+	•	/api/yodlee/accounts
+	•	/api/yodlee/transactions
+
+Normalize bank transactions to:
+
+{
+  "date": "...",
+  "amount": "...",
+  "vendor": "...",
+  "category": "...",
+  "source": "bank"
+}
+
+UI:
+	•	Under Integrations page → “Connect Bank Account”
+	•	Once connected, show imported transactions in the main dashboard.
+
+⸻
+
+5. STRIPE BILLING FULL ACTIVATION
+
+Add:
+	•	/api/billing/create-checkout-session
+	•	/api/billing/customer-portal
+
+Use STRIPE_SECRET_KEY
+
+Add UI hooks:
+	•	Pricing page → “Subscribe”
+	•	Settings → “Manage Billing”
+
+⸻
+
+6. UI CONNECTION FOR ALL DATA
+
+Every analytics page must now use live API data:
+	•	Replace placeholder graphs with charts that use:
+	•	bank transactions
+	•	document-extracted transactions
+	•	email-parsed subscriptions
+	•	Fix color palette to dark navy, charcoal, desaturated blues
+No bright colors.
+
+Add “Action Plan Output” to every analytics page:
+Use Groq/Gemini to generate:
+	•	“Cut these duplicate subscriptions”
+	•	“Vendor drift detected in marketing”
+	•	“Overtime added $X”
+	•	“3 tools exceeded benchmarks”
+
+Use real data from transactions.
+
+⸻
+
+7. CLEAN UP PRODUCTS PAGE
+
+Rewrite the entire Products/Features page so it describes:
+	•	Ingestion layer
+	•	Spend analytics
+	•	Budget builder
+	•	Action plan engine
+	•	Subscription monitoring
+	•	Cash-runway projections
+
+Remove the existing messy repetitive blocks and rebuild using a clean, modern layout.
+
+⸻
+
+8. ENSURE GLOBAL THEME CONSISTENCY
+
+Apply:
+	•	Dark navy background
+	•	Slate/dark gray surfaces
+	•	Off-white text
+	•	Desaturated teal + blue accents
+	•	Smooth hover states
+	•	Fade-in transitions
+
+Charts must use:
+	•	Navy, gray, muted blue
+No neon.
+
+⸻
+
+9. IMPLEMENT DEMO MODE
+
+Add a toggle under Login:
+	•	“Try Demo Mode”
+
+Demo mode must:
+	•	Auto-load sample transactions
+	•	Sample emails
+	•	Sample budget + action plan
+	•	Disable banking/email uploads
+
+⸻
+
+Final Requirements
+	•	No placeholder code
+	•	No TODOs
+	•	All endpoints working end-to-end
+	•	Everything wired cleanly into the UI
+	•	All API calls using environment secrets
+
+If a feature in this prompt exists already, upgrade it instead of overwriting.
+
+You are building a fully functional SaaS platform, not a mockup.
+
+⸻
+
+Paste that into Replit and it will force the AI to wire the entire stack.

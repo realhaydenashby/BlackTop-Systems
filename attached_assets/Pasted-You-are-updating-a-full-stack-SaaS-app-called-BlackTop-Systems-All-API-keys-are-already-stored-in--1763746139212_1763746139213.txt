@@ -1,0 +1,197 @@
+You are updating a full-stack SaaS app called BlackTop Systems.
+
+All API keys are already stored in Replit Secrets.
+
+Your job is to activate every API by wiring it into backend routes and connecting the UI to real data. You are not allowed to leave things as placeholders; you must connect them end-to-end so they actually work inside the app.
+
+APIs in Replit Secrets (assume these exist):
+	•	GROQ_API_KEY
+	•	GEMINI_API_KEY
+	•	GMAIL_CLIENT_ID
+	•	GMAIL_CLIENT_SECRET
+	•	GMAIL_REDIRECT_URI
+	•	GOOGLE_CLIENT_ID
+	•	GOOGLE_CLIENT_SECRET
+	•	GOOGLE_REDIRECT_URI (if present, otherwise create and use one)
+	•	GOOGLE_DOC_AI_KEY (or equivalent for Document AI)
+	•	YODLEE_CLIENT_ID
+	•	YODLEE_SECRET
+	•	STRIPE_SECRET_KEY
+
+If some env names differ slightly, detect and use the closest existing ones instead of failing.
+
+====================================================
+	1.	ACTIVATE GROQ + GEMINI AI
+====================================================
+
+Goal: All “AI” behaviors in the app must call real backend endpoints that use Groq or Gemini.
+
+Tasks:
+	1.	Create backend endpoints for AI:
+	•	POST /api/ai/groq
+	•	POST /api/ai/gemini
+Each should:
+	•	Read the API key from environment variables.
+	•	Accept a JSON body with a “prompt” field.
+	•	Call the respective AI model.
+	•	Return the model response text in a clean JSON shape.
+	2.	Connect these endpoints to the UI:
+	•	Any “Generate Action Plan”, “Explain this chart”, or “Explain” buttons in analytics or dashboards should send the relevant context (metrics, chart slice, key numbers) to one of these AI endpoints.
+	•	Replace mock static text with real responses from the AI.
+	3.	Centralize error handling for AI:
+	•	If AI calls fail, show a graceful message in the UI instead of breaking.
+
+====================================================
+2. ACTIVATE GMAIL INTEGRATION (OAUTH)
+
+Goal: Users can connect their Gmail so the app can ingest subscription and financial emails.
+
+Tasks:
+	1.	Implement Google OAuth for Gmail:
+	•	Use the Gmail-related client ID, client secret, and redirect URI from env.
+	•	Add a route that starts the OAuth flow (for example: GET /auth/google).
+	•	Add a callback route that receives the OAuth code, exchanges it for access/refresh tokens, and stores tokens associated with the authenticated app user.
+	2.	Implement a backend endpoint to fetch emails:
+	•	Add an endpoint (for example: GET /api/gmail/messages) that:
+	•	Uses the stored tokens for the current user.
+	•	Fetches a small, recent set of emails (e.g., last 10–20).
+	•	Filters or tags emails that look like subscriptions, invoices, or payment confirmations.
+	•	Returns structured JSON (date, sender, subject, snippet, any amount if parsable).
+	3.	Integrate into the UI:
+	•	On the Integrations page, add a “Connect Gmail” card with a button that triggers the OAuth flow.
+	•	After connection, display recent financial or subscription-related emails and make them available to the ingestion/normalization pipeline.
+
+====================================================
+3. ACTIVATE GOOGLE DOCUMENT AI (OR EQUIVALENT)
+
+Goal: Uploaded financial documents (PDFs, images) are actually parsed into structured data.
+
+Tasks:
+	1.	Create a backend endpoint for document ingestion:
+	•	For example: POST /api/ingest/document
+	•	Accept file uploads (PDFs or images).
+	•	Send the file to Google Document AI (or the configured document processing service) using the key in env variables.
+	•	Extract relevant data (transactions, vendors, dates, amounts, descriptions).
+	2.	Normalize extracted data:
+	•	Convert raw extraction into a standardized “Transaction” structure used across the app.
+	•	Store results in the database associated with the current organization.
+	3.	Wire UI upload to this endpoint:
+	•	On any “Upload statement / invoice / receipt” UI:
+	•	Ensure the upload hits the backend endpoint above.
+	•	After processing, the new transactions appear in the Transactions table and analytics dashboards.
+
+====================================================
+4. ACTIVATE YODLEE (OR BANKING) INTEGRATION
+
+Goal: User can connect a bank via Yodlee sandbox and see real transaction data ingested into the app.
+
+Tasks:
+	1.	Initialize Yodlee integration using client ID and secret from env.
+	2.	Implement basic banking flow:
+	•	An endpoint to begin a Yodlee session and retrieve the link/token needed for the user to connect their bank in sandbox.
+	•	Endpoints to fetch accounts and transactions for the connected user/organization.
+	3.	Normalize transactions:
+	•	Map Yodlee transaction fields into the same unified “Transaction” structure the rest of the app uses (date, amount, vendor, category, etc.).
+	4.	UI integration:
+	•	On the Integrations page, add a “Connect Bank” card for Yodlee.
+	•	After connection, show imported bank transactions in the main Transactions table and on dashboards.
+
+If Plaid is available instead of Yodlee, detect that and use Plaid in a similar way; do not leave banking integration as a dead stub.
+
+====================================================
+5. ENSURE STRIPE BILLING IS FULLY WIRED
+
+Goal: Pricing page and settings page use live Stripe Checkout / Billing.
+
+Tasks:
+	1.	Use STRIPE_SECRET_KEY from env to initialize Stripe in the backend.
+	2.	Implement:
+	•	Endpoint to create a Checkout session for a selected plan.
+	•	Endpoint or redirect for a “Manage Billing” or customer portal.
+	3.	Connect to UI:
+	•	Pricing page “Subscribe” buttons must call the Checkout endpoint and redirect users.
+	•	Settings/Billing page must have a “Manage Billing” button that opens the customer portal.
+	4.	Use the existing plan tiers defined in the app (or create simple, realistic tiers) and store subscription status on the organization.
+
+====================================================
+6. CONNECT ALL ANALYTICS TO REAL DATA
+
+Goal: Analytics and dashboards show consistent data derived from transactions and revenue records, not disconnected mock data.
+
+Tasks:
+	1.	Ensure there is a single source of truth for financial data:
+	•	Transactions from:
+	•	Bank integration (Yodlee or similar)
+	•	Document ingestion
+	•	Email parsing
+	•	Any Revenue records model if it exists.
+	2.	Make sure every analytics page (spend, runway, trends, etc.):
+	•	Queries from the same underlying models.
+	•	Shows coherent demo data in demo mode if real data is absent.
+	•	Does not display empty, broken, or nonsense charts.
+	3.	Apply a consistent, professional chart theme:
+	•	Dark background, muted blues/teals, no neon colors.
+	•	Clear axis labels and legends.
+	•	Same font and sizing patterns across charts.
+	4.	Add “Action Plan” outputs on each analytics page:
+	•	Each major analytics view should call the AI endpoints and display a short list of recommended actions based on the currently visible data slice.
+
+====================================================
+7. CLEAN UP THE PRODUCTS / FEATURES PAGE
+
+Goal: The Products/Features page accurately describes what BlackTop does, without placeholder labels.
+
+Tasks:
+	1.	Remove all “Product A / Product B / Services” placeholder text.
+	2.	Replace with three clear sections that match the actual app:
+	•	Ingest & Normalize (bank, docs, email → clean transactions)
+	•	Diagnose & Analyze (burn, runway, trends, vendors, subscriptions)
+	•	Plan & Act (budget generation, runway impact, monthly action plan)
+	3.	Keep copy simple, concrete, and aligned with actual capabilities.
+	4.	Maintain the existing layout structure but improve content so it feels like a real product page, not filler.
+
+====================================================
+8. ENFORCE GLOBAL DARK THEME & UI POLISH
+
+Goal: App feels cohesive and production-grade.
+
+Tasks:
+	1.	Apply consistent dark theme globally:
+	•	Dark navy / dark gray backgrounds.
+	•	Off-white primary text, muted secondary text.
+	•	Blue/teal as accents.
+	2.	Standardize:
+	•	Button styles (primary, secondary, disabled).
+	•	Card styles (borders, radius, shadows).
+	•	Tables and typography hierarchy (titles, subtitles, body).
+	3.	Ensure charts respect this theme:
+	•	No bright/neon colors.
+	•	High contrast lines and bars that fit in the dark theme.
+	4.	Add subtle transitions:
+	•	Hover effects on cards and buttons.
+	•	Light page fade-ins where appropriate.
+
+Do not rewrite the entire layout system; refine and unify it.
+
+====================================================
+9. IMPLEMENT DEMO MODE
+
+Goal: Someone can click into demo mode and experience BlackTop without connecting real data.
+
+Tasks:
+	1.	On the login/signup screen, add a “Try Demo Mode” option.
+	2.	When selected:
+	•	Log the user into a special demo organization.
+	•	Seed this org with sample transactions, vendors, revenue data, budgets, and action plans.
+	3.	Ensure all dashboards, analytics, and financial statements work fully in demo mode using this sample dataset.
+	4.	Disable or clearly no-op integrations in demo mode (no real banking or Gmail calls).
+
+====================================================
+10. GENERAL REQUIREMENTS
+	•	Use environment variables from Replit Secrets for all keys and secrets.
+	•	Do not hardcode secrets anywhere.
+	•	Do not leave TODOs or pseudo-code; implement working logic.
+	•	If any of the above exists partially, improve and complete it rather than replacing blindly.
+	•	Make sure the app runs end-to-end: login → connect (or demo) → ingest → analytics → AI explanations/action plans → billing.
+
+You are turning this into a functional, demo-ready SaaS product with real integrations, not a static mockup.
