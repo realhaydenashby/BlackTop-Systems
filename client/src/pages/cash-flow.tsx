@@ -1,7 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingDown, TrendingUp, DollarSign, AlertCircle } from "lucide-react";
+import { TrendingDown, TrendingUp, DollarSign } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from "recharts";
+import { CHART_COLORS, chartStyles, lineStyles } from "@/lib/chartTheme";
+import { ActionPlanModule } from "@/components/ActionPlanModule";
 
 export default function CashFlow() {
   const mockCashFlowData = [
@@ -11,6 +13,33 @@ export default function CashFlow() {
     { month: "Apr", actual: null, forecast: 58000, lower: 52000, upper: 64000 },
     { month: "May", actual: null, forecast: 62000, lower: 56000, upper: 70000 },
     { month: "Jun", actual: null, forecast: 67000, lower: 60000, upper: 76000 },
+  ];
+
+  const mockActionPlan = [
+    {
+      id: "cf1",
+      summary: "Strong cash runway above 6-month threshold",
+      metricRef: "Runway: 8.5 months",
+      severity: "low" as const,
+      recommendedAction: "Consider strategic investments in growth initiatives like hiring or marketing campaigns to accelerate revenue.",
+      impact: "Potential 20-30% revenue increase",
+    },
+    {
+      id: "cf2",
+      summary: "Seasonal revenue dip forecasted in May",
+      metricRef: "Revenue trend analysis",
+      severity: "medium" as const,
+      recommendedAction: "Prepare cash buffer or accelerate collections in Q2 to offset the historical 15% seasonal decrease.",
+      impact: "Maintain 7+ month runway",
+    },
+    {
+      id: "cf3",
+      summary: "Burn rate trending upward from Q1",
+      metricRef: "Monthly burn: $17,450",
+      severity: "medium" as const,
+      recommendedAction: "Review variable costs and negotiate better terms with top 3 vendors to reduce burn by 10-15%.",
+      impact: "Extend runway by 1-2 months",
+    },
   ];
 
   return (
@@ -67,27 +96,21 @@ export default function CashFlow() {
             <AreaChart data={mockCashFlowData}>
               <defs>
                 <linearGradient id="colorForecast" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                  <stop offset="5%" stopColor={CHART_COLORS[0]} stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor={CHART_COLORS[0]} stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" />
-              <YAxis stroke="hsl(var(--muted-foreground))" />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: "hsl(var(--popover))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "6px"
-                }}
-              />
-              <Legend />
+              <CartesianGrid {...chartStyles.cartesianGrid} />
+              <XAxis dataKey="month" {...chartStyles.xAxis} />
+              <YAxis {...chartStyles.yAxis} />
+              <Tooltip {...chartStyles.tooltip} />
+              <Legend {...chartStyles.legend} />
               <Area 
                 type="monotone" 
                 dataKey="upper" 
                 stroke="none" 
-                fill="hsl(var(--muted))" 
-                fillOpacity={0.3}
+                fill={CHART_COLORS[2]} 
+                fillOpacity={0.2}
                 name="Upper Bound"
               />
               <Area 
@@ -100,95 +123,67 @@ export default function CashFlow() {
               <Line 
                 type="monotone" 
                 dataKey="actual" 
-                stroke="hsl(var(--accent))" 
-                strokeWidth={3}
+                stroke={CHART_COLORS[1]} 
                 name="Actual"
+                {...lineStyles}
                 dot={{ r: 5 }}
               />
               <Line 
                 type="monotone" 
                 dataKey="forecast" 
-                stroke="hsl(var(--primary))" 
-                strokeWidth={2}
+                stroke={CHART_COLORS[0]} 
                 strokeDasharray="5 5"
                 name="Forecast"
+                {...lineStyles}
               />
             </AreaChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Scenario Analysis</CardTitle>
-            <CardDescription>Impact of different growth scenarios</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Conservative (-20% revenue)</span>
-                  <span className="text-sm font-bold">6.2 months</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-destructive" style={{ width: "52%" }} />
-                </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Scenario Analysis</CardTitle>
+          <CardDescription>Impact of different growth scenarios on runway</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Conservative (-20% revenue)</span>
+                <span className="text-sm font-bold">6.2 months</span>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Base Case (current trend)</span>
-                  <span className="text-sm font-bold">8.5 months</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-yellow-500" style={{ width: "71%" }} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Optimistic (+30% revenue)</span>
-                  <span className="text-sm font-bold">12.3 months</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-green-500" style={{ width: "100%" }} />
-                </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-destructive" style={{ width: "52%" }} />
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Base Case (current trend)</span>
+                <span className="text-sm font-bold">8.5 months</span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-yellow-500" style={{ width: "71%" }} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Optimistic (+30% revenue)</span>
+                <span className="text-sm font-bold">12.3 months</span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-green-500" style={{ width: "100%" }} />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>AI Insights</CardTitle>
-            <CardDescription>Key observations about your cash position</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex gap-3">
-                <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Seasonal dip expected in May</p>
-                  <p className="text-xs text-muted-foreground">Historical data shows 15% revenue decrease</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <TrendingUp className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Strong cash position</p>
-                  <p className="text-xs text-muted-foreground">You're above the recommended 6-month runway</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <DollarSign className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Opportunity for growth investment</p>
-                  <p className="text-xs text-muted-foreground">Consider strategic hires or marketing spend</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <ActionPlanModule 
+        title="Cash Flow Action Plan"
+        description="Strategic recommendations for cash management"
+        items={mockActionPlan}
+      />
 
       <Card>
         <CardHeader>
