@@ -1,0 +1,409 @@
+You are an expert product designer and full-stack SaaS architect inside a no-code/low-code app builder.
+
+Build a **production-quality, multi-tenant B2B SaaS web app** for the following product:
+
+====================================================
+PRODUCT CONCEPT
+====================================================
+
+Name (placeholder): **ClarityOS** (can be renamed later)
+
+Tagline:
+“Turn financial chaos into clean spend intelligence, smart budgets, and simple action plans.”
+
+Core idea:
+An AI-powered financial diagnostic and action platform for SMBs and startups. It ingests messy financial inputs (statements, invoices, receipts, subscription emails, payroll summaries, CSVs) and:
+
+1. Extracts & normalizes all financial data into a unified schema.
+2. Diagnoses financial behavior (spend patterns, drift, waste, anomalies).
+3. Generates a **budget** and a **monthly action plan** so operators can take action without a CFO.
+
+It is:
+- B2B-only at first (SMBs and startups).
+- A **pre-accounting / pre-FP&A financial intelligence layer**, NOT accounting software.
+- Designed to support founders, ops managers, and accountants/fractional CFOs.
+
+====================================================
+VISUAL THEME & UI DESIGN
+====================================================
+
+Overall vibe:
+- Professional, modern, premium SaaS.
+- Clean, slightly dark theme for “financial intelligence” feel.
+
+Color palette:
+- Primary background: very dark navy (#050816 or similar).
+- Primary accent: deep blue (#1D4ED8 or similar).
+- Secondary accent: teal or cyan for highlights (#22D3EE or similar).
+- Neutral background surfaces: dark gray (#0F172A, #111827).
+- Text: off-white (#F9FAFB for primary text, #9CA3AF for secondary).
+- Charts: coordinated blue/teal/amber palette, high contrast, no neon.
+
+Typography:
+- Sans-serif, modern, highly legible (e.g., Inter, SF Pro, or similar).
+- Headings: bold, slightly condensed.
+- Body text: regular, comfortable line height.
+
+Layout standards:
+- Responsive design for desktop-first, but usable on tablet and mobile.
+- App shell with **left sidebar navigation** and **top bar** for user info, notifications, and AI chatbot access.
+- Plenty of spacing and card-based sections for metrics, charts, and tables.
+- Consistent component system (buttons, inputs, tabs, modals, tags, badges).
+
+====================================================
+HIGH-LEVEL ARCHITECTURE (CONCEPTUAL)
+====================================================
+
+Entities / core data models (create corresponding data types/collections):
+
+- User
+  - name, email, role (founder, ops, accountant, CFO), password/auth method
+  - belongs_to Organization(s)
+
+- Organization (Company / Workspace)
+  - name, industry, size, revenue band
+  - plan_tier, status, stripe_customer_id
+  - has many Users, Documents, Transactions, Budgets, ActionPlans
+
+- Document
+  - organization_id
+  - type (bank_statement, invoice, receipt, payroll, subscription_email, csv_upload, other)
+  - source (file_upload, email_forward, integration)
+  - raw_file_url, parsed_text, status (uploaded, processing, processed, error)
+  - extraction_confidence_score
+
+- Transaction
+  - organization_id
+  - document_id (optional)
+  - date, amount, currency
+  - vendor_id (FK)
+  - category_id (FK)
+  - department_id (FK)
+  - tags (array)
+  - is_recurring (boolean)
+  - notes
+
+- Vendor
+  - name
+  - normalized_name
+  - typical_category
+  - is_subscription (boolean)
+
+- Category
+  - name (e.g., Marketing, Payroll, SaaS, Ops, Rent, Utilities, Misc)
+  - type (fixed, variable)
+
+- Department
+  - name (Marketing, Sales, Ops, Engineering, Admin, etc.)
+
+- Budget
+  - organization_id
+  - period_start, period_end
+  - total_budget_amount
+  - breakdown by category and department (store as structured JSON or related BudgetLine items)
+
+- BudgetLine
+  - budget_id
+  - category_id or department_id
+  - target_amount
+  - min_amount / max_amount (for dynamic ranges)
+
+- ActionPlan
+  - organization_id
+  - period_start, period_end
+  - status (draft, active, completed)
+  - generated_summary_text
+
+- ActionItem
+  - action_plan_id
+  - type (cut_subscription, renegotiate_vendor, adjust_budget, review_department_spend, etc.)
+  - description
+  - impact_estimate_amount
+  - priority (high/medium/low)
+  - status (open, in_progress, done)
+
+- IntegrationConnection
+  - organization_id
+  - type (stripe_payments, plaid_bank, email_inbox, accounting_tool)
+  - provider (Stripe, Plaid, Gmail, Outlook, QuickBooks, etc.)
+  - status (connected, pending, error)
+  - metadata (tokens/ids stored securely as per platform capabilities)
+
+- SubscriptionPlan (for pricing)
+  - name, monthly_price, yearly_price, features_list
+
+- Insight
+  - organization_id
+  - type (spend_drift, subscription_creep, vendor_overbilling, overtime_drift, etc.)
+  - title
+  - description
+  - metric_value
+  - severity (info, warning, critical)
+  - period
+
+====================================================
+CORE USER FLOWS & WORKFLOWS
+====================================================
+
+Implement the following key flows using the platform’s workflow/logic tools. Use real, working data flows where possible, not just static UI.
+
+1. Authentication & onboarding
+   - Sign up / Login with email + password (and support OAuth providers if available).
+   - On first login, user creates or joins an Organization.
+   - Onboarding survey for the Organization:
+     - Company size (employees)
+     - Estimated annual revenue band
+     - Rough monthly spend band
+     - Industry
+     - Departments used (checkboxes: Marketing, Ops, Eng, Sales, etc.)
+     - Optional goals: reduce SaaS waste, control marketing spend, extend runway, etc.
+   - After onboarding, redirect to the main Dashboard with a guided tour.
+
+2. Document upload & ingestion
+   - From the main app, provide a prominent “Upload financial documents” area.
+   - Support:
+     - File drag-and-drop (PDF, CSV, image)
+     - Document type selection or auto-detect
+   - On upload:
+     - Create a Document record with status = “processing”.
+     - Call an AI extraction agent / API that:
+       - runs OCR/parsing
+       - extracts tables/transactions
+       - returns structured JSON of transactions with vendor, date, amount, description
+     - Persist extracted Transactions linked to the Document and Organization.
+     - Update Document status to “processed”.
+   - Provide a **Data Validation UI**:
+     - Display extracted transactions in a table.
+     - Allow user edits (category, department, vendor mapping).
+     - Save corrections back to the database.
+     - Show a “confidence” indicator per row if possible.
+
+3. Bank account integration (Plaid placeholder)
+   - On an “Integrations” page, include a section for “Connect Bank (Plaid)”.
+   - Implement a UI button that would **trigger Plaid Link** or a similar bank integration flow. If the platform cannot fully implement Plaid, still scaffold the UI and integration logic as clearly as possible (e.g., placeholder modal and callback workflow).
+   - Show a list of connected bank accounts and sync status.
+   - When connected, simulate or implement a “Fetch transactions” workflow:
+     - Pull transactions into the Transactions table.
+     - Tag the source as `integration:bank`.
+
+4. Payments integration (Stripe)
+   - On a “Billing” or “Account” page, integrate Stripe for subscription payments.
+   - Let organizations:
+     - Choose a plan (from SubscriptionPlan records).
+     - Enter card details via Stripe Checkout or Billing Portal.
+     - View current plan, renewal date, and invoices.
+   - Use Stripe webhooks or equivalent to update `plan_tier` and `status` on Organization.
+
+5. Diagnostics generation
+   - Create a backend workflow that runs after:
+     - documents are processed, or
+     - bank transactions are synced.
+   - The workflow should:
+     - Aggregate spend by category and department.
+     - Identify recurring vendors and subscriptions.
+     - Detect major month-over-month or quarter-over-quarter changes.
+     - Generate Insight records (e.g., “Marketing spend up 22% vs last quarter”, “3 duplicate SaaS vendors detected”, etc.).
+   - Use an AI agent to generate human-readable descriptions for each Insight.
+
+6. Budget builder
+   - Provide a “Budget” page where the system:
+     - Suggests a budget for the next month/quarter based on historic spend.
+     - Allows the user to tweak targets per category and department.
+     - Shows:
+       - recommended monthly budget
+       - allocations (pie chart / bar chart)
+       - min/max ranges around each budget line (±10% scenario).
+     - Saves the finalized Budget record and BudgetLines.
+   - Add visualizations:
+     - Current vs recommended spend by category.
+     - Runway estimates (based on cash balance & burn, if available from integrations).
+
+7. Action Plan generator
+   - From the Diagnostics & Budget pages, allow the user to “Generate Action Plan”.
+   - Trigger an AI workflow that:
+     - Reads Insights, Budget, and Transactions.
+     - Creates an ActionPlan with a period (e.g., upcoming month).
+     - Creates multiple ActionItems with:
+       - recommended cuts (e.g., duplicate subscriptions)
+       - vendor renegotiations
+       - spend guardrails per department
+       - review tasks (“Review marketing ads from Vendor X; spend increased 40%”).
+   - Display the Action Plan in a clear, prioritized list view.
+   - Allow status updates (open → in progress → done).
+
+====================================================
+APP STRUCTURE & PAGES
+====================================================
+
+Create all necessary pages with working navigation:
+
+1. Public marketing site
+   - **Landing page**
+     - Hero section: tagline, subheading, primary CTA (“Get a financial diagnostic”) and secondary CTA (“View demo”).
+     - “How it works” section:
+       - Step 1: Upload statements, invoices, receipts.
+       - Step 2: AI cleans and analyzes spend.
+       - Step 3: Get a budget and action plan.
+     - “Who it’s for” section: agencies, startups, pro services, SMBs.
+     - “Key benefits” cards:
+       - Know exactly where money is going.
+       - Catch SaaS and vendor waste automatically.
+       - Build a realistic budget based on actual behavior.
+       - Come prepared to your accountant/CFO.
+     - Testimonials or placeholder logos (e.g., “Trusted by agencies and startups”).
+   - **Pricing page**
+     - Show tiered plans with:
+       - Small teams → $59/mo
+       - SMBs → $149/mo
+       - Growing startups → $299/mo
+       - Larger SMBs → $599/mo
+     - Feature comparison table:
+       - # of users
+       - # of organizations
+       - document/transaction limits
+       - access to budget builder
+       - integrations
+       - AI action plan generator
+     - CTA buttons to sign up.
+
+   - **About page**
+     - Explain the mission:
+       - “We exist to help SMBs run disciplined, data-smart operations without needing a full finance team.”
+     - Brief origin story of the product.
+     - Highlight that it supports founders, ops managers, and accountants.
+
+   - **Features page (or section)**
+     - Multi-source ingestion
+     - Diagnostics dashboard
+     - Budget builder
+     - Action plans
+     - Integrations (Stripe, Plaid, email, accounting tools)
+     - AI financial assistant
+
+   - **Login / Signup pages**
+     - Email + password login
+     - Forgot password
+     - Signup with organization creation
+
+2. Authenticated app (after login)
+   - **Main Dashboard**
+     - Top-level KPIs:
+       - Total monthly spend
+       - Top 3 categories by spend
+       - Top 3 vendors
+       - # of recurring subscriptions
+       - Runway estimate (if data available)
+     - Charts:
+       - Spend over time (line chart)
+       - Spend by category (bar/pie)
+       - Spend by department (bar)
+     - Insight cards:
+       - Each card shows an Insight summary and severity.
+       - Clicking an Insight opens details and linked transactions.
+     - CTA buttons:
+       - “Upload new documents”
+       - “Generate budget”
+       - “View action plan”
+
+   - **Documents page**
+     - List of uploaded documents with type, status, and date.
+     - Ability to open a document view that shows:
+       - original file preview (if supported)
+       - extracted transactions table
+       - edit/validate functionality.
+
+   - **Transactions page**
+     - Table view with:
+       - date, vendor, category, department, amount, source.
+     - Filters:
+       - by date, category, department, vendor, integration source.
+     - Bulk actions (e.g., recategorize, tag as subscription).
+
+   - **Budgets page**
+     - List of past and current budgets.
+     - Detail view for the selected budget:
+       - totals, breakdowns, visual charts.
+       - edit capability for admin roles.
+
+   - **Action Plans page**
+     - List of Action Plans (by month/period).
+     - Detail view:
+       - prioritized ActionItems with statuses and estimated impact.
+       - quick toggles to mark items as done.
+
+   - **Insights page**
+     - List and filter by type, period, severity.
+     - Each insight links back to contributing transactions and categories.
+
+   - **Integrations page**
+     - Cards for:
+       - Stripe (billing & subscription management)
+       - Plaid (bank connections)
+       - Email (Gmail/Outlook)
+       - Accounting (QuickBooks/Xero placeholder)
+     - Connection status indicators and connect/disconnect buttons.
+
+   - **Billing & Account page**
+     - View and change subscription plan (Stripe).
+     - View billing history and invoices.
+     - Update payment method via Stripe.
+
+====================================================
+AI AGENT & CHATBOT
+====================================================
+
+Create an AI assistant inside the app with two main roles:
+
+1. **Background AI agent**
+   - Used in workflows (server-side or backend logic) to:
+     - extract structured data from documents.
+     - summarize spend behavior.
+     - generate Insight descriptions.
+     - generate Budget suggestions.
+     - generate ActionPlans and ActionItems text.
+
+2. **In-app chatbot**
+   - Accessible from a floating chat icon in the authenticated app.
+   - Context-aware of the current Organization’s data (Transactions, Budgets, Insights, ActionPlans).
+   - Users can ask:
+     - “Why did our marketing spend go up last month?”
+     - “Where are we overspending compared to our budget?”
+     - “Which subscriptions can we cut?”
+     - “Show me our top vendors by spend.”
+   - The chatbot should:
+     - Query the Organization’s data.
+     - Use AI to phrase responses clearly.
+     - Link to relevant views (e.g., “Open Transactions filtered by Marketing”).
+
+If the platform supports function calls/tools, implement structured calls such as:
+- `get_organization_summary`
+- `get_spend_by_category(period)`
+- `get_spend_by_department(period)`
+- `get_top_vendors(limit)`
+- `get_open_action_items()`
+
+====================================================
+ANALYTICS & CUSTOMER INSIGHTS
+====================================================
+
+Implement a simple internal analytics view (for admins only) that shows:
+
+- # of Organizations
+- # of active users
+- # of uploaded documents
+- # of processed transactions
+- Average spend per Organization (from imported data)
+- Plan distribution (how many on each pricing tier)
+- Basic usage metrics (documents/month, logins/month)
+
+This can be an “Admin Dashboard” accessible only to a special admin user or role.
+
+====================================================
+GENERAL REQUIREMENTS
+====================================================
+
+- Make everything actually wired together: forms, workflows, and data models should be functional, not just static mockups.
+- Use secure patterns and best practices available in the no-code platform.
+- Ensure consistent styling, spacing, and responsive layouts.
+- Prefer simple, understandable UI over cleverness.
+- The experience should feel like a real, ready-to-sell SaaS platform, not a prototype.
