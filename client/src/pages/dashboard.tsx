@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, TrendingDown, FileText, AlertTriangle } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
@@ -9,13 +10,36 @@ import { Badge } from "@/components/ui/badge";
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 export default function Dashboard() {
+  const [, setLocation] = useLocation();
+
+  const { data: organizations, isLoading: orgsLoading } = useQuery<any[]>({
+    queryKey: ["/api/organizations"],
+  });
+
   const { data: stats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/dashboard/stats"],
+    enabled: !orgsLoading && (organizations?.length ?? 0) > 0,
   });
 
   const { data: insights, isLoading: insightsLoading } = useQuery<any>({
     queryKey: ["/api/insights"],
+    enabled: !orgsLoading && (organizations?.length ?? 0) > 0,
   });
+
+  if (orgsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!organizations || organizations.length === 0) {
+    setLocation("/onboarding");
+    return null;
+  }
 
   if (statsLoading) {
     return (
