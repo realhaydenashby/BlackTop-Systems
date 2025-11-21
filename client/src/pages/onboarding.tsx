@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Mail, Building2 } from "lucide-react";
+import { FileUploader } from "@/components/FileUploader";
 
 const onboardingSchema = z.object({
   organizationName: z.string().min(1, "Company name is required"),
@@ -407,6 +408,24 @@ export default function Onboarding() {
                     {emailConnected ? "Connected" : "Connect"}
                   </Button>
                 </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <h3 className="font-medium mb-1">Upload Financial Documents</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Drag and drop your bank statements, invoices, receipts, or CSV files for AI analysis
+                  </p>
+                </div>
+                <FileUploader 
+                  source="onboarding"
+                  onUploadComplete={(files) => {
+                    toast({
+                      title: "Documents uploaded!",
+                      description: `${files.length} file(s) are being processed for insights.`,
+                    });
+                  }}
+                />
               </div>
 
               <div className="flex gap-3 pt-4">
