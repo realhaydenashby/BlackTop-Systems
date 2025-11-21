@@ -83,7 +83,16 @@ export function generateMockAnalytics(days: number = 30) {
       date: format(subDays(new Date(), days - 1 - i), "MMM dd"),
       revenue: Math.floor(Math.random() * 20000) + 12000,
     })),
-    revenueBySource: [
+    revenueGrowth: Array.from({ length: 6 }, (_, i) => ({
+      month: format(new Date(2025, i, 1), "MMM"),
+      revenue: Math.floor(Math.random() * 25000) + 75000 + (i * 5000),
+    })),
+    mrrArr: Array.from({ length: 6 }, (_, i) => ({
+      month: format(new Date(2025, i, 1), "MMM"),
+      mrr: Math.floor(Math.random() * 5000) + 38000 + (i * 800),
+      arr: Math.floor(Math.random() * 60000) + 456000 + (i * 9600),
+    })),
+    revenueSources: [
       { name: "Subscriptions", value: 325000 },
       { name: "Professional Services", value: 95000 },
       { name: "One-time Sales", value: 45000 },
@@ -107,6 +116,16 @@ export function generateMockAnalytics(days: number = 30) {
       profit: Math.floor(Math.random() * 8000) + 2000,
       revenue: Math.floor(Math.random() * 18000) + 10000,
       costs: Math.floor(Math.random() * 10000) + 8000,
+    })),
+    margins: Array.from({ length: 6 }, (_, i) => ({
+      month: format(new Date(2025, i, 1), "MMM"),
+      gross: Math.floor(Math.random() * 5) + 66 + (i * 0.5),
+      operating: Math.floor(Math.random() * 3) + 30 + (i * 0.3),
+      net: Math.floor(Math.random() * 2) + 22 + (i * 0.2),
+    })),
+    netIncome: Array.from({ length: 6 }, (_, i) => ({
+      month: format(new Date(2025, i, 1), "MMM"),
+      income: Math.floor(Math.random() * 15000) + 18000 + (i * 2000),
     })),
     costStructure: [
       { name: "Cost of Goods Sold", value: 152000 },
@@ -147,16 +166,161 @@ export function generateMockAnalytics(days: number = 30) {
     },
   };
 
+  // Action Plans for each section
+  const spendActionPlan = [
+    {
+      id: "spend-1",
+      summary: "Duplicate subscriptions detected across 3 teams",
+      metricRef: "Software & SaaS",
+      severity: "high",
+      recommendedAction: "Consolidate project management tools to save $450/month. Slack and Teams are being used simultaneously.",
+      impact: "$5,400 annual savings",
+    },
+    {
+      id: "spend-2",
+      summary: "AWS costs exceeded benchmark by 28%",
+      metricRef: "Cloud Infrastructure",
+      severity: "critical",
+      recommendedAction: "Review instance sizes and implement auto-scaling. Consider reserved instances for predictable workloads.",
+      impact: "$3,200 monthly reduction",
+    },
+    {
+      id: "spend-3",
+      summary: "Marketing spend drift detected",
+      metricRef: "Marketing & Ads",
+      severity: "medium",
+      recommendedAction: "Marketing costs up 22% vs. last month. Reallocate budget from low-performing channels to LinkedIn Ads (3x better ROI).",
+      impact: "18% efficiency gain",
+    },
+    {
+      id: "spend-4",
+      summary: "Underutilized software licenses",
+      metricRef: "Software & SaaS",
+      severity: "medium",
+      recommendedAction: "35% of Salesforce licenses unused for 60+ days. Downgrade or reassign licenses.",
+      impact: "$1,800 monthly savings",
+    },
+  ];
+
+  const revenueActionPlan = [
+    {
+      id: "rev-1",
+      summary: "Enterprise customer concentration risk",
+      metricRef: "Customer Segments",
+      severity: "high",
+      recommendedAction: "58% of revenue from enterprise segment. Diversify by targeting mid-market with dedicated sales team.",
+      impact: "Risk mitigation",
+    },
+    {
+      id: "rev-2",
+      summary: "MRR growth slowing",
+      metricRef: "MRR vs ARR",
+      severity: "medium",
+      recommendedAction: "MRR growth rate dropped from 12% to 8% QoQ. Implement expansion revenue strategy for existing customers.",
+      impact: "$15K monthly increase",
+    },
+    {
+      id: "rev-3",
+      summary: "Professional services margin opportunity",
+      metricRef: "Revenue by Source",
+      severity: "low",
+      recommendedAction: "Services revenue at 20% but delivers lower margins. Package common requests into self-serve products.",
+      impact: "15% margin improvement",
+    },
+    {
+      id: "rev-4",
+      summary: "Churn prevention needed",
+      metricRef: "Subscriptions",
+      severity: "medium",
+      recommendedAction: "12 accounts flagged for churn risk. Deploy customer success playbook immediately.",
+      impact: "$42K ARR retention",
+    },
+  ];
+
+  const profitabilityActionPlan = [
+    {
+      id: "profit-1",
+      summary: "Operating expenses trending upward",
+      metricRef: "Operating Margin %",
+      severity: "high",
+      recommendedAction: "OpEx increased 14% while revenue grew 8%. Implement zero-based budgeting for Q2.",
+      impact: "5% margin recovery",
+    },
+    {
+      id: "profit-2",
+      summary: "COGS optimization opportunity",
+      metricRef: "Cost Structure",
+      severity: "medium",
+      recommendedAction: "Vendor consolidation could reduce COGS by 8%. Renegotiate contracts with top 3 suppliers.",
+      impact: "$12K monthly savings",
+    },
+    {
+      id: "profit-3",
+      summary: "R&D efficiency below target",
+      metricRef: "Cost Structure",
+      severity: "medium",
+      recommendedAction: "R&D spending at 20% of revenue vs. 15% target. Review project portfolio and prioritize high-ROI initiatives.",
+      impact: "Better resource allocation",
+    },
+    {
+      id: "profit-4",
+      summary: "Product B margin declining",
+      metricRef: "Margins by Product",
+      severity: "low",
+      recommendedAction: "Product B gross margin dropped 4% in 2 months. Analyze cost drivers and adjust pricing if needed.",
+      impact: "Margin stabilization",
+    },
+  ];
+
+  const forecastingActionPlan = [
+    {
+      id: "forecast-1",
+      summary: "Cash runway requires attention",
+      metricRef: "Cash Runway",
+      severity: "critical",
+      recommendedAction: "18 months runway at current burn. Reduce burn rate by 15% or secure bridge funding by Q3.",
+      impact: "6+ months extension",
+    },
+    {
+      id: "forecast-2",
+      summary: "Seasonal revenue dip expected",
+      metricRef: "12-Month Forecast",
+      severity: "medium",
+      recommendedAction: "Model shows 18% revenue decline in Q3. Plan marketing campaign and sales promotions now.",
+      impact: "Revenue stabilization",
+    },
+    {
+      id: "forecast-3",
+      summary: "Best-case scenario requires action",
+      metricRef: "Scenario Analysis",
+      severity: "low",
+      recommendedAction: "Best case ($750K revenue) achievable with 2 additional enterprise deals. Accelerate pipeline development.",
+      impact: "40% upside capture",
+    },
+    {
+      id: "forecast-4",
+      summary: "Expense forecast variance detected",
+      metricRef: "Forecasted Expenses",
+      severity: "medium",
+      recommendedAction: "Actual expenses trending 8% above forecast. Tighten approval processes for discretionary spend.",
+      impact: "$34K quarterly savings",
+    },
+  ];
+
   return {
     spendTrend: mockSpendTrend,
     categoryDistribution: mockCategoryDistribution,
     departmentSpending: mockDepartmentSpending,
     topVendors: mockTopVendors,
     monthlyComparison: mockMonthlyComparison,
+    spendActionPlan,
     // Additional sections
     revenue: mockRevenueData,
+    revenueActionPlan,
     profitability: mockProfitabilityData,
+    profitabilityActionPlan,
     forecasting: mockForecastingData,
+    forecastingActionPlan,
   };
 }
 
