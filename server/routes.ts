@@ -14,6 +14,7 @@ import { insertOrganizationSchema, insertDocumentSchema, insertTransactionSchema
 import * as pdfParse from "pdf-parse";
 import Papa from "papaparse";
 import { subDays, startOfMonth, endOfMonth, addMonths } from "date-fns";
+import { generateMockDashboardStats, generateMockAnalytics, generateMockInsights } from "./mockData";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -247,22 +248,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard stats
   app.get("/api/dashboard/stats", isAuthenticated, async (req, res) => {
     try {
+      // Always return mock data for demo purposes
+      return res.json(generateMockDashboardStats());
+      
+      // Original code commented out for mock data
+      /*
       const user = req.user as any;
       const userId = user.claims.sub;
 
       const orgs = await storage.getUserOrganizations(userId);
       if (orgs.length === 0) {
-        return res.json({
-          totalSpend: 0,
-          spendChange: 0,
-          transactionCount: 0,
-          subscriptionCount: 0,
-          subscriptionMrr: 0,
-          budgetVariance: 0,
-          spendOverTime: [],
-          spendByCategory: [],
-          spendByDepartment: [],
-        });
+        return res.json(generateMockDashboardStats());
       }
       const organizationId = orgs[0].id;
 
@@ -331,6 +327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         spendByCategory,
         spendByDepartment,
       });
+      */
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -339,12 +336,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Insights
   app.get("/api/insights", isAuthenticated, async (req, res) => {
     try {
+      // Always return mock data for demo purposes
+      return res.json(generateMockInsights());
+
+      // Original code commented out for mock data
+      /*
       const user = req.user as any;
       const userId = user.claims.sub;
 
       const orgs = await storage.getUserOrganizations(userId);
       if (orgs.length === 0) {
-        return res.json([]);
+        return res.json(generateMockInsights());
       }
       const organizationId = orgs[0].id;
 
@@ -375,6 +377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(insights);
+      */
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -459,17 +462,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Analytics
   app.get("/api/analytics", isAuthenticated, async (req, res) => {
     try {
+      // Always return comprehensive mock data for all analytics sections
+      const { days = "30" } = req.query;
+      const daysNum = parseInt(days as string);
+      return res.json(generateMockAnalytics(daysNum));
+
+      // Original code commented out for mock data
+      /*
       const user = req.user as any;
       const userId = user.claims.sub;
 
       const orgs = await storage.getUserOrganizations(userId);
       if (orgs.length === 0) {
-        return res.json({});
+        return res.json(generateMockAnalytics(30));
       }
       const organizationId = orgs[0].id;
 
-      const { days = "30" } = req.query;
-      const daysNum = parseInt(days as string);
       const startDate = subDays(new Date(), daysNum);
 
       const txns = await storage.getOrganizationTransactions(organizationId, {
@@ -531,6 +539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         topVendors,
         monthlyComparison: [],
       });
+      */
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
