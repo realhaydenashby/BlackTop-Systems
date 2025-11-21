@@ -6,8 +6,8 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-
-const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+import { CHART_COLORS, chartStyles, lineStyles, barStyles } from "@/lib/chartTheme";
+import { ActionPlanModule } from "@/components/ActionPlanModule";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -159,11 +159,16 @@ export default function Dashboard() {
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={stats?.spendOverTime || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="amount" stroke="hsl(var(--primary))" strokeWidth={2} />
+                <CartesianGrid {...chartStyles.cartesianGrid} />
+                <XAxis dataKey="date" {...chartStyles.xAxis} />
+                <YAxis {...chartStyles.yAxis} />
+                <Tooltip {...chartStyles.tooltip} />
+                <Line 
+                  type="monotone" 
+                  dataKey="amount" 
+                  stroke={CHART_COLORS[0]} 
+                  {...lineStyles}
+                />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -183,14 +188,13 @@ export default function Dashboard() {
                   labelLine={false}
                   label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                   outerRadius={80}
-                  fill="#8884d8"
                   dataKey="value"
                 >
                   {(stats?.spendByCategory || []).map((_: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip {...chartStyles.tooltip} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -204,15 +208,21 @@ export default function Dashboard() {
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={stats?.spendByDepartment || []}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="hsl(var(--primary))" />
+              <CartesianGrid {...chartStyles.cartesianGrid} />
+              <XAxis dataKey="name" {...chartStyles.xAxis} />
+              <YAxis {...chartStyles.yAxis} />
+              <Tooltip {...chartStyles.tooltip} />
+              <Bar dataKey="value" fill={CHART_COLORS[0]} {...barStyles} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      <ActionPlanModule 
+        title="AI-Generated Action Plan"
+        description="Top priorities for your financial health"
+        items={stats?.dashboardActionPlan || []}
+      />
     </div>
   );
 }
