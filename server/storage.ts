@@ -120,6 +120,10 @@ export interface IStorage {
   // Integrations
   createIntegrationConnection(conn: InsertIntegrationConnection): Promise<IntegrationConnection>;
   getOrganizationIntegrations(organizationId: string): Promise<IntegrationConnection[]>;
+  updateIntegrationConnection(id: string, data: Partial<InsertIntegrationConnection>): Promise<IntegrationConnection | undefined>;
+
+  // Helper methods
+  getOrganizationMember(userId: string): Promise<OrganizationMember | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -491,6 +495,22 @@ export class DatabaseStorage implements IStorage {
   async getOrganizationIntegrations(organizationId: string): Promise<IntegrationConnection[]> {
     return await db.query.integrationConnections.findMany({
       where: eq(integrationConnections.organizationId, organizationId),
+    });
+  }
+
+  async updateIntegrationConnection(id: string, data: Partial<InsertIntegrationConnection>): Promise<IntegrationConnection | undefined> {
+    const [updated] = await db
+      .update(integrationConnections)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(integrationConnections.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getOrganizationMember(userId: string): Promise<OrganizationMember | undefined> {
+    // Get the first organization the user is a member of
+    return await db.query.organizationMembers.findFirst({
+      where: eq(organizationMembers.userId, userId),
     });
   }
 }

@@ -10,13 +10,108 @@ import {
   generateActionPlan,
 } from "./openai";
 import { z } from "zod";
-import { insertOrganizationSchema, insertDocumentSchema, insertTransactionSchema } from "@shared/schema";
+import { User, insertOrganizationSchema, insertDocumentSchema, insertTransactionSchema } from "@shared/schema";
 import * as pdfParse from "pdf-parse";
 import Papa from "papaparse";
 import { subDays, startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { generateMockDashboardStats, generateMockAnalytics, generateMockInsights } from "./mockData";
 
 const objectStorageService = new ObjectStorageService();
+
+/**
+ * Background job to process uploaded documents
+ * Extracts text, transactions, and updates document status
+ */
+async function processDocument(
+  documentId: string,
+  fileUrl: string,
+  documentType: string,
+  organizationId: string
+): Promise<void> {
+  try {
+    console.log(`Processing document ${documentId}...`);
+
+    // Update status to processing
+    await storage.updateDocument(documentId, { status: "processing" });
+
+    // Check if Document AI is configured
+    const { documentAIService } = await import("./documentAIService");
+    
+    if (!documentAIService.isConfigured()) {
+      console.warn("Document AI not configured, using fallback PDF parsing");
+      
+      // Fallback to basic PDF parsing
+      const pdfParse = require("pdf-parse");
+      const response = await fetch(fileUrl);
+      const buffer = await response.arrayBuffer();
+      const pdfData = await pdfParse(Buffer.from(buffer));
+      
+      await storage.updateDocument(documentId, {
+        parsedText: pdfData.text,
+        status: "processed",
+        extractionConfidence: "0.5",
+      });
+      
+      console.log(`Document ${documentId} processed with fallback parser`);
+      return;
+    }
+
+    // Use Document AI for processing
+    const docTypeMap: { [key: string]: "bank_statement" | "invoice" | "receipt" } = {
+      "statement": "bank_statement",
+      "invoice": "invoice",
+      "receipt": "receipt",
+      "bank_statement": "bank_statement",
+      "csv": "bank_statement",
+    };
+
+    const aiDocType = docTypeMap[documentType] || "bank_statement";
+    
+    const result = await documentAIService.processAndExtractTransactions(fileUrl, aiDocType);
+
+    // Update document with extracted text
+    await storage.updateDocument(documentId, {
+      parsedText: result.rawText,
+      status: "processed",
+      extractionConfidence: result.confidence.toString(),
+    });
+
+    // Create transaction records
+    for (const txn of result.transactions) {
+      if (!txn.date || !txn.amount) {
+        continue; // Skip invalid transactions
+      }
+
+      // Find or create vendor
+      const vendor = txn.vendor
+        ? await storage.findOrCreateVendor(organizationId, txn.vendor)
+        : null;
+
+      // Find or create category
+      const category = txn.category
+        ? await storage.findOrCreateCategory(organizationId, txn.category)
+        : null;
+
+      // Create transaction
+      await storage.createTransaction({
+        organizationId,
+        documentId,
+        date: new Date(txn.date),
+        amount: txn.amount.toString(),
+        currency: "USD",
+        vendorId: vendor?.id || null,
+        categoryId: category?.id || null,
+        description: txn.description || null,
+        isRecurring: false, // Will be detected later
+      });
+    }
+
+    console.log(`Document ${documentId} processed successfully. Extracted ${result.transactions.length} transactions.`);
+  } catch (error: any) {
+    console.error(`Error processing document ${documentId}:`, error);
+    await storage.updateDocument(documentId, { status: "error" });
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth endpoint to get current user
@@ -407,7 +502,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const spent: Record<string, number> = {};
           if (budget.breakdown) {
             for (const category of Object.keys(budget.breakdown)) {
-              const catTxns = txns.filter((txn) => txn.category?.name === category);
+              // Filter by category name stored in the transaction
+              const catTxns = txns.filter((txn) => txn.category === category);
               spent[category] = catTxns.reduce((sum, txn) => sum + parseFloat(txn.amount), 0);
             }
           }
@@ -650,6 +746,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(connections);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Yodlee Banking Integration endpoints
+  app.post("/api/yodlee/connect", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const orgMember = await storage.getOrganizationMember(user.id);
+
+      if (!orgMember) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+
+      const { yodleeService } = await import("./yodleeService");
+      const { accessToken, fastLinkUrl } = await yodleeService.generateFastLink(user.id);
+
+      // Store the connection in the database
+      const connection = await storage.createIntegrationConnection({
+        organizationId: orgMember.organizationId,
+        type: "banking",
+        provider: "yodlee",
+        status: "pending",
+        metadata: {
+          userId: user.id,
+          accessToken,
+        },
+      });
+
+      res.json({ 
+        connectionId: connection.id,
+        fastLinkUrl 
+      });
+    } catch (error: any) {
+      console.error("Yodlee connect error:", error);
+      res.status(500).json({ message: error.message || "Failed to initiate bank connection" });
+    }
+  });
+
+  app.post("/api/yodlee/sync-transactions", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const orgMember = await storage.getOrganizationMember(user.id);
+
+      if (!orgMember) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+
+      // Get the Yodlee connection
+      const connections = await storage.getOrganizationIntegrations(orgMember.organizationId);
+      const yodleeConnection = connections.find(
+        (c: any) => c.provider === "yodlee" && c.status === "active"
+      );
+
+      const metadata = yodleeConnection?.metadata as { accessToken?: string; userId?: string } | null;
+      if (!yodleeConnection || !metadata?.accessToken) {
+        return res.status(404).json({ message: "No active Yodlee connection found" });
+      }
+
+      const { yodleeService } = await import("./yodleeService");
+      const days = parseInt(req.body.days) || 90;
+      
+      // Sync transactions
+      const normalizedTransactions = await yodleeService.syncTransactions(
+        orgMember.organizationId,
+        metadata.accessToken,
+        days
+      );
+
+      // Store transactions in database (resolve vendor and category names to IDs first)
+      const stored = [];
+      for (const txn of normalizedTransactions) {
+        // Find or create vendor
+        const vendor = await storage.findOrCreateVendor(orgMember.organizationId, txn.vendorName);
+        
+        // Find or create category  
+        const category = await storage.findOrCreateCategory(orgMember.organizationId, txn.categoryName);
+        
+        // Create transaction with proper IDs
+        const transaction = await storage.createTransaction({
+          organizationId: txn.organizationId,
+          date: txn.date,
+          amount: txn.amount,
+          currency: txn.currency,
+          vendorId: vendor.id,
+          categoryId: category.id,
+          description: txn.description,
+          isRecurring: txn.isRecurring,
+          tags: txn.tags,
+        });
+        
+        stored.push(transaction);
+      }
+
+      // Update connection status
+      await storage.updateIntegrationConnection(yodleeConnection.id, {
+        status: "active",
+        metadata: {
+          ...yodleeConnection.metadata,
+          lastSyncAt: new Date().toISOString(),
+          transactionCount: stored.length,
+        },
+      });
+
+      res.json({ 
+        success: true,
+        transactionCount: stored.length,
+        dateRange: {
+          from: new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+          to: new Date().toISOString().split("T")[0],
+        }
+      });
+    } catch (error: any) {
+      console.error("Transaction sync error:", error);
+      res.status(500).json({ message: error.message || "Failed to sync transactions" });
+    }
+  });
+
+  app.get("/api/yodlee/accounts", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const orgMember = await storage.getOrganizationMember(user.id);
+
+      if (!orgMember) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+
+      const connections = await storage.getOrganizationIntegrations(orgMember.organizationId);
+      const yodleeConnection = connections.find(
+        (c: any) => c.provider === "yodlee" && c.status === "active"
+      );
+
+      const metadata = yodleeConnection?.metadata as { accessToken?: string; userId?: string } | null;
+      if (!yodleeConnection || !metadata?.accessToken) {
+        return res.status(404).json({ message: "No active Yodlee connection found" });
+      }
+
+      const { yodleeService } = await import("./yodleeService");
+      const accounts = await yodleeService.getAccounts(metadata.accessToken);
+
+      res.json({ accounts });
+    } catch (error: any) {
+      console.error("Get accounts error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch accounts" });
     }
   });
 
