@@ -459,10 +459,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const existingInsights = await storage.getOrganizationInsights(org.id);
       
-      // Check if insights need regeneration (none exist or oldest is > 7 days old)
-      const needsRegeneration = existingInsights.length === 0 || 
-        existingInsights.every(i => i.createdAt && 
-          (Date.now() - new Date(i.createdAt).getTime()) > 7 * 24 * 60 * 60 * 1000);
+      // Check if insights need regeneration (none exist or newest is > 7 days old)
+      const newestInsight = existingInsights.length > 0 ? existingInsights[0] : null;
+      const needsRegeneration = !newestInsight || 
+        (newestInsight.createdAt && 
+          (Date.now() - new Date(newestInsight.createdAt).getTime()) > 7 * 24 * 60 * 60 * 1000);
       
       // Generate insights if needed
       if (needsRegeneration) {
@@ -473,6 +474,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Only generate insights if we have enough transactions
         if (txns.length > 10) {
+          // Calculate actual date range from transactions (minimum 1 day)
+          const txnDates = txns.map(t => new Date(t.date).getTime());
+          const minDate = new Date(Math.min(...txnDates));
+          const maxDate = new Date(Math.max(...txnDates));
+          const actualDays = Math.max(1, Math.ceil((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)));
+          
           const vendors = await storage.getOrganizationVendors(org.id);
           const categories = await storage.getOrganizationCategories(org.id);
 
@@ -496,21 +503,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return mapping[category] || "other";
           };
 
-          // Store new insights in database (schema doesn't support separate recommendation field)
+          // Extract numeric dollar value from text (return valid number or null)
+          const extractMetricValue = (text: string): string | null => {
+            const dollarMatch = text.match(/\$([0-9,]+(?:\.[0-9]{2})?)/);
+            if (dollarMatch) {
+              const numStr = dollarMatch[1].replace(/,/g, '');
+              const num = parseFloat(numStr);
+              return Number.isFinite(num) ? numStr : null;
+            }
+            return null;
+          };
+
+          // Prepare new insight records
+          const newInsightRecords = [];
           for (const insight of generatedInsights) {
-            await storage.createInsight({
+            const combinedText = `${insight.description} ${insight.recommendation}`;
+            const metricValue = extractMetricValue(combinedText);
+            
+            newInsightRecords.push({
               organizationId: org.id,
               type: mapCategoryToType(insight.category),
               title: insight.title,
               description: `${insight.description}\n\nRecommendation: ${insight.recommendation}`,
-              metricValue: null, // AI doesn't provide numeric metrics in current schema
+              metricValue,
               severity: insight.severity,
-              period: `${lookbackDays}d`,
+              period: `${actualDays}d`,
             });
           }
-          
-          const newInsights = await storage.getOrganizationInsights(org.id);
-          return res.json(newInsights);
+
+          // Only replace if we have new insights to prevent data loss
+          if (newInsightRecords.length > 0) {
+            try {
+              const newInsights = await storage.replaceOrganizationInsights(org.id, newInsightRecords);
+              return res.json(newInsights);
+            } catch (replaceError) {
+              console.error("Failed to replace insights transactionally:", replaceError);
+              // If transaction fails, return existing insights to avoid showing empty state
+              return res.json(existingInsights);
+            }
+          }
         }
       }
 

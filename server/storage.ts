@@ -116,6 +116,9 @@ export interface IStorage {
   // Insights
   createInsight(insight: InsertInsight): Promise<Insight>;
   getOrganizationInsights(organizationId: string): Promise<Insight[]>;
+  deleteInsight(id: string): Promise<void>;
+  deleteOrganizationInsights(organizationId: string): Promise<void>;
+  replaceOrganizationInsights(organizationId: string, newInsights: InsertInsight[]): Promise<Insight[]>;
 
   // Integrations
   createIntegrationConnection(conn: InsertIntegrationConnection): Promise<IntegrationConnection>;
@@ -488,6 +491,33 @@ export class DatabaseStorage implements IStorage {
       where: eq(insights.organizationId, organizationId),
       orderBy: [desc(insights.createdAt)],
       limit: 20,
+    });
+  }
+
+  async deleteInsight(id: string): Promise<void> {
+    await db.delete(insights).where(eq(insights.id, id));
+  }
+
+  async deleteOrganizationInsights(organizationId: string): Promise<void> {
+    await db.delete(insights).where(eq(insights.organizationId, organizationId));
+  }
+
+  async replaceOrganizationInsights(organizationId: string, newInsights: InsertInsight[]): Promise<Insight[]> {
+    return await db.transaction(async (tx) => {
+      // Delete all existing insights for this organization
+      await tx.delete(insights).where(eq(insights.organizationId, organizationId));
+      
+      // Insert new insights if any
+      if (newInsights.length > 0) {
+        await tx.insert(insights).values(newInsights);
+      }
+      
+      // Return the newly inserted insights
+      return await tx.query.insights.findMany({
+        where: eq(insights.organizationId, organizationId),
+        orderBy: [desc(insights.createdAt)],
+        limit: 20,
+      });
     });
   }
 
