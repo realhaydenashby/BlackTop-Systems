@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Upload, Loader2, Download, Eye, CheckCircle2, Clock, XCircle, AlertCircle } from "lucide-react";
+import { FileText, Upload, Loader2, Download, Eye, CheckCircle2, Clock, XCircle, AlertCircle, Trash2 } from "lucide-react";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -33,6 +33,26 @@ export default function Documents() {
       toast({
         title: "Upload failed",
         description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/documents/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+      toast({
+        title: "Document deleted",
+        description: "The document has been successfully deleted.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete document. Please try again.",
         variant: "destructive",
       });
     },
@@ -237,6 +257,15 @@ export default function Documents() {
                               </Button>
                             </>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteMutation.mutate(doc.id)}
+                            disabled={deleteMutation.isPending}
+                            data-testid={`button-delete-${doc.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </CardContent>

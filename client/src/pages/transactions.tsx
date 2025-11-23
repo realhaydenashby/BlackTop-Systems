@@ -1,18 +1,22 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Transactions() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("30");
+  const { toast } = useToast();
 
   const { data: transactions, isLoading } = useQuery<any>({
     queryKey: ["/api/transactions", { search, category: categoryFilter, days: dateFilter }],
@@ -20,6 +24,26 @@ export default function Transactions() {
 
   const { data: categories } = useQuery<any>({
     queryKey: ["/api/categories"],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/transactions/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      toast({
+        title: "Transaction deleted",
+        description: "The transaction has been successfully deleted.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   return (
@@ -94,6 +118,7 @@ export default function Transactions() {
                   <TableHead>Category</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -112,6 +137,17 @@ export default function Transactions() {
                     <TableCell>{txn.department?.name || "-"}</TableCell>
                     <TableCell className="text-right font-medium">
                       ${parseFloat(txn.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteMutation.mutate(txn.id)}
+                        disabled={deleteMutation.isPending}
+                        data-testid={`button-delete-transaction-${txn.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

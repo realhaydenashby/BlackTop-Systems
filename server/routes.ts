@@ -317,6 +317,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/documents/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user.claims.sub;
+      const { id } = req.params;
+
+      const orgs = await storage.getUserOrganizations(userId);
+      if (orgs.length === 0) {
+        return res.status(403).json({ message: "No organization found" });
+      }
+
+      // Verify document belongs to one of the user's organizations
+      const document = await storage.getDocument(id);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      const userOrgIds = orgs.map(org => org.id);
+      if (!userOrgIds.includes(document.organizationId)) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteDocument(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Transactions
   app.get("/api/transactions", isAuthenticated, async (req, res) => {
     try {
@@ -340,6 +369,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(txns);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/transactions/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user.claims.sub;
+      const { id } = req.params;
+
+      const orgs = await storage.getUserOrganizations(userId);
+      if (orgs.length === 0) {
+        return res.status(403).json({ message: "No organization found" });
+      }
+
+      // Verify transaction belongs to one of the user's organizations
+      const transaction = await storage.getTransaction(id);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      const userOrgIds = orgs.map(org => org.id);
+      if (!userOrgIds.includes(transaction.organizationId)) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      await storage.deleteTransaction(id);
+      res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

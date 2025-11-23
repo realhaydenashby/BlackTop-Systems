@@ -69,6 +69,7 @@ export interface IStorage {
   getDocument(id: string): Promise<Document | undefined>;
   getOrganizationDocuments(organizationId: string): Promise<Document[]>;
   updateDocument(id: string, data: Partial<InsertDocument>): Promise<Document | undefined>;
+  deleteDocument(id: string): Promise<void>;
 
   // Transactions
   createTransaction(txn: InsertTransaction): Promise<Transaction>;
@@ -82,6 +83,7 @@ export interface IStorage {
     search?: string;
   }): Promise<Transaction[]>;
   updateTransaction(id: string, data: Partial<InsertTransaction>): Promise<Transaction | undefined>;
+  deleteTransaction(id: string): Promise<void>;
 
   // Vendors
   createVendor(vendor: InsertVendor): Promise<Vendor>;
@@ -244,6 +246,10 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async deleteDocument(id: string): Promise<void> {
+    await db.delete(documents).where(eq(documents.id, id));
+  }
+
   async createTransaction(txnData: InsertTransaction): Promise<Transaction> {
     const [txn] = await db.insert(transactions).values(txnData).returning();
     return txn;
@@ -317,6 +323,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(transactions.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteTransaction(id: string): Promise<void> {
+    await db.delete(transactions).where(eq(transactions.id, id));
   }
 
   async createVendor(vendorData: InsertVendor): Promise<Vendor> {
