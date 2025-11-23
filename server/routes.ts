@@ -366,11 +366,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard stats
   app.get("/api/dashboard/stats", isAuthenticated, async (req, res) => {
     try {
-      // Always return mock data for demo purposes
-      return res.json(generateMockDashboardStats());
-      
-      // Original code commented out for mock data
-      /*
       const user = req.user as any;
       const userId = user.claims.sub;
 
@@ -445,7 +440,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         spendByCategory,
         spendByDepartment,
       });
-      */
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -454,49 +448,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Insights
   app.get("/api/insights", isAuthenticated, async (req, res) => {
     try {
-      // Always return mock data for demo purposes
-      return res.json(generateMockInsights());
-
-      // Original code commented out for mock data
-      /*
       const user = req.user as any;
       const userId = user.claims.sub;
 
       const orgs = await storage.getUserOrganizations(userId);
       if (orgs.length === 0) {
-        return res.json(generateMockInsights());
+        return res.json([]);
       }
-      const organizationId = orgs[0].id;
+      const org = orgs[0];
 
-      const insights = await storage.getOrganizationInsights(organizationId);
-
-      if (insights.length === 0) {
-        const txns = await storage.getOrganizationTransactions(organizationId, {
-          startDate: subDays(new Date(), 90),
+      const existingInsights = await storage.getOrganizationInsights(org.id);
+      
+      // Check if insights need regeneration (none exist or oldest is > 7 days old)
+      const needsRegeneration = existingInsights.length === 0 || 
+        existingInsights.every(i => i.createdAt && 
+          (Date.now() - new Date(i.createdAt).getTime()) > 7 * 24 * 60 * 60 * 1000);
+      
+      // Generate insights if needed
+      if (needsRegeneration) {
+        const lookbackDays = 90;
+        const txns = await storage.getOrganizationTransactions(org.id, {
+          startDate: subDays(new Date(), lookbackDays),
         });
-        const budgets = await storage.getOrganizationBudgets(organizationId);
 
+        // Only generate insights if we have enough transactions
         if (txns.length > 10) {
-          const generatedInsights = await generateInsights(txns, budgets);
+          const vendors = await storage.getOrganizationVendors(org.id);
+          const categories = await storage.getOrganizationCategories(org.id);
+
+          const { intelligenceService } = await import("./intelligenceService");
+          const generatedInsights = await intelligenceService.generateInsights(
+            txns,
+            vendors,
+            categories,
+            org
+          );
+
+          // Map AI category to database insight type
+          const mapCategoryToType = (category: string): "spend_drift" | "subscription_creep" | "vendor_overbilling" | "overtime_drift" | "other" => {
+            const mapping: Record<string, "spend_drift" | "subscription_creep" | "vendor_overbilling" | "overtime_drift" | "other"> = {
+              "spending": "spend_drift",
+              "subscriptions": "subscription_creep",
+              "vendors": "vendor_overbilling",
+              "cash_flow": "spend_drift",
+              "efficiency": "other",
+            };
+            return mapping[category] || "other";
+          };
+
+          // Store new insights in database (schema doesn't support separate recommendation field)
           for (const insight of generatedInsights) {
             await storage.createInsight({
-              organizationId,
-              type: insight.type,
+              organizationId: org.id,
+              type: mapCategoryToType(insight.category),
               title: insight.title,
-              description: insight.description,
-              metricValue: insight.metricValue?.toString(),
+              description: `${insight.description}\n\nRecommendation: ${insight.recommendation}`,
+              metricValue: null, // AI doesn't provide numeric metrics in current schema
               severity: insight.severity,
-              period: insight.period,
+              period: `${lookbackDays}d`,
             });
           }
-          const newInsights = await storage.getOrganizationInsights(organizationId);
+          
+          const newInsights = await storage.getOrganizationInsights(org.id);
           return res.json(newInsights);
         }
       }
 
-      res.json(insights);
-      */
+      res.json(existingInsights);
     } catch (error: any) {
+      console.error("Error generating insights:", error);
       res.status(500).json({ message: error.message });
     }
   });
