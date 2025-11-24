@@ -75,90 +75,184 @@ async function processDocument(
       // Import normalization service for AI-powered vendor/category classification
       const { normalizationService } = await import("./normalizationService");
 
-      // Cache to avoid redundant AI calls for duplicate vendors in same CSV
-      const vendorCache = new Map<string, { cleanName: string; isRecurring: boolean }>();
-      const categoryCache = new Map<string, string>();
+      // Helper function to normalize vendor strings for better cache matching
+      const normalizeVendorKey = (raw: string): string => {
+        return raw
+          .replace(/\*\w+/g, '') // Remove *ABC123 patterns
+          .replace(/\d{4,}/g, '') // Remove long number sequences
+          .replace(/\s+/g, ' ') // Normalize whitespace
+          .trim()
+          .toUpperCase();
+      };
 
-      // Map CSV columns to transaction fields (flexible column name detection)
+      // PHASE 1: Parse and extract all transaction data
+      interface ParsedTransaction {
+        date: Date;
+        amount: number;
+        description: string | null;
+        rawVendor: string;
+        vendorKey: string;
+      }
+
+      const parsedTransactions: ParsedTransaction[] = [];
+      
       for (const row of csvData) {
-        // Find date column (common names: date, transaction date, posting date, etc.)
         const dateValue = row['Date'] || row['date'] || row['Transaction Date'] || row['Posting Date'] || row['DATE'];
-        
-        // Find amount column (common names: amount, debit, credit, etc.)
         const amountValue = row['Amount'] || row['amount'] || row['Debit'] || row['Credit'] || row['AMOUNT'];
-        
-        // Find description/memo column
         const descriptionValue = row['Description'] || row['description'] || row['Memo'] || row['memo'] || row['DESCRIPTION'];
-        
-        // Find vendor/payee column
         const vendorValue = row['Vendor'] || row['vendor'] || row['Payee'] || row['payee'] || row['Merchant'] || row['merchant'];
 
-        if (!dateValue || !amountValue) {
-          continue; // Skip rows without required fields
+        if (!dateValue || !amountValue) continue;
+
+        const parsedAmount = parseFloat(String(amountValue).replace(/[^0-9.-]/g, ''));
+        if (isNaN(parsedAmount)) continue;
+
+        const rawVendor = vendorValue || descriptionValue || "Unknown";
+        const vendorKey = normalizeVendorKey(rawVendor);
+
+        parsedTransactions.push({
+          date: new Date(dateValue),
+          amount: parsedAmount,
+          description: descriptionValue || null,
+          rawVendor,
+          vendorKey,
+        });
+      }
+
+      // PHASE 2: Identify unique vendors and batch normalize with AI (with concurrency control)
+      const uniqueVendorKeys = new Set<string>();
+      parsedTransactions.forEach(t => uniqueVendorKeys.add(t.vendorKey));
+
+      const vendorCache = new Map<string, { cleanName: string; isRecurring: boolean }>();
+      
+      // Use p-limit to control concurrency (max 5 concurrent AI calls)
+      const pLimit = (await import("p-limit")).default;
+      const limit = pLimit(5);
+      
+      // Batch process unique vendors in parallel with concurrency control
+      const vendorResults = await Promise.allSettled(
+        Array.from(uniqueVendorKeys).map(vendorKey => 
+          limit(async () => {
+            const sample = parsedTransactions.find(t => t.vendorKey === vendorKey);
+            if (!sample) return { vendorKey, success: false };
+
+            try {
+              const vendorResult = await normalizationService.normalizeVendorName(sample.rawVendor);
+              const cleanName = vendorResult.cleanName;
+              const isRecurring = normalizationService.isLikelySubscription(cleanName);
+              
+              return { vendorKey, success: true, cleanName, isRecurring };
+            } catch (error) {
+              console.error(`Failed to normalize vendor ${vendorKey}:`, error);
+              // Fallback to simple normalization
+              return { 
+                vendorKey, 
+                success: true, 
+                cleanName: sample.rawVendor.substring(0, 50).trim(),
+                isRecurring: false 
+              };
+            }
+          })
+        )
+      );
+
+      // Populate cache from results
+      vendorResults.forEach(result => {
+        if (result.status === 'fulfilled' && result.value.success && result.value.cleanName) {
+          vendorCache.set(result.value.vendorKey, {
+            cleanName: result.value.cleanName,
+            isRecurring: result.value.isRecurring ?? false,
+          });
         }
+      });
 
-        // Parse amount (handle negative values, parentheses for negatives, etc.)
-        let parsedAmount = parseFloat(String(amountValue).replace(/[^0-9.-]/g, ''));
-        if (isNaN(parsedAmount)) {
-          continue;
+      // PHASE 3: Identify unique categories and batch classify with AI (with concurrency control)
+      const uniqueCategories = new Map<string, { vendor: string; description: string; amount: number }>();
+      
+      parsedTransactions.forEach(t => {
+        const cached = vendorCache.get(t.vendorKey);
+        if (!cached) return;
+        
+        const categoryKey = `${cached.cleanName}|${t.description || ''}`;
+        if (!uniqueCategories.has(categoryKey)) {
+          uniqueCategories.set(categoryKey, {
+            vendor: cached.cleanName,
+            description: t.description || "",
+            amount: t.amount,
+          });
         }
+      });
 
-        // Use AI to normalize vendor name and classify category (with caching)
-        const rawVendorName = vendorValue || descriptionValue || "Unknown";
-        let vendorName = rawVendorName;
-        let categoryName = "Operations & Misc";
-        let isRecurring = false;
+      const categoryCache = new Map<string, string>();
+      
+      // Batch process unique categories in parallel with concurrency control (max 5 concurrent)
+      const categoryResults = await Promise.allSettled(
+        Array.from(uniqueCategories.entries()).map(([key, data]) =>
+          limit(async () => {
+            try {
+              const categoryResult = await normalizationService.classifyCategory(
+                data.vendor,
+                data.description,
+                data.amount
+              );
+              return { key, success: true, category: categoryResult.category };
+            } catch (error) {
+              console.error(`Failed to classify category for ${key}:`, error);
+              // Fallback to default category
+              return { key, success: true, category: "Operations & Misc" };
+            }
+          })
+        )
+      );
 
-        // Check vendor cache first
-        if (vendorCache.has(rawVendorName)) {
-          const cached = vendorCache.get(rawVendorName)!;
-          vendorName = cached.cleanName;
-          isRecurring = cached.isRecurring;
-        } else if (vendorValue || descriptionValue) {
-          // Call AI only if not cached
-          const vendorResult = await normalizationService.normalizeVendorName(rawVendorName);
-          vendorName = vendorResult.cleanName;
-          isRecurring = normalizationService.isLikelySubscription(vendorName);
-          
-          // Cache the result
-          vendorCache.set(rawVendorName, { cleanName: vendorName, isRecurring });
+      // Populate cache from results
+      categoryResults.forEach(result => {
+        if (result.status === 'fulfilled' && result.value.success) {
+          categoryCache.set(result.value.key, result.value.category);
         }
+      });
 
-        // Check category cache (key = vendor + description for better accuracy)
-        const categoryCacheKey = `${vendorName}|${descriptionValue || ''}`;
-        if (categoryCache.has(categoryCacheKey)) {
-          categoryName = categoryCache.get(categoryCacheKey)!;
-        } else {
-          // Call AI only if not cached
-          const categoryResult = await normalizationService.classifyCategory(
-            vendorName,
-            descriptionValue || "",
-            parsedAmount
-          );
-          categoryName = categoryResult.category;
-          
-          // Cache the result
-          categoryCache.set(categoryCacheKey, categoryName);
-        }
+      // PHASE 4: Create vendors and categories (bulk lookup)
+      const vendorMap = new Map<string, any>();
+      const categoryMap = new Map<string, any>();
 
-        // Find or create vendor and category
-        const vendor = await storage.findOrCreateVendor(organizationId, vendorName);
+      for (const cached of Array.from(vendorCache.values())) {
+        const vendor = await storage.findOrCreateVendor(organizationId, cached.cleanName);
+        vendorMap.set(cached.cleanName, vendor);
+      }
+
+      for (const categoryName of Array.from(categoryCache.values())) {
         const category = await storage.findOrCreateCategory(organizationId, categoryName);
+        categoryMap.set(categoryName, category);
+      }
+
+      // PHASE 5: Bulk insert transactions
+      for (const txn of parsedTransactions) {
+        const cached = vendorCache.get(txn.vendorKey);
+        if (!cached) continue;
+
+        const categoryKey = `${cached.cleanName}|${txn.description || ''}`;
+        const categoryName = categoryCache.get(categoryKey) || "Operations & Misc";
+
+        const vendor = vendorMap.get(cached.cleanName);
+        const category = categoryMap.get(categoryName);
+
+        if (!vendor || !category) continue;
 
         await storage.createTransaction({
           organizationId,
           documentId,
-          date: new Date(dateValue),
-          amount: parsedAmount.toString(),
+          date: txn.date,
+          amount: txn.amount.toString(),
           currency: "USD",
           vendorId: vendor.id,
           categoryId: category.id,
-          description: descriptionValue || null,
-          isRecurring,
+          description: txn.description,
+          isRecurring: cached.isRecurring,
         });
       }
 
-      console.log(`CSV ${documentId} processed successfully. Extracted ${csvData.length} transactions (${vendorCache.size} unique vendors, ${categoryCache.size} unique categories).`);
+      console.log(`CSV ${documentId} processed successfully. Extracted ${parsedTransactions.length} transactions (${vendorCache.size} unique vendors, ${categoryCache.size} unique categories).`);
       return;
     }
 
