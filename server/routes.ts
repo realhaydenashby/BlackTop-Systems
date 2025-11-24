@@ -35,8 +35,8 @@ async function processDocument(
       throw new Error("Failed to fetch document from storage");
     }
 
-    const arrayBuffer = await fileResponse.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // Download file content from Google Cloud Storage
+    const [buffer] = await fileResponse.download();
 
     // Check if Document AI is configured
     const { documentAIService } = await import("./documentAIService");
@@ -452,8 +452,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const subscriptions = recentTxns.filter((txn) => txn.isRecurring);
       const subscriptionMrr = subscriptions.reduce((sum, txn) => sum + parseFloat(txn.amount), 0);
 
+      // Fetch categories and departments for mapping
+      const categories = await storage.getOrganizationCategories(organizationId);
+      const departments = await storage.getOrganizationDepartments(organizationId);
+      
+      const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+      const departmentMap = new Map(departments.map(d => [d.id, d.name]));
+
       const spendByCategory = recentTxns.reduce((acc: any[], txn) => {
-        const catName = txn.category?.name || "Uncategorized";
+        const catName = txn.categoryId ? categoryMap.get(txn.categoryId) || "Uncategorized" : "Uncategorized";
         const existing = acc.find((item) => item.name === catName);
         if (existing) {
           existing.value += parseFloat(txn.amount);
@@ -464,8 +471,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, []);
 
       const spendByDepartment = recentTxns.reduce((acc: any[], txn) => {
-        if (txn.department) {
-          const deptName = txn.department.name;
+        if (txn.departmentId) {
+          const deptName = departmentMap.get(txn.departmentId);
           const existing = acc.find((item) => item.name === deptName);
           if (existing) {
             existing.value += parseFloat(txn.amount);
@@ -541,12 +548,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const vendors = await storage.getOrganizationVendors(org.id);
           const categories = await storage.getOrganizationCategories(org.id);
 
+          // Normalize transactions for intelligence service (ensure isRecurring is boolean)
+          const normalizedTxns = txns.map(txn => ({
+            ...txn,
+            isRecurring: txn.isRecurring ?? false
+          }));
+
+          // Map organization to intelligence service format (employeeCount -> companySize)
+          const mappedOrg = {
+            id: org.id,
+            name: org.name,
+            industry: org.industry,
+            companySize: org.employeeCount,
+          };
+
           const { intelligenceService } = await import("./intelligenceService");
           const generatedInsights = await intelligenceService.generateInsights(
-            txns,
+            normalizedTxns,
             vendors,
             categories,
-            org
+            mappedOrg
           );
 
           // Map AI category to database insight type
@@ -665,10 +686,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: subDays(new Date(), 90),
       });
 
+      // Normalize transactions for intelligence service (ensure isRecurring is boolean)
+      const normalizedTxns = txns.map(txn => ({
+        ...txn,
+        isRecurring: txn.isRecurring ?? false
+      }));
+
+      // Map organization to intelligence service format (employeeCount -> companySize)
+      const mappedOrg = {
+        id: org.id,
+        name: org.name,
+        industry: org.industry,
+        companySize: org.employeeCount,
+      };
+
       // Use intelligence service to generate budget
       const { intelligenceService } = await import("./intelligenceService");
       const categories = await storage.getOrganizationCategories(org.id);
-      const suggestions = await intelligenceService.generateBudget(txns, categories, org);
+      const suggestions = await intelligenceService.generateBudget(normalizedTxns, categories, mappedOrg);
 
       const now = new Date();
       const periodStart = startOfMonth(addMonths(now, 1));
@@ -720,11 +755,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const categories = await storage.getOrganizationCategories(organizationId);
       const vendors = await storage.getOrganizationVendors(organizationId);
 
+      // Normalize transactions for analytics service (ensure isRecurring is boolean)
+      const normalizedTxns = txns.map(txn => ({
+        ...txn,
+        isRecurring: txn.isRecurring ?? false
+      }));
+
       // Use analytics service for calculations
       const { analyticsService } = await import("./analyticsService");
-      const monthlyTrends = analyticsService.calculateMonthlyTrends(txns, categories, 6);
-      const spendingPatterns = analyticsService.analyzeSpendingPatterns(txns, vendors, categories);
-      const burnAnalysis = analyticsService.calculateBurnRate(txns, 50000);
+      const monthlyTrends = analyticsService.calculateMonthlyTrends(normalizedTxns, categories, 6);
+      const spendingPatterns = analyticsService.analyzeSpendingPatterns(normalizedTxns, vendors, categories);
+      const burnAnalysis = analyticsService.calculateBurnRate(normalizedTxns, 50000);
 
       // Format spend trend for chart
       const spendTrend = txns.reduce((acc: any[], txn) => {
@@ -934,9 +975,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: subDays(new Date(), 90),
       });
 
+      // Map insights to format expected by intelligence service (type -> category)
+      const mapTypeToCategory = (type: string): string => {
+        const mapping: Record<string, string> = {
+          "spend_drift": "spending",
+          "subscription_creep": "subscriptions",
+          "vendor_overbilling": "vendors",
+          "overtime_drift": "cash_flow",
+          "other": "efficiency",
+        };
+        return mapping[type] || "efficiency";
+      };
+
+      const mappedInsights = insights.map(insight => ({
+        title: insight.title,
+        description: insight.description,
+        severity: insight.severity,
+        category: mapTypeToCategory(insight.type),
+      }));
+
+      // Calculate budget gap (current month spend vs budget)
+      const currentMonthSpend = txns
+        .filter(t => new Date(t.date) >= startOfMonth(new Date()))
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+      
+      const currentBudget = budgets.find(b => 
+        new Date(b.periodStart) <= new Date() && new Date(b.periodEnd) >= new Date()
+      );
+      
+      const budgetAmount = currentBudget ? parseFloat(currentBudget.totalBudgetAmount) : 0;
+      const budgetGap = currentMonthSpend - budgetAmount;
+
+      // Map organization to intelligence service format
+      const org = orgs[0];
+      const mappedOrg = {
+        id: org.id,
+        name: org.name,
+        industry: org.industry,
+        companySize: org.employeeCount,
+      };
+
       // Use intelligence service to generate action plan
       const { intelligenceService } = await import("./intelligenceService");
-      const generated = await intelligenceService.generateActionPlan(insights, budgets, txns);
+      const generated = await intelligenceService.generateActionPlan(mappedInsights, budgetGap, mappedOrg);
 
       const now = new Date();
       const periodStart = startOfMonth(addMonths(now, 1));
@@ -951,12 +1032,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: userId,
       });
 
-      for (const item of generated.actionItems || []) {
+      // The AI service returns 'actions' field with specific structure
+      const actionItems = generated.actions || [];
+      
+      for (const item of actionItems) {
         await storage.createActionItem({
           actionPlanId: plan.id,
-          type: item.type,
-          description: item.description,
-          impactEstimate: item.impactEstimate?.toString(),
+          type: "other", // Default type for AI-generated actions
+          description: `${item.title}: ${item.description}`,
+          impactEstimate: item.estimatedImpact?.toString(),
           priority: item.priority,
           status: "open",
         });
@@ -1094,7 +1178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateIntegrationConnection(yodleeConnection.id, {
         status: "active",
         metadata: {
-          ...yodleeConnection.metadata,
+          ...(yodleeConnection.metadata || {}),
           lastSyncAt: new Date().toISOString(),
           transactionCount: stored.length,
         },
