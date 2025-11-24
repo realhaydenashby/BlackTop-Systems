@@ -86,6 +86,8 @@ async function processDocument(
       };
 
       // PHASE 1: Parse and extract all transaction data
+      console.log(`[CSV PHASE 1] Parsing ${csvData.length} CSV rows...`);
+      
       interface ParsedTransaction {
         date: Date;
         amount: number;
@@ -95,6 +97,7 @@ async function processDocument(
       }
 
       const parsedTransactions: ParsedTransaction[] = [];
+      let skippedRows = 0;
       
       for (const row of csvData) {
         const dateValue = row['Date'] || row['date'] || row['Transaction Date'] || row['Posting Date'] || row['DATE'];
@@ -102,10 +105,16 @@ async function processDocument(
         const descriptionValue = row['Description'] || row['description'] || row['Memo'] || row['memo'] || row['DESCRIPTION'];
         const vendorValue = row['Vendor'] || row['vendor'] || row['Payee'] || row['payee'] || row['Merchant'] || row['merchant'];
 
-        if (!dateValue || !amountValue) continue;
+        if (!dateValue || !amountValue) {
+          skippedRows++;
+          continue;
+        }
 
         const parsedAmount = parseFloat(String(amountValue).replace(/[^0-9.-]/g, ''));
-        if (isNaN(parsedAmount)) continue;
+        if (isNaN(parsedAmount)) {
+          skippedRows++;
+          continue;
+        }
 
         const rawVendor = vendorValue || descriptionValue || "Unknown";
         const vendorKey = normalizeVendorKey(rawVendor);
@@ -118,10 +127,20 @@ async function processDocument(
           vendorKey,
         });
       }
+      
+      console.log(`[CSV PHASE 1] Parsed ${parsedTransactions.length} valid transactions (skipped ${skippedRows} invalid rows)`);
+      
+      if (parsedTransactions.length === 0) {
+        console.error(`[CSV ERROR] No valid transactions found in CSV file ${documentId}`);
+        await storage.updateDocument(documentId, { status: "error" });
+        return;
+      }
 
       // PHASE 2: Identify unique vendors and batch normalize with AI (with concurrency control)
       const uniqueVendorKeys = new Set<string>();
       parsedTransactions.forEach(t => uniqueVendorKeys.add(t.vendorKey));
+      
+      console.log(`[CSV PHASE 2] Normalizing ${uniqueVendorKeys.size} unique vendors with AI (max 5 concurrent)...`);
 
       const vendorCache = new Map<string, { cleanName: string; isRecurring: boolean }>();
       
@@ -129,25 +148,30 @@ async function processDocument(
       const pLimit = (await import("p-limit")).default;
       const limit = pLimit(5);
       
+      let vendorAISuccesses = 0;
+      let vendorAIFallbacks = 0;
+      let vendorAIFailures = 0;
+      
       // Batch process unique vendors in parallel with concurrency control
       const vendorResults = await Promise.allSettled(
         Array.from(uniqueVendorKeys).map(vendorKey => 
           limit(async () => {
             const sample = parsedTransactions.find(t => t.vendorKey === vendorKey);
-            if (!sample) return { vendorKey, success: false };
+            if (!sample) return { vendorKey, success: false, fallback: false };
 
             try {
               const vendorResult = await normalizationService.normalizeVendorName(sample.rawVendor);
               const cleanName = vendorResult.cleanName;
               const isRecurring = normalizationService.isLikelySubscription(cleanName);
               
-              return { vendorKey, success: true, cleanName, isRecurring };
+              return { vendorKey, success: true, fallback: false, cleanName, isRecurring };
             } catch (error) {
-              console.error(`Failed to normalize vendor ${vendorKey}:`, error);
+              console.error(`[CSV PHASE 2] Failed to normalize vendor "${sample.rawVendor}" (key: ${vendorKey}):`, error);
               // Fallback to simple normalization
               return { 
                 vendorKey, 
                 success: true, 
+                fallback: true,
                 cleanName: sample.rawVendor.substring(0, 50).trim(),
                 isRecurring: false 
               };
@@ -163,8 +187,17 @@ async function processDocument(
             cleanName: result.value.cleanName,
             isRecurring: result.value.isRecurring ?? false,
           });
+          if (result.value.fallback) {
+            vendorAIFallbacks++;
+          } else {
+            vendorAISuccesses++;
+          }
+        } else {
+          vendorAIFailures++;
         }
       });
+      
+      console.log(`[CSV PHASE 2] Vendor normalization complete: ${vendorAISuccesses} AI successes, ${vendorAIFallbacks} fallbacks, ${vendorAIFailures} failures`);
 
       // PHASE 3: Identify unique categories and batch classify with AI (with concurrency control)
       const uniqueCategories = new Map<string, { vendor: string; description: string; amount: number }>();
@@ -183,7 +216,12 @@ async function processDocument(
         }
       });
 
+      console.log(`[CSV PHASE 3] Classifying ${uniqueCategories.size} unique categories with AI (max 5 concurrent)...`);
+
       const categoryCache = new Map<string, string>();
+      let categoryAISuccesses = 0;
+      let categoryAIFallbacks = 0;
+      let categoryAIFailures = 0;
       
       // Batch process unique categories in parallel with concurrency control (max 5 concurrent)
       const categoryResults = await Promise.allSettled(
@@ -195,11 +233,11 @@ async function processDocument(
                 data.description,
                 data.amount
               );
-              return { key, success: true, category: categoryResult.category };
+              return { key, success: true, fallback: false, category: categoryResult.category };
             } catch (error) {
-              console.error(`Failed to classify category for ${key}:`, error);
+              console.error(`[CSV PHASE 3] Failed to classify category for "${data.vendor}":`, error);
               // Fallback to default category
-              return { key, success: true, category: "Operations & Misc" };
+              return { key, success: true, fallback: true, category: "Operations & Misc" };
             }
           })
         )
@@ -209,27 +247,58 @@ async function processDocument(
       categoryResults.forEach(result => {
         if (result.status === 'fulfilled' && result.value.success) {
           categoryCache.set(result.value.key, result.value.category);
+          if (result.value.fallback) {
+            categoryAIFallbacks++;
+          } else {
+            categoryAISuccesses++;
+          }
+        } else {
+          categoryAIFailures++;
         }
       });
+      
+      console.log(`[CSV PHASE 3] Category classification complete: ${categoryAISuccesses} AI successes, ${categoryAIFallbacks} fallbacks, ${categoryAIFailures} failures`);
 
       // PHASE 4: Create vendors and categories (bulk lookup)
+      console.log(`[CSV PHASE 4] Creating ${vendorCache.size} vendors and ${categoryCache.size} categories in database...`);
+      
       const vendorMap = new Map<string, any>();
       const categoryMap = new Map<string, any>();
 
       for (const cached of Array.from(vendorCache.values())) {
-        const vendor = await storage.findOrCreateVendor(organizationId, cached.cleanName);
-        vendorMap.set(cached.cleanName, vendor);
+        try {
+          const vendor = await storage.findOrCreateVendor(organizationId, cached.cleanName);
+          vendorMap.set(cached.cleanName, vendor);
+        } catch (error) {
+          console.error(`[CSV PHASE 4] Failed to create vendor "${cached.cleanName}":`, error);
+        }
       }
 
       for (const categoryName of Array.from(categoryCache.values())) {
-        const category = await storage.findOrCreateCategory(organizationId, categoryName);
-        categoryMap.set(categoryName, category);
+        try {
+          const category = await storage.findOrCreateCategory(organizationId, categoryName);
+          categoryMap.set(categoryName, category);
+        } catch (error) {
+          console.error(`[CSV PHASE 4] Failed to create category "${categoryName}":`, error);
+        }
       }
+      
+      console.log(`[CSV PHASE 4] Database operations complete: ${vendorMap.size} vendors, ${categoryMap.size} categories`);
 
       // PHASE 5: Bulk insert transactions
+      console.log(`[CSV PHASE 5] Inserting ${parsedTransactions.length} transactions...`);
+      
+      let transactionsCreated = 0;
+      let skippedNoVendorCache = 0;
+      let skippedNoDatabaseRecord = 0;
+      
       for (const txn of parsedTransactions) {
         const cached = vendorCache.get(txn.vendorKey);
-        if (!cached) continue;
+        if (!cached) {
+          skippedNoVendorCache++;
+          console.warn(`[CSV PHASE 5] Skipping transaction - no vendor cache for key: ${txn.vendorKey} (raw: ${txn.rawVendor})`);
+          continue;
+        }
 
         const categoryKey = `${cached.cleanName}|${txn.description || ''}`;
         const categoryName = categoryCache.get(categoryKey) || "Operations & Misc";
@@ -237,22 +306,37 @@ async function processDocument(
         const vendor = vendorMap.get(cached.cleanName);
         const category = categoryMap.get(categoryName);
 
-        if (!vendor || !category) continue;
+        if (!vendor || !category) {
+          skippedNoDatabaseRecord++;
+          console.warn(`[CSV PHASE 5] Skipping transaction - missing database record. Vendor: ${vendor ? 'OK' : 'MISSING'}, Category: ${category ? 'OK' : 'MISSING'} (${categoryName})`);
+          continue;
+        }
 
-        await storage.createTransaction({
-          organizationId,
-          documentId,
-          date: txn.date,
-          amount: txn.amount.toString(),
-          currency: "USD",
-          vendorId: vendor.id,
-          categoryId: category.id,
-          description: txn.description,
-          isRecurring: cached.isRecurring,
-        });
+        try {
+          await storage.createTransaction({
+            organizationId,
+            documentId,
+            date: txn.date,
+            amount: txn.amount.toString(),
+            currency: "USD",
+            vendorId: vendor.id,
+            categoryId: category.id,
+            description: txn.description,
+            isRecurring: cached.isRecurring,
+          });
+          transactionsCreated++;
+        } catch (error) {
+          console.error(`[CSV PHASE 5] Failed to insert transaction for vendor ${cached.cleanName}:`, error);
+        }
       }
 
-      console.log(`CSV ${documentId} processed successfully. Extracted ${parsedTransactions.length} transactions (${vendorCache.size} unique vendors, ${categoryCache.size} unique categories).`);
+      console.log(`[CSV COMPLETE] Document ${documentId} processed: ${transactionsCreated} transactions created, ${skippedNoVendorCache} skipped (no vendor cache), ${skippedNoDatabaseRecord} skipped (no database record)`);
+      
+      if (transactionsCreated === 0) {
+        console.error(`[CSV ERROR] No transactions were created from CSV file ${documentId}`);
+        await storage.updateDocument(documentId, { status: "error" });
+      }
+      
       return;
     }
 
