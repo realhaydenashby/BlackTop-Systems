@@ -66,6 +66,13 @@ async function processDocument(
 
       const csvData = parseResult.data as any[];
       
+      // Log CSV columns for debugging
+      if (csvData.length > 0) {
+        const firstRow = csvData[0];
+        const columnNames = Object.keys(firstRow);
+        console.log(`[CSV DEBUG] Found ${columnNames.length} columns in CSV:`, columnNames);
+      }
+      
       await storage.updateDocument(documentId, {
         parsedText: `CSV file with ${csvData.length} rows`,
         status: "processed",
