@@ -29,6 +29,8 @@ import type {
   InsertInsight,
   IntegrationConnection,
   InsertIntegrationConnection,
+  MonthlyMetric,
+  InsertMonthlyMetric,
 } from "@shared/schema";
 import {
   users,
@@ -45,6 +47,7 @@ import {
   actionItems,
   insights,
   integrationConnections,
+  monthlyMetrics,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -126,6 +129,15 @@ export interface IStorage {
   createIntegrationConnection(conn: InsertIntegrationConnection): Promise<IntegrationConnection>;
   getOrganizationIntegrations(organizationId: string): Promise<IntegrationConnection[]>;
   updateIntegrationConnection(id: string, data: Partial<InsertIntegrationConnection>): Promise<IntegrationConnection | undefined>;
+
+  // Monthly Metrics
+  createMonthlyMetric(metric: InsertMonthlyMetric): Promise<MonthlyMetric>;
+  getOrganizationMonthlyMetrics(organizationId: string, filters?: {
+    startMonth?: Date;
+    endMonth?: Date;
+    departmentId?: string;
+  }): Promise<MonthlyMetric[]>;
+  deleteDocumentMonthlyMetrics(documentId: string): Promise<void>;
 
   // Helper methods
   getOrganizationMember(userId: string): Promise<OrganizationMember | undefined>;
@@ -549,6 +561,38 @@ export class DatabaseStorage implements IStorage {
       .where(eq(integrationConnections.id, id))
       .returning();
     return updated;
+  }
+
+  async createMonthlyMetric(metricData: InsertMonthlyMetric): Promise<MonthlyMetric> {
+    const [metric] = await db.insert(monthlyMetrics).values(metricData).returning();
+    return metric;
+  }
+
+  async getOrganizationMonthlyMetrics(organizationId: string, filters?: {
+    startMonth?: Date;
+    endMonth?: Date;
+    departmentId?: string;
+  }): Promise<MonthlyMetric[]> {
+    const conditions = [eq(monthlyMetrics.organizationId, organizationId)];
+
+    if (filters?.startMonth) {
+      conditions.push(gte(monthlyMetrics.month, filters.startMonth));
+    }
+    if (filters?.endMonth) {
+      conditions.push(lte(monthlyMetrics.month, filters.endMonth));
+    }
+    if (filters?.departmentId) {
+      conditions.push(eq(monthlyMetrics.departmentId, filters.departmentId));
+    }
+
+    return await db.query.monthlyMetrics.findMany({
+      where: and(...conditions),
+      orderBy: [desc(monthlyMetrics.month)],
+    });
+  }
+
+  async deleteDocumentMonthlyMetrics(documentId: string): Promise<void> {
+    await db.delete(monthlyMetrics).where(eq(monthlyMetrics.documentId, documentId));
   }
 
   async getOrganizationMember(userId: string): Promise<OrganizationMember | undefined> {

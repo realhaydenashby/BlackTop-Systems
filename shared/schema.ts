@@ -272,6 +272,26 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Monthly Financial Metrics (summary-level data by department and month)
+export const monthlyMetrics = pgTable("monthly_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  departmentId: varchar("department_id").references(() => departments.id, { onDelete: "set null" }),
+  documentId: varchar("document_id").references(() => documents.id, { onDelete: "set null" }),
+  month: timestamp("month").notNull(), // Stored as first day of month
+  revenue: numeric("revenue", { precision: 12, scale: 2 }).default("0"),
+  expenses: numeric("expenses", { precision: 12, scale: 2 }).default("0"),
+  profit: numeric("profit", { precision: 12, scale: 2 }).default("0"),
+  cashBalance: numeric("cash_balance", { precision: 12, scale: 2 }),
+  headcount: integer("headcount").default(0),
+  subscriptionCount: integer("subscription_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_monthly_metrics_org_month").on(table.organizationId, table.month),
+  index("idx_monthly_metrics_department").on(table.departmentId),
+]);
+
 // Drizzle Relations
 export const usersRelations = relations(users, ({ many }) => ({
   organizationMembers: many(organizationMembers),
@@ -382,6 +402,7 @@ export const insertActionItemSchema = createInsertSchema(actionItems).omit({ id:
 export const insertInsightSchema = createInsertSchema(insights).omit({ id: true, createdAt: true });
 export const insertIntegrationConnectionSchema = createInsertSchema(integrationConnections).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true, createdAt: true });
+export const insertMonthlyMetricSchema = createInsertSchema(monthlyMetrics).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
@@ -414,6 +435,8 @@ export type IntegrationConnection = typeof integrationConnections.$inferSelect;
 export type InsertIntegrationConnection = z.infer<typeof insertIntegrationConnectionSchema>;
 export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
 export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+export type MonthlyMetric = typeof monthlyMetrics.$inferSelect;
+export type InsertMonthlyMetric = z.infer<typeof insertMonthlyMetricSchema>;
 
 // Extended types with relations
 export type TransactionWithRelations = Transaction & {
