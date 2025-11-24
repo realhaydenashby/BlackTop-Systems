@@ -75,6 +75,10 @@ async function processDocument(
       // Import normalization service for AI-powered vendor/category classification
       const { normalizationService } = await import("./normalizationService");
 
+      // Cache to avoid redundant AI calls for duplicate vendors in same CSV
+      const vendorCache = new Map<string, { cleanName: string; isRecurring: boolean }>();
+      const categoryCache = new Map<string, string>();
+
       // Map CSV columns to transaction fields (flexible column name detection)
       for (const row of csvData) {
         // Find date column (common names: date, transaction date, posting date, etc.)
@@ -99,23 +103,43 @@ async function processDocument(
           continue;
         }
 
-        // Use AI to normalize vendor name and classify category
-        let vendorName = vendorValue || descriptionValue || "Unknown";
+        // Use AI to normalize vendor name and classify category (with caching)
+        const rawVendorName = vendorValue || descriptionValue || "Unknown";
+        let vendorName = rawVendorName;
         let categoryName = "Operations & Misc";
         let isRecurring = false;
 
-        if (vendorValue || descriptionValue) {
-          const vendorResult = await normalizationService.normalizeVendorName(vendorName);
+        // Check vendor cache first
+        if (vendorCache.has(rawVendorName)) {
+          const cached = vendorCache.get(rawVendorName)!;
+          vendorName = cached.cleanName;
+          isRecurring = cached.isRecurring;
+        } else if (vendorValue || descriptionValue) {
+          // Call AI only if not cached
+          const vendorResult = await normalizationService.normalizeVendorName(rawVendorName);
           vendorName = vendorResult.cleanName;
           isRecurring = normalizationService.isLikelySubscription(vendorName);
+          
+          // Cache the result
+          vendorCache.set(rawVendorName, { cleanName: vendorName, isRecurring });
         }
 
-        const categoryResult = await normalizationService.classifyCategory(
-          vendorName,
-          descriptionValue || "",
-          parsedAmount
-        );
-        categoryName = categoryResult.category;
+        // Check category cache (key = vendor + description for better accuracy)
+        const categoryCacheKey = `${vendorName}|${descriptionValue || ''}`;
+        if (categoryCache.has(categoryCacheKey)) {
+          categoryName = categoryCache.get(categoryCacheKey)!;
+        } else {
+          // Call AI only if not cached
+          const categoryResult = await normalizationService.classifyCategory(
+            vendorName,
+            descriptionValue || "",
+            parsedAmount
+          );
+          categoryName = categoryResult.category;
+          
+          // Cache the result
+          categoryCache.set(categoryCacheKey, categoryName);
+        }
 
         // Find or create vendor and category
         const vendor = await storage.findOrCreateVendor(organizationId, vendorName);
@@ -134,7 +158,7 @@ async function processDocument(
         });
       }
 
-      console.log(`CSV ${documentId} processed successfully. Extracted ${csvData.length} transactions.`);
+      console.log(`CSV ${documentId} processed successfully. Extracted ${csvData.length} transactions (${vendorCache.size} unique vendors, ${categoryCache.size} unique categories).`);
       return;
     }
 
