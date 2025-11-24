@@ -38,7 +38,107 @@ async function processDocument(
     // Download file content from Google Cloud Storage
     const [buffer] = await fileResponse.download();
 
-    // Check if Document AI is configured
+    // Get file metadata to determine content type
+    const [metadata] = await fileResponse.getMetadata();
+    const contentType = metadata.contentType || '';
+
+    // Check if this is a CSV file
+    const isCSV = documentType === "csv" || 
+                  documentType === "csv_upload" ||
+                  contentType.includes('csv') || 
+                  contentType.includes('comma-separated') ||
+                  fileUrl.toLowerCase().endsWith('.csv');
+
+    if (isCSV) {
+      console.log(`Processing CSV file ${documentId}...`);
+      
+      // Parse CSV file
+      const csvText = buffer.toString('utf-8');
+      const parseResult = Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: true,
+      });
+
+      if (parseResult.errors.length > 0) {
+        console.error("CSV parsing errors:", parseResult.errors);
+      }
+
+      const csvData = parseResult.data as any[];
+      
+      await storage.updateDocument(documentId, {
+        parsedText: `CSV file with ${csvData.length} rows`,
+        status: "processed",
+        extractionConfidence: "0.9",
+      });
+
+      // Import normalization service for AI-powered vendor/category classification
+      const { normalizationService } = await import("./normalizationService");
+
+      // Map CSV columns to transaction fields (flexible column name detection)
+      for (const row of csvData) {
+        // Find date column (common names: date, transaction date, posting date, etc.)
+        const dateValue = row['Date'] || row['date'] || row['Transaction Date'] || row['Posting Date'] || row['DATE'];
+        
+        // Find amount column (common names: amount, debit, credit, etc.)
+        const amountValue = row['Amount'] || row['amount'] || row['Debit'] || row['Credit'] || row['AMOUNT'];
+        
+        // Find description/memo column
+        const descriptionValue = row['Description'] || row['description'] || row['Memo'] || row['memo'] || row['DESCRIPTION'];
+        
+        // Find vendor/payee column
+        const vendorValue = row['Vendor'] || row['vendor'] || row['Payee'] || row['payee'] || row['Merchant'] || row['merchant'];
+
+        if (!dateValue || !amountValue) {
+          continue; // Skip rows without required fields
+        }
+
+        // Parse amount (handle negative values, parentheses for negatives, etc.)
+        let parsedAmount = parseFloat(String(amountValue).replace(/[^0-9.-]/g, ''));
+        if (isNaN(parsedAmount)) {
+          continue;
+        }
+
+        // Use AI to normalize vendor name and classify category
+        let vendorName = vendorValue || descriptionValue || "Unknown";
+        let categoryName = "Operations & Misc";
+        let isRecurring = false;
+
+        if (vendorValue || descriptionValue) {
+          const vendorResult = await normalizationService.normalizeVendorName(vendorName);
+          vendorName = vendorResult.cleanName;
+          isRecurring = normalizationService.isLikelySubscription(vendorName);
+        }
+
+        const categoryResult = await normalizationService.classifyCategory(
+          vendorName,
+          descriptionValue || "",
+          parsedAmount
+        );
+        categoryName = categoryResult.category;
+
+        // Find or create vendor and category
+        const vendor = await storage.findOrCreateVendor(organizationId, vendorName);
+        const category = await storage.findOrCreateCategory(organizationId, categoryName);
+
+        await storage.createTransaction({
+          organizationId,
+          documentId,
+          date: new Date(dateValue),
+          amount: parsedAmount.toString(),
+          currency: "USD",
+          vendorId: vendor.id,
+          categoryId: category.id,
+          description: descriptionValue || null,
+          isRecurring,
+        });
+      }
+
+      console.log(`CSV ${documentId} processed successfully. Extracted ${csvData.length} transactions.`);
+      return;
+    }
+
+    // Check if Document AI is configured for PDF processing
     const { documentAIService } = await import("./documentAIService");
     
     if (!documentAIService.isConfigured()) {
