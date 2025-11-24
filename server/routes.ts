@@ -13,6 +13,129 @@ import { generateMockDashboardStats, generateMockAnalytics, generateMockInsights
 const objectStorageService = new ObjectStorageService();
 
 /**
+ * Process summary-level financial metrics CSV
+ * Handles CSVs with columns: Month, Department, Expenses, Revenue, Profit, Cash, Headcount, Subscriptions
+ */
+async function processSummaryMetricsCSV(
+  csvData: any[],
+  documentId: string,
+  organizationId: string
+): Promise<void> {
+  try {
+    console.log(`[SUMMARY CSV] Processing ${csvData.length} rows of summary metrics...`);
+    
+    let metricsCreated = 0;
+    let skippedRows = 0;
+    let departmentErrors = 0;
+    
+    for (const row of csvData) {
+      // Extract column values (case-insensitive)
+      const monthValue = row['Month'] || row['month'] || row['MONTH'];
+      const departmentValue = row['Department'] || row['department'] || row['DEPARTMENT'];
+      const expensesValue = row['Expenses'] || row['expenses'] || row['EXPENSES'];
+      const revenueValue = row['Revenue'] || row['revenue'] || row['REVENUE'];
+      const profitValue = row['Profit'] || row['profit'] || row['PROFIT'];
+      const cashValue = row['Current Cash'] || row['current cash'] || row['Cash'] || row['cash'] || row['CASH'];
+      const headcountValue = row['Headcount'] || row['headcount'] || row['HEADCOUNT'];
+      const subscriptionsValue = row['Subscriptions'] || row['subscriptions'] || row['SUBSCRIPTIONS'];
+      
+      // Skip rows without month value
+      if (!monthValue) {
+        skippedRows++;
+        continue;
+      }
+      
+      // Parse month value and normalize to month start
+      let monthDate: Date;
+      try {
+        monthDate = new Date(monthValue);
+        // Normalize to first day of month
+        monthDate = startOfMonth(monthDate);
+      } catch (error) {
+        console.warn(`[SUMMARY CSV] Skipping row with invalid month: ${monthValue}`);
+        skippedRows++;
+        continue;
+      }
+      
+      // Find or create department if specified
+      let departmentId: string | null = null;
+      if (departmentValue) {
+        try {
+          const department = await storage.findOrCreateDepartment(organizationId, departmentValue);
+          departmentId = department.id;
+        } catch (error) {
+          console.error(`[SUMMARY CSV] Failed to create department "${departmentValue}":`, error);
+          departmentErrors++;
+          skippedRows++;
+          continue; // Skip this row if department creation fails
+        }
+      }
+      
+      // Parse numeric values - return strings for Drizzle numeric columns
+      const parseNumeric = (value: any): string | null => {
+        if (value === null || value === undefined || value === '') return null;
+        const parsed = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+        return isNaN(parsed) ? null : parsed.toString();
+      };
+      
+      const revenue = parseNumeric(revenueValue);
+      const expenses = parseNumeric(expensesValue);
+      const profit = parseNumeric(profitValue);
+      const cashBalance = parseNumeric(cashValue);
+      
+      const parseInteger = (value: any): number | null => {
+        if (value === null || value === undefined || value === '') return null;
+        const parsed = parseInt(String(value).replace(/[^0-9]/g, ''), 10);
+        return isNaN(parsed) ? null : parsed;
+      };
+      
+      const headcount = parseInteger(headcountValue);
+      const subscriptionCount = parseInteger(subscriptionsValue);
+      
+      // Create monthly metric record
+      try {
+        await storage.createMonthlyMetric({
+          organizationId,
+          departmentId,
+          documentId,
+          month: monthDate,
+          revenue,
+          expenses,
+          profit,
+          cashBalance,
+          headcount,
+          subscriptionCount,
+        });
+        metricsCreated++;
+      } catch (error) {
+        console.error(`[SUMMARY CSV] Failed to create monthly metric for ${monthDate.toISOString()}:`, error);
+        skippedRows++;
+      }
+    }
+    
+    console.log(`[SUMMARY CSV] Created ${metricsCreated} monthly metrics (skipped ${skippedRows} rows, ${departmentErrors} department errors)`);
+    
+    // Update document status - fail if any department errors occurred or no metrics created
+    if (departmentErrors > 0) {
+      console.error(`[SUMMARY CSV ERROR] ${departmentErrors} department creation errors - marking document as failed`);
+      await storage.updateDocument(documentId, { status: "error" });
+    } else if (metricsCreated > 0) {
+      await storage.updateDocument(documentId, {
+        parsedText: `Summary metrics CSV with ${metricsCreated} monthly records`,
+        status: "processed",
+        extractionConfidence: "0.95",
+      });
+    } else {
+      console.error(`[SUMMARY CSV ERROR] No metrics created from CSV file ${documentId}`);
+      await storage.updateDocument(documentId, { status: "error" });
+    }
+  } catch (error) {
+    console.error(`[SUMMARY CSV ERROR] Failed to process summary metrics CSV:`, error);
+    await storage.updateDocument(documentId, { status: "error" });
+  }
+}
+
+/**
  * Background job to process uploaded documents
  * Extracts text, transactions, and updates document status
  */
@@ -71,14 +194,29 @@ async function processDocument(
         const firstRow = csvData[0];
         const columnNames = Object.keys(firstRow);
         console.log(`[CSV DEBUG] Found ${columnNames.length} columns in CSV:`, columnNames);
+        
+        // Detect CSV type based on column names
+        const hasMonthColumn = columnNames.some(c => c.toLowerCase() === 'month');
+        const hasDepartmentColumn = columnNames.some(c => c.toLowerCase() === 'department');
+        const hasExpensesColumn = columnNames.some(c => c.toLowerCase() === 'expenses');
+        const hasRevenueColumn = columnNames.some(c => c.toLowerCase() === 'revenue');
+        
+        const hasDateColumn = columnNames.some(c => c.toLowerCase() === 'date' || c.toLowerCase().includes('date'));
+        const hasAmountColumn = columnNames.some(c => c.toLowerCase() === 'amount' || c.toLowerCase() === 'debit' || c.toLowerCase() === 'credit');
+        
+        const isSummaryMetrics = hasMonthColumn && (hasDepartmentColumn || hasExpensesColumn || hasRevenueColumn);
+        const isTransactionLevel = hasDateColumn && hasAmountColumn;
+        
+        console.log(`[CSV TYPE DETECTION] Summary Metrics: ${isSummaryMetrics}, Transaction Level: ${isTransactionLevel}`);
+        
+        if (isSummaryMetrics) {
+          // Process as summary-level financial metrics CSV
+          console.log(`[SUMMARY CSV] Processing summary-level financial metrics CSV...`);
+          await processSummaryMetricsCSV(csvData, documentId, organizationId);
+          return;
+        }
       }
       
-      await storage.updateDocument(documentId, {
-        parsedText: `CSV file with ${csvData.length} rows`,
-        status: "processed",
-        extractionConfidence: "0.9",
-      });
-
       // Import normalization service for AI-powered vendor/category classification
       const { normalizationService } = await import("./normalizationService");
 
@@ -342,6 +480,12 @@ async function processDocument(
       if (transactionsCreated === 0) {
         console.error(`[CSV ERROR] No transactions were created from CSV file ${documentId}`);
         await storage.updateDocument(documentId, { status: "error" });
+      } else {
+        await storage.updateDocument(documentId, {
+          parsedText: `CSV file with ${transactionsCreated} transactions`,
+          status: "processed",
+          extractionConfidence: "0.9",
+        });
       }
       
       return;
