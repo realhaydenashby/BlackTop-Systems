@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, FileText, AlertTriangle } from "lucide-react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { DollarSign, TrendingUp, TrendingDown, FileText, AlertTriangle, Wallet, Users } from "lucide-react";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +70,64 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card data-testid="card-total-revenue">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-total-revenue">
+              {stats?.totalRevenue !== null && stats?.totalRevenue !== undefined 
+                ? `$${stats.totalRevenue.toLocaleString()}` 
+                : "N/A"}
+            </div>
+            <p className="text-xs text-muted-foreground">Current month</p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-total-profit">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-total-profit">
+              {stats?.totalProfit !== null && stats?.totalProfit !== undefined 
+                ? `$${stats.totalProfit.toLocaleString()}` 
+                : "N/A"}
+            </div>
+            <p className="text-xs text-muted-foreground">Current month</p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-cash-position">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+            <CardTitle className="text-sm font-medium">Cash Position</CardTitle>
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-cash-position">
+              {stats?.currentCash !== null && stats?.currentCash !== undefined 
+                ? `$${stats.currentCash.toLocaleString()}` 
+                : "N/A"}
+            </div>
+            <p className="text-xs text-muted-foreground">Available balance</p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-headcount">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+            <CardTitle className="text-sm font-medium">Team Headcount</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-headcount">
+              {stats?.totalHeadcount ?? "N/A"}
+            </div>
+            <p className="text-xs text-muted-foreground">Total employees</p>
+          </CardContent>
+        </Card>
+
         <Card data-testid="card-total-spend">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
             <CardTitle className="text-sm font-medium">Total Spend (30d)</CardTitle>
@@ -200,6 +258,51 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {stats?.revenueOverTime && stats.revenueOverTime.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Revenue & Profit Trends</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={stats.revenueOverTime}>
+                <CartesianGrid {...chartStyles.cartesianGrid} />
+                <XAxis dataKey="month" {...chartStyles.xAxis} />
+                <YAxis {...chartStyles.yAxis} />
+                <Tooltip {...chartStyles.tooltip} />
+                <Area 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stackId="1"
+                  stroke={CHART_COLORS[0]} 
+                  fill={CHART_COLORS[0]}
+                  fillOpacity={0.6}
+                  name="Revenue"
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="expenses" 
+                  stackId="2"
+                  stroke={CHART_COLORS[1]} 
+                  fill={CHART_COLORS[1]}
+                  fillOpacity={0.6}
+                  name="Expenses"
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="profit" 
+                  stackId="3"
+                  stroke={CHART_COLORS[2]} 
+                  fill={CHART_COLORS[2]}
+                  fillOpacity={0.6}
+                  name="Profit"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

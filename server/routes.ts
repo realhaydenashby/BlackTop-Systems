@@ -947,6 +947,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return acc;
       }, []);
 
+      // Fetch monthly metrics for the past 6 months
+      const sixMonthsAgo = subDays(new Date(), 180);
+      const monthlyMetrics = await storage.getOrganizationMonthlyMetrics(organizationId, {
+        startMonth: sixMonthsAgo,
+      });
+
+      // Group metrics by month and aggregate across departments
+      const metricsByMonth = new Map<string, {
+        revenue: number;
+        expenses: number;
+        profit: number;
+        cash: number | null;
+        headcount: number;
+      }>();
+
+      for (const metric of monthlyMetrics) {
+        const monthKey = startOfMonth(new Date(metric.month)).toISOString();
+        const existing = metricsByMonth.get(monthKey);
+        
+        if (!existing) {
+          metricsByMonth.set(monthKey, {
+            revenue: metric.revenue ? parseFloat(metric.revenue) : 0,
+            expenses: metric.expenses ? parseFloat(metric.expenses) : 0,
+            profit: metric.profit ? parseFloat(metric.profit) : 0,
+            cash: metric.cashBalance !== null && metric.cashBalance !== undefined 
+              ? parseFloat(metric.cashBalance) 
+              : null,
+            headcount: metric.headcount || 0,
+          });
+        } else {
+          // Sum revenue, expenses, profit, headcount across departments
+          existing.revenue += metric.revenue ? parseFloat(metric.revenue) : 0;
+          existing.expenses += metric.expenses ? parseFloat(metric.expenses) : 0;
+          existing.profit += metric.profit ? parseFloat(metric.profit) : 0;
+          existing.headcount += metric.headcount || 0;
+          
+          // For cash (organization-level), prefer non-null values or take max
+          if (metric.cashBalance !== null && metric.cashBalance !== undefined) {
+            const cashValue = parseFloat(metric.cashBalance);
+            if (existing.cash === null || cashValue > existing.cash) {
+              existing.cash = cashValue;
+            }
+          }
+        }
+      }
+
+      // Get current month metrics for KPI cards
+      const currentMonth = startOfMonth(new Date());
+      const currentMonthKey = currentMonth.toISOString();
+      const currentMonthMetrics = metricsByMonth.get(currentMonthKey);
+
+      const totalRevenue = currentMonthMetrics?.revenue ?? null;
+      const totalProfit = currentMonthMetrics?.profit ?? null;
+      const currentCash = currentMonthMetrics?.cash ?? null;
+      const totalHeadcount = currentMonthMetrics?.headcount ?? null;
+
+      // Build revenue and profit over time charts from aggregated data
+      const revenueOverTime = Array.from(metricsByMonth.entries())
+        .map(([monthKey, data]) => ({
+          month: monthKey.split("T")[0],
+          revenue: Math.round(data.revenue),
+          expenses: Math.round(data.expenses),
+          profit: Math.round(data.profit),
+        }))
+        .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+
       res.json({
         totalSpend: Math.round(totalSpend),
         spendChange: Math.round(spendChange),
@@ -957,6 +1023,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         spendOverTime,
         spendByCategory,
         spendByDepartment,
+        // New monthly metrics (properly aggregated)
+        totalRevenue: totalRevenue !== null ? Math.round(totalRevenue) : null,
+        totalProfit: totalProfit !== null ? Math.round(totalProfit) : null,
+        currentCash: currentCash !== null ? Math.round(currentCash) : null,
+        totalHeadcount,
+        revenueOverTime,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
