@@ -1,0 +1,182 @@
+You are refactoring the existing BlackTop Systems codebase.
+
+Goal:
+Split the current app into:
+1) A DEMO EXPERIENCE that keeps all the nice charts and mock data.
+2) A CORE LIVE EXPERIENCE that wires in real data from APIs and becomes the foundation of the production app.
+
+Do NOT delete existing pages. Instead, reorganize and rewire.
+
+-------------------------
+1. App Modes: demo vs live
+-------------------------
+Introduce a clear separation between:
+- Demo mode (mock data only)
+- Live mode (real data from APIs)
+
+Implementation rules:
+- Add a simple mode flag (e.g. `mode: "demo" | "live"`) that flows from the auth / entry point into the app shell.
+- Demo mode:
+  - Uses ONLY mock/seeded data for all charts, tables, and metrics.
+  - Never calls real external APIs (Stripe, Yodlee, Gmail, etc.).
+- Live mode:
+  - Uses real data services and API calls.
+  - Is the foundation for future bank + QuickBooks/Xero integrations.
+
+-------------------------
+2. Data Layer Refactor
+-------------------------
+Right now, many components pull mock data directly inside the UI.
+
+Refactor to introduce a data layer:
+
+- Create a `data` or `services` folder with:
+  - `demoDataService`:
+    - Returns the existing mock data for:
+      - transactions
+      - spend analytics
+      - runway/burn
+      - revenue & forecasts (if present)
+  - `liveDataService`:
+    - Placeholder functions that will later call:
+      - Yodlee/ Plaid / QuickBooks / Stripe / Gmail / Google Document AI
+    - For now, implement minimal, hard-coded sample responses so the code compiles and the wiring is correct.
+
+- Update all dashboard/analytics components so they:
+  - Accept data via props OR
+  - Call a single `getData()` function that branches on `mode`:
+    - If `mode === "demo"` → use `demoDataService`
+    - If `mode === "live"` → use `liveDataService`
+
+Do NOT leave mock data scattered in multiple components. Centralize it into `demoDataService`.
+
+-------------------------
+3. Core Live Experience (Phase 1)
+-------------------------
+For LIVE mode, implement a minimal but functional pipeline:
+
+Core entities:
+- Bank account(s)
+- Transactions
+- Categories
+- Basic metrics: burn rate, runway, top vendors
+
+Core flows:
+1. Auth
+   - Reuse existing auth flow as-is.
+   - When a real user logs in, set `mode = "live"`.
+
+2. Manual transaction import (Phase 1)
+   - Add a simple “Upload CSV / bank export” page.
+   - User can upload a CSV of transactions.
+   - Parse and store rows in a `transactions` table/model.
+   - Add basic fields: date, description, amount, type (debit/credit), category (optional), vendor (optional).
+
+3. Categorization (stubbed AI integration)
+   - Add a function `categorizeTransactions()` that:
+     - For now: uses a simple rule-based mapping or trivial Groq call.
+     - Updates transaction categories and vendors.
+   - Make this callable from a button on the Transactions page: “Auto-categorize”.
+
+4. Basic metrics
+   - On the live Dashboard, calculate:
+     - Monthly burn (net spend per month)
+     - Simple runway (cash / monthly burn if you have cash; otherwise use a placeholder)
+     - Top 5 vendors by spend
+   - Make sure these metrics are derived from the LIVE transactions table, not mock data.
+
+The goal: in LIVE mode, a user can:
+- Log in
+- Upload a CSV of transactions
+- Click “Auto-categorize”
+- See:
+  - Transactions table
+  - Burn
+  - Runway
+  - Top vendors
+on the existing dashboards, using real data.
+
+-------------------------
+4. UI & Navigation
+-------------------------
+Auth / Entry:
+- Keep “Demo Login” and “Real Login” if they exist, or create:
+  - Button 1: “Explore Demo”
+    - Sets `mode = "demo"` and logs into the demo org with MOCK data.
+  - Button 2: “Log in to your account”
+    - Uses real auth and sets `mode = "live"`.
+
+App shell:
+- In the top bar, show:
+  - A small tag: “Demo workspace” or “Live workspace”.
+- Ensure both modes re-use the same:
+  - Dashboard
+  - Analytics pages
+  - Transactions page
+
+Only the **data source** should differ by mode, not the layout.
+
+-------------------------
+5. Strip to Core, Keep Extensibility
+-------------------------
+Clean up anything that is half-implemented or fake:
+
+- Remove or comment out any analytics panels that:
+  - Have no data source
+  - Are placeholders with nonsense numbers
+- Keep and polish ONLY:
+  - Spend overview
+  - Burn & runway
+  - Top vendors
+  - Very simple forecast if it can be computed from transactions
+
+Design the code so that:
+- New analytics (profitability, detailed forecasting, raise modeling) can be added later by:
+  - Adding functions to `liveDataService`
+  - Passing new metrics into existing layout components
+
+Do NOT try to build full FP&A right now. Focus on:
+1) Wiring live data end-to-end.
+2) Making demo and live modes share the same components.
+
+-------------------------
+6. Slack / SMS hooks (stub only)
+-------------------------
+Add a small stub layer for future notifications:
+
+- Create a `notificationsService` with placeholder functions:
+  - `sendSlackAlert(message)`
+  - `sendSmsAlert(message)`
+
+For now:
+- Do NOT call real APIs.
+- Log to console when they are called.
+- Wire one example alert:
+  - When burn rate exceeds a threshold in LIVE mode, call the notification stub.
+
+This is just to structure the code for later integration.
+
+-------------------------
+7. Acceptance Criteria
+-------------------------
+When you're done, I should be able to:
+
+DEMO MODE:
+- Click “Explore Demo”
+- Land in a fully populated workspace with:
+  - Dashboard charts
+  - Analytics
+  - Action plan examples
+- All data coming from `demoDataService`.
+
+LIVE MODE:
+- Log in with real auth.
+- Upload a CSV with transactions.
+- Click “Auto-categorize”.
+- See:
+  - Transactions table populated from my upload
+  - Burn & runway calculated from those transactions
+  - Top vendors
+- No mock data used in live mode.
+
+Do not break existing styling or navigation. Only refactor the data flow and add the mode separation.
