@@ -89,6 +89,7 @@ export interface IStorage {
   // Transactions
   createTransaction(txn: InsertTransaction): Promise<Transaction>;
   getTransaction(id: string): Promise<Transaction | undefined>;
+  getTransactionByExternalId(organizationId: string, source: string, externalId: string): Promise<Transaction | undefined>;
   getOrganizationTransactions(organizationId: string, filters?: {
     startDate?: Date;
     endDate?: Date;
@@ -307,6 +308,25 @@ export class DatabaseStorage implements IStorage {
   async getTransaction(id: string): Promise<Transaction | undefined> {
     return await db.query.transactions.findFirst({
       where: eq(transactions.id, id),
+      with: {
+        vendor: true,
+        category: true,
+        department: true,
+      },
+    });
+  }
+
+  async getTransactionByExternalId(
+    organizationId: string,
+    source: string,
+    externalId: string
+  ): Promise<Transaction | undefined> {
+    return await db.query.transactions.findFirst({
+      where: and(
+        eq(transactions.organizationId, organizationId),
+        eq(transactions.source, source as any),
+        eq(transactions.yodleeTransactionId, externalId)
+      ),
       with: {
         vendor: true,
         category: true,

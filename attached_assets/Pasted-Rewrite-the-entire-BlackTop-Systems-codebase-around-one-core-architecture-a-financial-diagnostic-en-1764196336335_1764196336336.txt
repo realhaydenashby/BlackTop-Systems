@@ -1,0 +1,141 @@
+Rewrite the entire BlackTop Systems codebase around one core architecture: a financial diagnostic engine. Strip away everything that is not essential to delivering the founder-facing MVP. Keep the design simple, minimal, fast, and stable.
+
+⸻
+
+GOAL
+
+Rebuild BlackTop so it does ONLY these things:
+	1.	Connect to financial sources
+	•	Yodlee/Plaid (bank)
+	•	QuickBooks/Xero (accounting)
+	•	Stripe (revenue)
+	2.	Ingest all transactions
+	•	Pull debits and credits
+	•	Store them in a unified table
+	3.	Normalize the data using Groq + Gemini
+	•	Vendor normalization
+	•	Category classification
+	•	Recurring spend detection
+	•	Payroll vs non-payroll
+	•	Revenue vs expense
+	4.	Compute core analytics
+	•	Burn rate
+	•	Runway
+	•	Cash flow
+	•	Base-case forecast
+	5.	Generate a small set of actionable insights
+	•	3–5 AI-generated recommendations
+	•	Anomaly detection
+	•	Subscription creep
+	•	Vendor spikes
+	•	Payroll drift
+	6.	Deliver the results in two places
+	•	Inside the web dashboard
+	•	Slack/SMS notifications (Ramp-style alerts)
+	7.	Keep everything minimal and founder-friendly
+	•	No overbuilt FP&A
+	•	No unnecessary pages
+	•	No experimental modules
+	•	No bright colors or clutter
+
+⸻
+
+ACTIONS TO TAKE ON THE CODEBASE
+
+1. Remove everything unrelated to the diagnostic engine
+
+Delete or consolidate: 
+Dashboard, Transactions, Documents, Analytics Suite, Fundraising Prep Suite, Budgets, Action Plans
+	•	Unused components
+	•	Unused pages
+	•	Placeholder analytics
+	•	Overbuilt charts
+	•	Anything not tied to ingestion → normalization → analytics → insights
+
+2. Rebuild the folder structure EXACTLY like this
+
+/server
+  /integrations       (yodlee, plaid, qb, xero, stripe)
+  /ingestion          (raw transaction ingestion handlers)
+  /normalize          (vendor/category classifiers using Groq + Gemini)
+  /analytics          (burn, runway, cashflow, forecasting)
+  /insights           (action plans + anomalies)
+  /notifs             (slack + sms alerts)
+
+/client
+  /dashboard          (spend, revenue, burn, runway, forecast)
+  /auth
+  /components
+  /layout
+
+3. Implement one unified transaction object
+
+{
+  id,
+  date,
+  description,
+  vendor_normalized,
+  category,
+  amount,
+  type: "debit" | "credit",
+  is_recurring,
+  source: "bank" | "stripe" | "qb" | "xero"
+}
+
+4. Add ONLY these analytics functions
+	•	calculateBurnRate()
+	•	calculateRunway()
+	•	calculateCashFlow()
+	•	generateForecastBaseCase()
+
+5. Build the insights engine
+
+It should output 3–5 actionable insights per dataset, such as:
+	•	“AWS spend up 42% this week.”
+	•	“Payroll drift exceeded plan by 9%.”
+	•	“Recurring SaaS spend is $3,450. Suggested reduction: $900–$1,400.”
+	•	“You have 6.2 months of runway remaining.”
+
+Insights must appear on every page.
+
+6. Implement Slack + SMS notifications (this is later)
+
+Trigger alerts when:
+	•	A vendor spikes
+	•	Burn accelerates
+	•	Runway shortens
+	•	Subscriptions balloon
+	•	A spending anomaly occurs
+
+Make notifications clean, simple, and short. Users must also be able to respond to the text/slack and upload it receipts or things like that
+
+7. Rebuild the UI to match a minimal, grayscale, modern design
+	•	Simple typography
+	•	Clear spacing
+	•	One “Action Plan” block at the bottom of every analytics page
+
+Pages needed:
+	•	Dashboard and individual dropdown (Spend(overall and by category), Revenue, Burn, Runway, Forecast, Raise, Hiring)
+	•	Transactions + Modeling page with spreadsheet layout and all financial information for manual forecasting
+	•	Connect Accounts
+	•	Settings
+	•	ONLY what’s required for the engine to operate
+
+⸻
+
+EXPECTED OUTPUT
+
+A simplified, stable, and scalable codebase that:
+	•	Works end-to-end
+	•	Is easy to extend into a full modeling product later
+	•	Can be demoed confidently
+	•	Mirrors the simplicity of Ramp + the intelligence of Parallel
+	•	Has the backbone needed for future FP&A expansion
+
+This rebuild should make BlackTop:
+
+“Connect → ingest → understand → explain → alert → decide.”
+
+That is the entire product.
+
+⸻

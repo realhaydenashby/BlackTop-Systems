@@ -31,6 +31,9 @@ import Integrations from "@/pages/integrations";
 import Settings from "@/pages/settings";
 // Live Mode Pages
 import BankConnect from "@/pages/app/bank-connect";
+import AppDashboard from "@/pages/app/dashboard";
+import AppTransactions from "@/pages/app/transactions";
+import AppSettings from "@/pages/app/settings";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -139,8 +142,10 @@ function LiveModeRouter() {
   return (
     <LiveAppLayout>
       <Switch>
+        <Route path="/app" component={() => <ProtectedRoute component={AppDashboard} />} />
+        <Route path="/app/transactions" component={() => <ProtectedRoute component={AppTransactions} />} />
         <Route path="/app/connect" component={() => <ProtectedRoute component={BankConnect} />} />
-        <Route path="/app/settings" component={() => <ProtectedRoute component={Settings} />} />
+        <Route path="/app/settings" component={() => <ProtectedRoute component={AppSettings} />} />
         <Route component={NotFound} />
       </Switch>
     </LiveAppLayout>
@@ -163,8 +168,8 @@ function RouterInner() {
     "/company/contact"
   ].some(route => cleanLocation === route || cleanLocation.startsWith(route + "/"));
 
-  // Check if route is a Live Mode route (/app/*)
-  const isLiveModeRoute = cleanLocation.startsWith("/app/");
+  // Check if route is a Live Mode route (/app or /app/*)
+  const isLiveModeRoute = cleanLocation === "/app" || cleanLocation.startsWith("/app/");
 
   if (isLoading) {
     return (
