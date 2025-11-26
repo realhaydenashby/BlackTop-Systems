@@ -8,38 +8,20 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { CHART_COLORS, chartStyles, lineStyles, barStyles } from "@/lib/chartTheme";
 import { ActionPlanModule } from "@/components/ActionPlanModule";
+import { demoDataService, type DashboardStats, type Insight } from "@/services/demoDataService";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
 
-  const { data: organizations, isLoading: orgsLoading } = useQuery<any[]>({
-    queryKey: ["/api/organizations"],
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
+    queryKey: ["dashboard-stats", "demo"],
+    queryFn: () => demoDataService.getDashboardStats(),
   });
 
-  const { data: stats, isLoading: statsLoading } = useQuery<any>({
-    queryKey: ["/api/dashboard/stats"],
-    enabled: !orgsLoading && (organizations?.length ?? 0) > 0,
+  const { data: insights, isLoading: insightsLoading } = useQuery<Insight[]>({
+    queryKey: ["insights", "demo"],
+    queryFn: () => demoDataService.getInsights(),
   });
-
-  const { data: insights, isLoading: insightsLoading } = useQuery<any>({
-    queryKey: ["/api/insights"],
-    enabled: !orgsLoading && (organizations?.length ?? 0) > 0,
-  });
-
-  if (orgsLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!organizations || organizations.length === 0) {
-    setLocation("/onboarding");
-    return null;
-  }
 
   if (statsLoading) {
     return (
@@ -138,7 +120,7 @@ export default function Dashboard() {
               ${stats?.totalSpend?.toLocaleString() || "0"}
             </div>
             <p className="text-xs text-muted-foreground">
-              {stats?.spendChange >= 0 ? "+" : ""}{stats?.spendChange || 0}% from last month
+              {(stats?.spendChange ?? 0) >= 0 ? "+" : ""}{stats?.spendChange || 0}% from last month
             </p>
           </CardContent>
         </Card>
@@ -178,27 +160,27 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-budget-variance">
-              {stats?.budgetVariance >= 0 ? "+" : ""}{stats?.budgetVariance || 0}%
+              {(stats?.budgetVariance ?? 0) >= 0 ? "+" : ""}{stats?.budgetVariance || 0}%
             </div>
             <p className="text-xs text-muted-foreground">vs. budgeted amount</p>
           </CardContent>
         </Card>
       </div>
 
-      {!insightsLoading && insights?.length > 0 && (
+      {!insightsLoading && insights && insights.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Financial Insights</h2>
           <div className="grid gap-4 md:grid-cols-2">
-            {insights.slice(0, 4).map((insight: any) => (
+            {insights.slice(0, 4).map((insight) => (
               <Alert
                 key={insight.id}
-                variant={insight.severity === "critical" ? "destructive" : "default"}
+                variant={insight.severity === "critical" || insight.severity === "high" ? "destructive" : "default"}
                 data-testid={`alert-insight-${insight.type}`}
               >
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle className="flex items-center gap-2">
                   {insight.title}
-                  <Badge variant={insight.severity === "critical" ? "destructive" : "secondary"}>
+                  <Badge variant={insight.severity === "critical" || insight.severity === "high" ? "destructive" : "secondary"}>
                     {insight.severity}
                   </Badge>
                 </AlertTitle>

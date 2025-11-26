@@ -9,6 +9,7 @@ import { LiveSidebar } from "@/components/live-sidebar";
 import { TopBar } from "@/components/top-bar";
 import { MarketingLayout } from "@/layouts/MarketingLayout";
 import { useAuth } from "@/hooks/useAuth";
+import { AppModeProvider } from "@/contexts/AppModeContext";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Features from "@/pages/features";
@@ -34,6 +35,7 @@ import BankConnect from "@/pages/app/bank-connect";
 import AppDashboard from "@/pages/app/dashboard";
 import AppTransactions from "@/pages/app/transactions";
 import AppSettings from "@/pages/app/settings";
+import UploadPage from "@/pages/upload";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -114,24 +116,36 @@ function PublicRouter() {
   );
 }
 
+function DemoRouter() {
+  return (
+    <AppLayout>
+      <Switch>
+        <Route path="/dashboard" component={Dashboard} />
+        <Route path="/documents" component={Documents} />
+        <Route path="/transactions" component={Transactions} />
+        <Route path="/upload" component={UploadPage} />
+        <Route path="/cash-flow" component={CashFlow} />
+        <Route path="/analytics" component={Analytics} />
+        <Route path="/analytics/:section" component={Analytics} />
+        <Route path="/fundraising" component={Fundraising} />
+        <Route path="/fundraising/:section" component={Fundraising} />
+        <Route path="/budgets" component={Budgets} />
+        <Route path="/action-plans" component={ActionPlans} />
+        <Route path="/resources" component={Resources} />
+        <Route path="/integrations" component={Integrations} />
+        <Route path="/settings" component={Settings} />
+        <Route component={NotFound} />
+      </Switch>
+    </AppLayout>
+  );
+}
+
 function ProtectedRouter() {
   return (
     <AppLayout>
       <Switch>
         <Route path="/onboarding" component={() => <ProtectedRoute component={Onboarding} />} />
-        <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
-        <Route path="/documents" component={() => <ProtectedRoute component={Documents} />} />
-        <Route path="/transactions" component={() => <ProtectedRoute component={Transactions} />} />
-        <Route path="/cash-flow" component={() => <ProtectedRoute component={CashFlow} />} />
-        <Route path="/analytics" component={() => <ProtectedRoute component={Analytics} />} />
-        <Route path="/analytics/:section" component={() => <ProtectedRoute component={Analytics} />} />
-        <Route path="/fundraising" component={() => <ProtectedRoute component={Fundraising} />} />
-        <Route path="/fundraising/:section" component={() => <ProtectedRoute component={Fundraising} />} />
-        <Route path="/budgets" component={() => <ProtectedRoute component={Budgets} />} />
-        <Route path="/action-plans" component={() => <ProtectedRoute component={ActionPlans} />} />
         <Route path="/app/resources" component={() => <ProtectedRoute component={Resources} />} />
-        <Route path="/integrations" component={() => <ProtectedRoute component={Integrations} />} />
-        <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
@@ -144,6 +158,7 @@ function LiveModeRouter() {
       <Switch>
         <Route path="/app" component={() => <ProtectedRoute component={AppDashboard} />} />
         <Route path="/app/transactions" component={() => <ProtectedRoute component={AppTransactions} />} />
+        <Route path="/app/upload" component={() => <ProtectedRoute component={UploadPage} />} />
         <Route path="/app/connect" component={() => <ProtectedRoute component={BankConnect} />} />
         <Route path="/app/settings" component={() => <ProtectedRoute component={AppSettings} />} />
         <Route component={NotFound} />
@@ -153,12 +168,12 @@ function LiveModeRouter() {
 }
 
 function RouterInner() {
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   const [location] = useLocation();
 
   const cleanLocation = location.split('?')[0].split('#')[0];
 
-  const isMarketingRoute = [
+  const marketingRoutes = [
     "/",
     "/features",
     "/pricing",
@@ -166,12 +181,35 @@ function RouterInner() {
     "/company/about",
     "/company/security",
     "/company/contact"
-  ].some(route => cleanLocation === route || cleanLocation.startsWith(route + "/"));
+  ];
 
-  // Check if route is a Live Mode route (/app or /app/*)
+  const demoRoutes = [
+    "/dashboard",
+    "/documents",
+    "/transactions",
+    "/upload",
+    "/cash-flow",
+    "/analytics",
+    "/fundraising",
+    "/budgets",
+    "/action-plans",
+    "/settings",
+    "/integrations"
+  ];
+
+  const isMarketingRoute = marketingRoutes.some(route => 
+    cleanLocation === route || cleanLocation.startsWith(route + "/")
+  );
+
+  const isDemoRoute = demoRoutes.some(route =>
+    cleanLocation === route || cleanLocation.startsWith(route + "/")
+  );
+
   const isLiveModeRoute = cleanLocation === "/app" || cleanLocation.startsWith("/app/");
 
-  if (isLoading) {
+  const isProtectedRoute = cleanLocation === "/onboarding";
+
+  if (isLoading && (isLiveModeRoute || isProtectedRoute)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -185,13 +223,19 @@ function RouterInner() {
     return <PublicRouter />;
   }
 
-  // Route to Live Mode for /app/* paths (let LiveModeRouter handle auth internally)
+  if (isDemoRoute) {
+    return <DemoRouter />;
+  }
+
   if (isLiveModeRoute) {
     return <LiveModeRouter />;
   }
 
-  // Route to ProtectedRouter for all other app routes (let ProtectedRoute handle auth internally)
-  return <ProtectedRouter />;
+  if (isProtectedRoute) {
+    return <ProtectedRouter />;
+  }
+
+  return <PublicRouter />;
 }
 
 function Router() {
@@ -206,8 +250,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        <AppModeProvider>
+          <Toaster />
+          <Router />
+        </AppModeProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

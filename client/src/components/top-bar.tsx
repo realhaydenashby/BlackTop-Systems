@@ -1,4 +1,4 @@
-import { Bell, MessagesSquare, ChevronDown } from "lucide-react";
+import { Bell, MessagesSquare, ChevronDown, FlaskConical, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
@@ -12,9 +12,66 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { useLocation } from "wouter";
+
+const routeMapping: Record<string, Record<string, string>> = {
+  demoToLive: {
+    "/dashboard": "/app",
+    "/transactions": "/app/transactions",
+    "/upload": "/app/upload",
+    "/settings": "/app/settings",
+    "/documents": "/app",
+    "/cash-flow": "/app",
+    "/analytics": "/app",
+    "/fundraising": "/app",
+    "/budgets": "/app",
+    "/action-plans": "/app",
+    "/resources": "/app",
+    "/integrations": "/app",
+  },
+  liveToDemo: {
+    "/app": "/dashboard",
+    "/app/transactions": "/transactions",
+    "/app/upload": "/upload",
+    "/app/settings": "/settings",
+    "/app/connect": "/integrations",
+  }
+};
 
 export function TopBar() {
   const { user } = useAuth();
+  const { mode, setMode, isDemo } = useAppMode();
+  const [location, navigate] = useLocation();
+
+  const handleModeSwitch = (newMode: 'demo' | 'live') => {
+    if (newMode === mode) return;
+    setMode(newMode);
+
+    const cleanLocation = location.split('?')[0].split('#')[0];
+    
+    if (newMode === 'live') {
+      const mapping = routeMapping.demoToLive;
+      let targetPath = '/app';
+      for (const [demoPath, livePath] of Object.entries(mapping)) {
+        if (cleanLocation === demoPath || cleanLocation.startsWith(demoPath + '/')) {
+          targetPath = livePath;
+          break;
+        }
+      }
+      navigate(targetPath);
+    } else {
+      const mapping = routeMapping.liveToDemo;
+      let targetPath = '/dashboard';
+      for (const [livePath, demoPath] of Object.entries(mapping)) {
+        if (cleanLocation === livePath || cleanLocation.startsWith(livePath + '/')) {
+          targetPath = demoPath;
+          break;
+        }
+      }
+      navigate(targetPath);
+    }
+  };
 
   const userInitials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`
@@ -25,6 +82,40 @@ export function TopBar() {
       <div className="flex items-center gap-3">
         <SidebarTrigger data-testid="button-sidebar-toggle" />
         
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className={`gap-2 ${isDemo ? 'border-amber-500/50 text-amber-500' : 'border-emerald-500/50 text-emerald-500'}`}
+              data-testid="button-mode-switcher"
+            >
+              {isDemo ? <FlaskConical className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+              <span className="hidden sm:inline">{isDemo ? 'Demo workspace' : 'Live workspace'}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuLabel>Switch Mode</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={() => handleModeSwitch('demo')}
+              className={mode === 'demo' ? 'bg-accent' : ''}
+              data-testid="menu-item-demo-mode"
+            >
+              <FlaskConical className="w-4 h-4 mr-2 text-amber-500" />
+              <span>Demo workspace</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => handleModeSwitch('live')}
+              className={mode === 'live' ? 'bg-accent' : ''}
+              data-testid="menu-item-live-mode"
+            >
+              <Zap className="w-4 h-4 mr-2 text-emerald-500" />
+              <span>Live workspace</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button 

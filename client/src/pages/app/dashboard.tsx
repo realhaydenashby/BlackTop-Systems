@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   ArrowDownRight,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { notificationsService } from "@/services/notificationsService";
 
 interface Insight {
   id: string;
@@ -174,65 +175,74 @@ function Section({
   );
 }
 
+const fallbackData: DashboardData = {
+  metrics: {
+    grossBurn: 85000,
+    netBurn: 65000,
+    revenue: 20000,
+    runway: 8.5,
+    cashBalance: 552500,
+    burnChange: 12,
+    revenueChange: 8,
+  },
+  insights: [
+    {
+      id: "1",
+      type: "runway_warning",
+      severity: "warning",
+      title: "8.5 months of runway remaining",
+      description:
+        "At your current burn rate, you will run out of cash in approximately 8.5 months.",
+      recommendation:
+        "Consider starting fundraising conversations or identify areas to reduce burn.",
+    },
+    {
+      id: "2",
+      type: "vendor_spike",
+      severity: "info",
+      title: "AWS spend up 42% this month",
+      description:
+        "Spending on AWS increased from $4,200 to $5,964 this month.",
+      recommendation: "Review AWS charges for unexpected increases.",
+    },
+    {
+      id: "3",
+      type: "subscription_creep",
+      severity: "info",
+      title: "Recurring SaaS spend is $3,450/month",
+      description:
+        "Your subscription costs have increased 15% over the past 3 months.",
+      recommendation: "Suggested potential savings: $900-$1,400/month.",
+    },
+  ],
+  spendByCategory: [
+    { category: "Payroll", amount: 45000, change: 5 },
+    { category: "Software", amount: 12500, change: 18 },
+    { category: "Infrastructure", amount: 8500, change: 42 },
+    { category: "Marketing", amount: 6500, change: -10 },
+    { category: "Office", amount: 4500, change: 0 },
+    { category: "Other", amount: 8000, change: 25 },
+  ],
+};
+
 export default function AppDashboard() {
   const { user } = useAuth();
+  const alertCheckDone = useRef(false);
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/live/dashboard"],
     enabled: !!user,
   });
 
-  const mockData: DashboardData = {
-    metrics: {
-      grossBurn: 85000,
-      netBurn: 65000,
-      revenue: 20000,
-      runway: 8.5,
-      cashBalance: 552500,
-      burnChange: 12,
-      revenueChange: 8,
-    },
-    insights: [
-      {
-        id: "1",
-        type: "runway_warning",
-        severity: "warning",
-        title: "8.5 months of runway remaining",
-        description:
-          "At your current burn rate, you will run out of cash in approximately 8.5 months.",
-        recommendation:
-          "Consider starting fundraising conversations or identify areas to reduce burn.",
-      },
-      {
-        id: "2",
-        type: "vendor_spike",
-        severity: "info",
-        title: "AWS spend up 42% this month",
-        description:
-          "Spending on AWS increased from $4,200 to $5,964 this month.",
-        recommendation: "Review AWS charges for unexpected increases.",
-      },
-      {
-        id: "3",
-        type: "subscription_creep",
-        severity: "info",
-        title: "Recurring SaaS spend is $3,450/month",
-        description:
-          "Your subscription costs have increased 15% over the past 3 months.",
-        recommendation: "Suggested potential savings: $900-$1,400/month.",
-      },
-    ],
-    spendByCategory: [
-      { category: "Payroll", amount: 45000, change: 5 },
-      { category: "Software", amount: 12500, change: 18 },
-      { category: "Infrastructure", amount: 8500, change: 42 },
-      { category: "Marketing", amount: 6500, change: -10 },
-      { category: "Office", amount: 4500, change: 0 },
-      { category: "Other", amount: 8000, change: 25 },
-    ],
-  };
+  useEffect(() => {
+    if (!alertCheckDone.current && data) {
+      alertCheckDone.current = true;
+      notificationsService.checkBurnThreshold(data.metrics.grossBurn);
+      notificationsService.checkRunwayThreshold(data.metrics.runway);
+    }
+  }, [data]);
 
-  const displayData = data || mockData;
+  const displayData = data || fallbackData;
 
   if (isLoading) {
     return (

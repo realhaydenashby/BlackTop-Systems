@@ -1,10 +1,19 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, BarChart3, Shield, Zap, AlertCircle, Clock, FileQuestion, TrendingDown } from "lucide-react";
+import { ArrowRight, BarChart3, Shield, Zap, AlertCircle, Clock, FileQuestion, TrendingDown, FlaskConical } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useAppMode } from "@/contexts/AppModeContext";
 
 export default function Home() {
+  const { setMode } = useAppMode();
+  const [, setLocation] = useLocation();
+
+  const handleExploreDemo = () => {
+    setMode("demo");
+    setLocation("/dashboard");
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <section className="px-6 py-32">
@@ -32,14 +41,20 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.4 }}
           >
             <a href="/api/login">
-              <Button size="lg" className="group" data-testid="button-get-started">
-                Get Started 
+              <Button size="lg" className="group" data-testid="button-login">
+                Log in to your account
                 <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </a>
-            <Link href="/pricing">
-              <Button size="lg" variant="outline" data-testid="link-view-pricing">View Pricing</Button>
-            </Link>
+            <Button 
+              size="lg" 
+              variant="outline" 
+              onClick={handleExploreDemo}
+              data-testid="button-explore-demo"
+            >
+              <FlaskConical className="mr-2 w-4 h-4" />
+              Explore Demo
+            </Button>
           </motion.div>
         </div>
       </section>
@@ -175,12 +190,23 @@ export default function Home() {
           <p className="text-lg text-muted-foreground mb-10">
             Join founders who've stopped guessing and started knowing.
           </p>
-          <a href="/api/login">
-            <Button size="lg" className="group" data-testid="button-cta-get-started">
-              Get Started Free
-              <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          <div className="flex gap-4 justify-center flex-wrap">
+            <a href="/api/login">
+              <Button size="lg" className="group" data-testid="button-cta-login">
+                Log in to your account
+                <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </a>
+            <Button 
+              size="lg" 
+              variant="outline" 
+              onClick={handleExploreDemo}
+              data-testid="button-cta-demo"
+            >
+              <FlaskConical className="mr-2 w-4 h-4" />
+              Explore Demo
             </Button>
-          </a>
+          </div>
         </motion.div>
       </section>
     </div>
