@@ -1,80 +1,85 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Check, Rocket } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const mainPlans = [
   {
-    name: "Founder Lite",
-    price: "$39",
+    name: "Blacktop Lite",
+    price: "$99",
     period: "month",
-    tagline: "Early-stage financial clarity without the complexity.",
-    label: "For solo founders and tiny teams",
+    tagline: "Get the basics right. Know your burn, see your runway.",
+    label: "Perfect for pre-revenue founders",
     features: [
-      "PDF & invoice ingestion",
-      "Automatic transaction normalization",
-      "Core spend diagnostics (burn, vendors, subscriptions)",
-      "Basic budget builder (single scenario)",
-      "3 monthly AI-generated action insights",
+      "Bank + QuickBooks + Stripe sync",
+      "Auto-transaction categorization",
+      "Basic burn rate tracking",
+      "Basic runway calculation",
+      "Subscription detection",
+      "One scenario: \"When do I run out?\"",
+      "One-page founder snapshot",
+      "3 AI action items per month",
+      "Email support",
+    ],
+    omitted: [
+      "Hiring planning",
+      "Raise planning",
+      "Scenario modeling",
+      "Board packets",
+      "Multi-user access",
     ],
     cta: "Start Free Trial",
-    tier: "founder-lite",
+    tier: "blacktop-lite",
   },
   {
-    name: "Startup Clarity",
-    price: "$119",
+    name: "Blacktop Core",
+    price: "$199",
     period: "month",
-    tagline: "Everything you need to see burn, runway, and where to cut or invest.",
+    tagline: "Everything you need to raise money and run your finances like a pro.",
     label: "",
     features: [
-      "Everything in Founder Lite, plus:",
-      "Full diagnostics suite (categories, vendors, trends)",
-      "Vendor & payroll checks",
-      "Multi-scenario budgets (lean, baseline, growth)",
-      "Runway calculations",
-      "Unlimited AI-generated action plans",
-      "Up to 3 team seats (founder, ops, finance helper)",
+      "Everything in Lite, plus:",
+      "Full financial forecasting",
+      "Hiring plan modeling",
+      "Raise planning & recommendations",
+      "Multi-scenario engine",
+      "Department budgets",
+      "Investor-ready board packet",
+      "Unlimited AI insights",
+      "Deep anomaly detection",
+      "\"What changed and why\" analysis",
+      "Monthly founder health report",
+      "3-5 team seats",
+      "Priority support",
     ],
+    omitted: [],
     cta: "Start Free Trial",
-    tier: "startup-clarity",
+    tier: "blacktop-core",
     popular: true,
   },
   {
-    name: "SMB Intelligence",
-    price: "$289",
+    name: "Blacktop Growth",
+    price: "$399",
     period: "month",
-    tagline: "Pre-CFO financial intelligence for growing teams.",
+    tagline: "For scaling teams that need custom insights and automation.",
     label: "",
     features: [
-      "Everything in Startup Clarity, plus:",
-      "90-day cash flow forecasting module",
-      "Multi-department budgets & tracking",
-      "Project / client profitability views",
-      "Vendor benchmarking and high-cost alerts",
-      "Up to 10 user seats",
+      "Everything in Core, plus:",
+      "10 team seats",
+      "Custom KPIs & metrics",
+      "Custom dashboards",
+      "Multi-entity consolidation",
+      "Automated monthly board packets",
+      "API access",
+      "Priority Slack support",
+      "AI-drafted investor update narratives",
+      "Dedicated onboarding session",
     ],
+    omitted: [],
     cta: "Talk to Sales",
-    tier: "smb-intelligence",
+    tier: "blacktop-growth",
   },
 ];
-
-const addon = {
-  name: "Fundraise-Ready Add-On",
-  priceOptions: [
-    { amount: "$49", type: "one-time" },
-    { amount: "$19", type: "month" },
-  ],
-  tagline: "Turn your numbers into an investor-ready story.",
-  note: "Can be added to any plan.",
-  features: [
-    "Investor metrics dashboard (burn, runway, raise needs)",
-    '"How much should we raise?" scenario model',
-    "AI-generated investor prep packet (summary + charts)",
-    "Basic pitch review using your financials",
-  ],
-  cta: "Add to Plan",
-  tier: "fundraise-addon",
-};
 
 export default function Pricing() {
   return (
@@ -86,8 +91,8 @@ export default function Pricing() {
               Simple, Transparent Pricing
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Know your burn and runway. See where money is going. Decide what to cut or double down on. 
-              Show up prepared for investors.
+              Know your burn and runway. See where money is going. Show up prepared for investors.
+              No CFO required.
             </p>
           </div>
 
@@ -96,7 +101,7 @@ export default function Pricing() {
               <Card 
                 key={plan.tier} 
                 className={`hover-elevate transition-all flex flex-col relative ${
-                  plan.popular ? "border-primary shadow-lg" : ""
+                  plan.popular ? "border-primary shadow-lg scale-105" : ""
                 }`}
                 data-testid={`card-plan-${plan.tier}`}
               >
@@ -135,6 +140,19 @@ export default function Pricing() {
                       </li>
                     ))}
                   </ul>
+                  {plan.omitted && plan.omitted.length > 0 && (
+                    <div className="mt-6 pt-4 border-t border-border">
+                      <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wider">Not included:</p>
+                      <ul className="space-y-2">
+                        {plan.omitted.map((item, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-muted-foreground">
+                            <X className="w-4 h-4 mt-0.5 flex-shrink-0 opacity-50" />
+                            <span className="text-xs">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </CardContent>
                 <CardFooter>
                   <a href="/api/login" className="w-full">
@@ -151,62 +169,105 @@ export default function Pricing() {
             ))}
           </div>
 
-          <div className="max-w-3xl mx-auto">
-            <Card className="hover-elevate transition-all border-accent" data-testid="card-addon-fundraise">
-              <CardHeader>
-                <div className="flex items-center gap-3 mb-2">
-                  <Rocket className="h-6 w-6 text-accent" />
-                  <Badge variant="outline" className="border-accent text-accent" data-testid="badge-addon">
-                    Add-On
-                  </Badge>
-                </div>
-                <CardTitle className="text-2xl" data-testid="text-addon-name">
-                  {addon.name}
-                </CardTitle>
-                <div className="mt-4 mb-2 flex items-baseline gap-3">
-                  <div>
-                    <span className="text-3xl font-bold" data-testid="text-addon-price-onetime">
-                      {addon.priceOptions[0].amount}
-                    </span>
-                    <span className="text-muted-foreground"> {addon.priceOptions[0].type}</span>
-                  </div>
-                  <span className="text-muted-foreground">or</span>
-                  <div>
-                    <span className="text-3xl font-bold" data-testid="text-addon-price-monthly">
-                      {addon.priceOptions[1].amount}
-                    </span>
-                    <span className="text-muted-foreground">/{addon.priceOptions[1].type}</span>
-                  </div>
-                </div>
-                <CardDescription className="text-base" data-testid="text-addon-tagline">
-                  {addon.tagline}
-                </CardDescription>
-                <p className="text-xs text-muted-foreground mt-2" data-testid="text-addon-note">
-                  {addon.note}
-                </p>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {addon.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-start gap-2" data-testid={`feature-addon-${idx}`}>
-                      <Check className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
-                      <span className="text-sm">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-              <CardFooter>
-                <a href="/api/login" className="w-full">
-                  <Button
-                    className="w-full"
-                    variant="outline"
-                    data-testid="button-cta-addon"
-                  >
-                    {addon.cta}
-                  </Button>
-                </a>
-              </CardFooter>
-            </Card>
+          <div className="max-w-3xl mx-auto text-center">
+            <div className="bg-muted/50 rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-2">All plans include a 14-day free trial</h3>
+              <p className="text-sm text-muted-foreground">
+                No credit card required. Connect your accounts and see your financial health in minutes.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-6 py-16 bg-muted/30">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-2xl font-bold text-center mb-8">Compare Plans</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-4 px-4 font-medium">Feature</th>
+                  <th className="text-center py-4 px-4 font-medium">Lite</th>
+                  <th className="text-center py-4 px-4 font-medium bg-primary/5">Core</th>
+                  <th className="text-center py-4 px-4 font-medium">Growth</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                <tr>
+                  <td className="py-3 px-4">Bank/QuickBooks/Stripe sync</td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Auto-categorization</td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Burn & Runway</td>
+                  <td className="text-center py-3 px-4 text-muted-foreground">Basic</td>
+                  <td className="text-center py-3 px-4 bg-primary/5">Full</td>
+                  <td className="text-center py-3 px-4">Full</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Scenarios</td>
+                  <td className="text-center py-3 px-4 text-muted-foreground">1</td>
+                  <td className="text-center py-3 px-4 bg-primary/5">Unlimited</td>
+                  <td className="text-center py-3 px-4">Unlimited</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">AI Insights</td>
+                  <td className="text-center py-3 px-4 text-muted-foreground">3/month</td>
+                  <td className="text-center py-3 px-4 bg-primary/5">Unlimited</td>
+                  <td className="text-center py-3 px-4">Unlimited</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Hiring Planning</td>
+                  <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Raise Planning</td>
+                  <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Board Packets</td>
+                  <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4">Automated</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Team Seats</td>
+                  <td className="text-center py-3 px-4 text-muted-foreground">1</td>
+                  <td className="text-center py-3 px-4 bg-primary/5">3-5</td>
+                  <td className="text-center py-3 px-4">10</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Custom Dashboards</td>
+                  <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">API Access</td>
+                  <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Support</td>
+                  <td className="text-center py-3 px-4 text-muted-foreground">Email</td>
+                  <td className="text-center py-3 px-4 bg-primary/5">Priority</td>
+                  <td className="text-center py-3 px-4">Priority Slack</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
