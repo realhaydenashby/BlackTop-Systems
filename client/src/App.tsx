@@ -185,12 +185,13 @@ function RouterInner() {
     return <PublicRouter />;
   }
 
-  // Route to Live Mode for /app/* paths
-  if (isLiveModeRoute && user) {
+  // Route to Live Mode for /app/* paths (let LiveModeRouter handle auth internally)
+  if (isLiveModeRoute) {
     return <LiveModeRouter />;
   }
 
-  return user ? <ProtectedRouter /> : <PublicRouter />;
+  // Route to ProtectedRouter for all other app routes (let ProtectedRoute handle auth internally)
+  return <ProtectedRouter />;
 }
 
 function Router() {
