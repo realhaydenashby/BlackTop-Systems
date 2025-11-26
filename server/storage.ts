@@ -31,6 +31,14 @@ import type {
   InsertIntegrationConnection,
   MonthlyMetric,
   InsertMonthlyMetric,
+  BankAccount,
+  InsertBankAccount,
+  PlannedHire,
+  InsertPlannedHire,
+  BurnMetric,
+  InsertBurnMetric,
+  RaiseRecommendation,
+  InsertRaiseRecommendation,
 } from "@shared/schema";
 import {
   users,
@@ -48,6 +56,10 @@ import {
   insights,
   integrationConnections,
   monthlyMetrics,
+  bankAccounts,
+  plannedHires,
+  burnMetrics,
+  raiseRecommendations,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -138,6 +150,31 @@ export interface IStorage {
     departmentId?: string;
   }): Promise<MonthlyMetric[]>;
   deleteDocumentMonthlyMetrics(documentId: string): Promise<void>;
+
+  // Bank Accounts (Live Mode)
+  createBankAccount(account: InsertBankAccount): Promise<BankAccount>;
+  getBankAccount(id: string): Promise<BankAccount | undefined>;
+  getUserBankAccounts(userId: string): Promise<BankAccount[]>;
+  updateBankAccount(id: string, data: Partial<InsertBankAccount>): Promise<BankAccount | undefined>;
+  deleteBankAccount(id: string): Promise<void>;
+  getBankAccountByYodleeId(yodleeAccountId: string): Promise<BankAccount | undefined>;
+
+  // Planned Hires (Runway Calculator)
+  createPlannedHire(hire: InsertPlannedHire): Promise<PlannedHire>;
+  getUserPlannedHires(userId: string): Promise<PlannedHire[]>;
+  updatePlannedHire(id: string, data: Partial<InsertPlannedHire>): Promise<PlannedHire | undefined>;
+  deletePlannedHire(id: string): Promise<void>;
+
+  // Burn Metrics (Analytics)
+  createBurnMetric(metric: InsertBurnMetric): Promise<BurnMetric>;
+  getUserBurnMetrics(userId: string, months?: number): Promise<BurnMetric[]>;
+
+  // Raise Recommendations
+  createRaiseRecommendation(rec: InsertRaiseRecommendation): Promise<RaiseRecommendation>;
+  getLatestRaiseRecommendation(userId: string): Promise<RaiseRecommendation | undefined>;
+
+  // User Updates (Live Mode)
+  updateUser(id: string, data: Partial<UpsertUser>): Promise<User | undefined>;
 
   // Helper methods
   getOrganizationMember(userId: string): Promise<OrganizationMember | undefined>;
@@ -600,6 +637,115 @@ export class DatabaseStorage implements IStorage {
     return await db.query.organizationMembers.findFirst({
       where: eq(organizationMembers.userId, userId),
     });
+  }
+
+  // Bank Accounts (Live Mode)
+  async createBankAccount(accountData: InsertBankAccount): Promise<BankAccount> {
+    const [account] = await db.insert(bankAccounts).values(accountData).returning();
+    return account;
+  }
+
+  async getBankAccount(id: string): Promise<BankAccount | undefined> {
+    return await db.query.bankAccounts.findFirst({
+      where: eq(bankAccounts.id, id),
+    });
+  }
+
+  async getUserBankAccounts(userId: string): Promise<BankAccount[]> {
+    return await db.query.bankAccounts.findMany({
+      where: eq(bankAccounts.userId, userId),
+      orderBy: [desc(bankAccounts.createdAt)],
+    });
+  }
+
+  async updateBankAccount(id: string, data: Partial<InsertBankAccount>): Promise<BankAccount | undefined> {
+    const [updated] = await db
+      .update(bankAccounts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(bankAccounts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBankAccount(id: string): Promise<void> {
+    await db.delete(bankAccounts).where(eq(bankAccounts.id, id));
+  }
+
+  async getBankAccountByYodleeId(yodleeAccountId: string): Promise<BankAccount | undefined> {
+    return await db.query.bankAccounts.findFirst({
+      where: eq(bankAccounts.yodleeAccountId, yodleeAccountId),
+    });
+  }
+
+  // Planned Hires (Runway Calculator)
+  async createPlannedHire(hireData: InsertPlannedHire): Promise<PlannedHire> {
+    const [hire] = await db.insert(plannedHires).values(hireData).returning();
+    return hire;
+  }
+
+  async getUserPlannedHires(userId: string): Promise<PlannedHire[]> {
+    return await db.query.plannedHires.findMany({
+      where: and(
+        eq(plannedHires.userId, userId),
+        eq(plannedHires.isActive, true)
+      ),
+      orderBy: [desc(plannedHires.startDate)],
+    });
+  }
+
+  async updatePlannedHire(id: string, data: Partial<InsertPlannedHire>): Promise<PlannedHire | undefined> {
+    const [updated] = await db
+      .update(plannedHires)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(plannedHires.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePlannedHire(id: string): Promise<void> {
+    await db.delete(plannedHires).where(eq(plannedHires.id, id));
+  }
+
+  // Burn Metrics (Analytics)
+  async createBurnMetric(metricData: InsertBurnMetric): Promise<BurnMetric> {
+    const [metric] = await db.insert(burnMetrics).values(metricData).returning();
+    return metric;
+  }
+
+  async getUserBurnMetrics(userId: string, months: number = 12): Promise<BurnMetric[]> {
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
+    
+    return await db.query.burnMetrics.findMany({
+      where: and(
+        eq(burnMetrics.userId, userId),
+        gte(burnMetrics.month, startDate)
+      ),
+      orderBy: [desc(burnMetrics.month)],
+    });
+  }
+
+  // Raise Recommendations
+  async createRaiseRecommendation(recData: InsertRaiseRecommendation): Promise<RaiseRecommendation> {
+    const [rec] = await db.insert(raiseRecommendations).values(recData).returning();
+    return rec;
+  }
+
+  async getLatestRaiseRecommendation(userId: string): Promise<RaiseRecommendation | undefined> {
+    return await db.query.raiseRecommendations.findFirst({
+      where: eq(raiseRecommendations.userId, userId),
+      orderBy: [desc(raiseRecommendations.createdAt)],
+    });
+  }
+
+  // User Updates (Live Mode)
+  async updateUser(id: string, data: Partial<UpsertUser>): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return updated;
   }
 }
 

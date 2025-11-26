@@ -1,0 +1,156 @@
+Refactor the entire BlackTop Systems platform into a next-generation financial modeling and intelligence environment that combines the simplicity and speed of BlackTop with the modeling depth of Parallel. Preserve our minimal founder-first UX, but add a full modeling workspace that functions like an AI-accelerated Excel for startups. The platform must allow founders to get live insights in 30 minutes, then go deep if they want—without requiring complex onboarding.”
+
+Do all of the following:
+
+====================================================
+	1.	CORE REBUILD: ADD THE ‘AI MODELING WORKBOOK’
+====================================================
+
+Create a new feature called Modeling Workbook, which functions like a simplified spreadsheet inside the app:
+	•	Sheets for:
+• Financial Model
+• Revenue Model
+• Hiring Plan
+• CAC/LTV
+• Operating Expenses
+• Scenario Engine
+	•	AI auto-generates the full model from:
+• QuickBooks/Xero data
+• Stripe revenue
+• Bank feeds
+• Payroll data
+• Historical transactions
+	•	Users can override or edit any line item, similar to Excel.
+	•	But AI maintains formulas, sanity checks, and consistency.
+
+No manual model setup.
+AI builds the entire model first.
+
+====================================================
+2. CLEAN UX REWRITE (KEEP OUR SIMPLICITY)
+
+Redesign the app so that BlackTop has two modes:
+
+Mode A: Founder Mode (Default)
+	•	30-minute setup
+	•	Simple dashboards
+	•	Action plans
+	•	Runway
+	•	Raise recommendations
+	•	Cash insights
+	•	“What changed this month?”
+	•	Visual charts only, no complexity
+	•	Zero finance background needed
+	•	Instant intelligence
+
+Mode B: Analyst Mode (Advanced)
+	•	Opens the AI Modeling Workbook
+	•	Editable assumptions
+	•	Deep scenario modeling
+	•	Department-level budgets
+	•	Multi-driver forecasts
+	•	Editable revenue logic
+	•	Hiring plan tool
+	•	All formulas are AI-maintained
+
+Parallel’s depth with Notion/Ramp-level simplicity.
+
+====================================================
+3. REMODEL ALL ANALYTICS PAGES FOR EXPECTED DEPTH
+
+For each analytics category (Spend, Revenue, Profitability, Forecasting):
+	•	Add deeper charts, CFO-level KPIs, and scenario toggles
+	•	Add a “View in Modeling Workbook” button
+	•	Include action plan summaries on every page
+	•	Replace placeholder data with consistent demo datasets
+	•	Use a professional dark navy theme
+	•	Smooth transitions, clean typography, no clutter
+	•	Use consistent, elegant color palettes
+
+====================================================
+4. ADD THESE CORE MODULES (MATCH / SURPASS PARALLEL)
+
+A. Live Financial Model
+	•	Pulls from QBO/Xero/Stripe/Bank
+	•	Updates in real time
+	•	AI diagnoses mistakes or missing assumptions
+
+B. Hiring Plan + Runway Tool
+	•	Add/remove hires
+	•	Fully-loaded cost adjustments
+	•	AI recommends safe hiring ranges
+	•	Real-time runway changes
+
+C. Raise Planning Tool
+	•	Auto-calculates “how much to raise”
+	•	Shows milestones
+	•	Models runway post-raise
+	•	Creates investor-facing narrative
+
+D. Scenario Engine
+	•	Best case / base case / conservative
+	•	Revenue drivers
+	•	Spend cuts
+	•	CAC/LTV shifts
+	•	Headcount growth
+	•	Seasonality
+
+E. Board-Ready Snapshot
+	•	Generate a PDF with:
+• Burn
+• Runway
+• Highlights
+• Lowlights
+• Forecast
+• Key risks
+• Action plan
+
+====================================================
+5. MAINTAIN OUR ADVANTAGE: ZERO OVERHEAD
+
+Ensure the entire platform is “Parallel without pain”:
+	•	No 6-hour onboarding
+	•	No manual model build
+	•	AI does 95% of the setup
+	•	User only reviews/challenges assumptions
+	•	Ensure all integrations work:
+• QuickBooks
+• Xero
+• Puzzle
+• Stripe
+• Plaid/Yodlee
+• Gmail invoice parsing
+• Groq/Gemini intelligence
+• Google Doc AI for PDFs
+
+====================================================
+6. OVERRIDE ANY COMPLEXITY WITH AI GUARDRAILS
+
+Build guardrails so users cannot “break” the model:
+	•	AI protects formulas
+	•	AI corrects broken assumptions
+	•	AI flags unrealistic inputs
+	•	AI auto-reconciles model vs real data
+
+====================================================
+7. RETAIN OUR CORE IDENTITY
+
+BlackTop must stay:
+	•	Beautiful
+	•	Founder-friendly
+	•	Fast
+	•	Minimalist
+	•	Useful on Day 1
+	•	Ready for fundraising
+	•	Better UX than Ramp, Parallel, or QuickBooks
+
+Visual consistency:
+Dark navy, charcoal, deep blue accents, clean cards, smooth transitions.
+
+====================================================
+8. FINAL DELIVERABLE
+
+Produce a working version of BlackTop that functions as:
+
+A modern, AI-native, founder-first replacement for Parallel
+with an embedded FP&A modeling engine anyone can use in 30 minutes.”

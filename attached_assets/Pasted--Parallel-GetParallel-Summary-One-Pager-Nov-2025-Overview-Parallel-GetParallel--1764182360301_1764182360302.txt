@@ -1,0 +1,69 @@
+**Parallel (GetParallel) – Summary One-Pager (Nov 2025)**
+
+**Overview:**  
+Parallel (“GetParallel”) is an AI‑powered financial modeling and planning platform purpose‑built for VC‑backed startups, combining always‑on software, embedded AI finance agents, and fractional CFO oversight. Headquarters are in Lehi, UT.
+
+***
+
+**Founding & Team:**  
+- Founded in 2023 by Renato Villanueva (CEO), Clint Savage (Product/Design), Tyler Slater (CTO)  
+- Focused on serving founders and lean finance leads from pre‑seed to Series A+  
+- Recognized by Utah startup community and VC podcasts for innovation in “AI-native finance”
+
+***
+
+**Product & Technology:**  
+- **Core Features:**  
+  - Live, integrated financial models that sync with QuickBooks, Puzzle, Xero, etc.
+  - Always‑updating views of runway, burn rate, hiring plans, and scenario modeling  
+  - Budget vs actuals, anomaly detection, and investor/board‑ready report generation  
+  - AI finance agents that clean GL data, draft narratives, run “what if” plans, supervised by fractional CFOs  
+  - Designed to replace brittle spreadsheets and serve as an FP&A system of record
+
+- **Technical Stack:**  
+  - Real‑time integrations with accounting/data platforms  
+  - Role-based access, audit trails, collaborative dashboards  
+  - Embedded AI agents with humans in the loop for guidance and on-demand support
+
+***
+
+**Funding & Investors:**  
+- Raised at least $4.25M across pre‑seed and seed rounds since 2023
+  - Backers include Penny Jar Capital, Night Capital, K5 Tokyo Black, Convoi Ventures, Peak Capital, Background VC, Mintaka VC, Path Ventures, and strategic angels (Spiff, Weave, Omni, Divvy founders)
+- Primarily supports VC‑backed SaaS and growth startups in B2B, especially those seeking to professionalize finance prior to a full internal team
+
+***
+
+**Pricing & Tiers:**  
+- No public spreadsheet of plans/tier features; sales-driven “talk to us” pricing model
+- Plans most likely vary by:
+  - Level of fractional CFO service and support hours
+  - Company complexity (entity count, currencies, metrics)
+  - User seats/collaboration, integrations, and governance tools
+- All paid customers receive the core suite: live models, accounting sync, scenario planning, dashboards, anomaly alerts, reporting, and access to AI finance agents + CFO supervision
+
+***
+
+**Unique Value/Positioning:**  
+- Parallel positions itself as a “finance team in a box” for startups, distinct from traditional spreadsheet tools or large-company FP&A systems
+- Differentiators: AI-native agents, automated scenario planning, real-time numbers, immediate human support — all tuned for startups preparing to raise money or manage rapid growth
+
+***
+
+**Go-to-Market & Marketing:**  
+- Heavy founder-first content, with guides/blogs focused on fundraising, financial modeling, and planning best practices
+- Frequent PR campaigns and paid coverage in startup/VC media and Utah business press
+- Social “founder brand” presence and recognition in local startup founder lists, both for credibility and inbound demand
+
+***
+
+**Typical Use Cases:**  
+- Runway and hiring scenario modeling with live numbers  
+- Rapid data room and investor readiness before fundraising  
+- Monthly/quarterly board reporting without spreadsheet rebuild  
+- Automated budget vs actual variance review for cash management
+
+***
+
+**Takeaway:**  
+Parallel is a full-stack financial modeling and planning solution for founders who need reliable, real-time metrics, actionable planning, and institutional-level reporting without hiring an in-house team. Its AI agents and fractional CFO layer provide guidance well beyond pure automation, with pricing and support tailored individually to startup stage and complexity.

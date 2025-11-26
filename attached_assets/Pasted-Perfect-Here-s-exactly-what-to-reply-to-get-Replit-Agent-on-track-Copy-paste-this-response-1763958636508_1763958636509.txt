@@ -1,0 +1,70 @@
+Perfect! Here's exactly what to reply to get Replit Agent on track:
+
+---
+
+**Copy/paste this response:**
+
+---
+
+Great questions! Here are my answers:
+
+**1. Tech Stack: Option A - Keep TypeScript/Node.js/Express**
+Stick with what's already built. Don't rewrite anything. Just add Yodlee and Groq on top of the existing backend.
+
+**2. Demo Mode Routing: Option B - Keep existing pages at root level**
+Don't move anything. Current dashboard at `/dashboard` stays exactly as-is for demo users. We'll build NEW pages at `/app/*` for live mode. Zero changes to existing routes.
+
+**3. Authentication: Option C - Use existing auth, add user flag**
+Keep Replit Auth. Add a boolean field `is_live_mode` to the users table. Demo users have `is_live_mode = false`, live users have `is_live_mode = true`. That's it.
+
+**4. Yodlee Environment: Sandbox for now**
+Yes, sandbox. The credentials I provided are for Yodlee Sandbox. We'll test with their sandbox banks first.
+
+**5. Scope: Build incrementally, ONE feature at a time**
+This is critical: **Do NOT build all 6 pages at once.**
+
+Here's the order I want:
+
+**Phase 1: Bank Connection ONLY (this week)**
+- Create `/app/connect` page (onboarding flow)
+- Backend endpoints for Yodlee FastLink
+- Store transactions in database
+- **Stop here and let me test before moving forward**
+
+**Phase 2: Classification (next week)**
+- Groq vendor normalization
+- Groq category classification  
+- Recurring detection
+- **Stop here and let me test**
+
+**Phase 3: Transactions Page (week 3)**
+- Build `/app/transactions` page
+- Show classified transactions
+- Manual override UI
+- **Stop here and let me test**
+
+**Phase 4-6: Other pages (only after Phase 3 works)**
+- Performance page
+- Runway page
+- Snapshot page
+
+---
+
+**Important rules:**
+- ❌ Don't touch ANY existing code in `/dashboard`, `/transactions`, `/documents`, etc.
+- ❌ Don't modify existing database tables (users, transactions if they exist)
+- ✅ Create NEW files only: `/app/*` routes, new API endpoints, new components
+- ✅ Show me code BEFORE running migrations or making database changes
+- ✅ Build small, test, then build next feature
+
+**Start with Phase 1 only:** Show me your plan for JUST the Yodlee bank connection. What files will you create? What endpoints? What database tables?
+
+---
+
+This should get Replit Agent focused on:
+1. Not touching existing code
+2. Building incrementally 
+3. Starting with ONLY bank connection
+4. Asking for approval before proceeding
+
+The key phrase is **"Stop here and let me test before moving forward"** - that forces it to pause between phases.

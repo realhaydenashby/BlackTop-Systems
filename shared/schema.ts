@@ -33,6 +33,9 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  isLiveMode: boolean("is_live_mode").default(false), // Live mode = real bank connection, Demo mode = existing features
+  yodleeUserSession: varchar("yodlee_user_session"), // Cached Yodlee user session
+  currentCash: numeric("current_cash", { precision: 15, scale: 2 }), // User's current cash on hand for runway calc
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -131,28 +134,110 @@ export const documents = pgTable("documents", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Transactions
+// Bank Accounts (Yodlee connections)
+export const bankAccountTypeEnum = pgEnum("bank_account_type", ["checking", "savings", "credit_card", "investment", "loan", "other"]);
+export const bankAccountStatusEnum = pgEnum("bank_account_status", ["active", "disconnected", "error"]);
+
+export const bankAccounts = pgTable("bank_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  yodleeAccountId: varchar("yodlee_account_id"), // Yodlee's account ID
+  yodleeProviderAccountId: varchar("yodlee_provider_account_id"), // Yodlee's provider account ID
+  bankName: varchar("bank_name", { length: 255 }),
+  accountName: varchar("account_name", { length: 255 }),
+  accountNumberMasked: varchar("account_number_masked", { length: 50 }), // e.g., "****1234"
+  accountType: bankAccountTypeEnum("account_type").default("checking"),
+  currentBalance: numeric("current_balance", { precision: 15, scale: 2 }),
+  availableBalance: numeric("available_balance", { precision: 15, scale: 2 }),
+  currency: varchar("currency", { length: 3 }).default("USD"),
+  status: bankAccountStatusEnum("status").default("active"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_bank_accounts_user").on(table.userId),
+  index("idx_bank_accounts_yodlee").on(table.yodleeAccountId),
+]);
+
+// Transaction source enum for distinguishing Yodlee vs CSV vs manual
+export const transactionSourceEnum = pgEnum("transaction_source", ["yodlee", "csv", "manual", "stripe"]);
+
+// Transactions (updated with Yodlee fields)
 export const transactions = pgTable("transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   documentId: varchar("document_id").references(() => documents.id, { onDelete: "set null" }),
+  bankAccountId: varchar("bank_account_id").references(() => bankAccounts.id, { onDelete: "set null" }), // Link to bank account
+  yodleeTransactionId: varchar("yodlee_transaction_id"), // Yodlee's transaction ID (for deduplication)
   date: timestamp("date").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).default("USD"),
   vendorId: varchar("vendor_id").references(() => vendors.id, { onDelete: "set null" }),
+  vendorOriginal: varchar("vendor_original", { length: 255 }), // Raw vendor string from bank
+  vendorNormalized: varchar("vendor_normalized", { length: 255 }), // AI-cleaned vendor name
   categoryId: varchar("category_id").references(() => categories.id, { onDelete: "set null" }),
   departmentId: varchar("department_id").references(() => departments.id, { onDelete: "set null" }),
   description: text("description"),
   tags: text("tags").array(),
   isRecurring: boolean("is_recurring").default(false),
+  source: transactionSourceEnum("source").default("csv"), // Where transaction came from
+  classificationConfidence: numeric("classification_confidence", { precision: 3, scale: 2 }), // AI confidence 0-1
   notes: text("notes"),
+  metadata: jsonb("metadata"), // Extra data from Yodlee/Stripe
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("idx_transactions_org_date").on(table.organizationId, table.date),
   index("idx_transactions_vendor").on(table.vendorId),
   index("idx_transactions_category").on(table.categoryId),
+  index("idx_transactions_yodlee").on(table.yodleeTransactionId),
+  index("idx_transactions_bank_account").on(table.bankAccountId),
 ]);
+
+// Planned Hires (for runway calculations)
+export const plannedHires = pgTable("planned_hires", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  role: varchar("role", { length: 255 }).notNull(),
+  department: varchar("department", { length: 100 }),
+  monthlyCost: numeric("monthly_cost", { precision: 12, scale: 2 }).notNull(), // Fully-loaded cost
+  startDate: timestamp("start_date").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Burn Metrics (calculated financial metrics for analytics)
+export const burnMetrics = pgTable("burn_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  month: timestamp("month").notNull(), // First day of month
+  grossBurn: numeric("gross_burn", { precision: 15, scale: 2 }), // Total expenses
+  netBurn: numeric("net_burn", { precision: 15, scale: 2 }), // Expenses - Revenue
+  revenue: numeric("revenue", { precision: 15, scale: 2 }),
+  runway: numeric("runway", { precision: 5, scale: 1 }), // Months of runway
+  cashBalance: numeric("cash_balance", { precision: 15, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_burn_metrics_user_month").on(table.userId, table.month),
+]);
+
+// Raise Recommendations (AI-generated fundraising suggestions)
+export const raiseRecommendations = pgTable("raise_recommendations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  recommendedAmount: numeric("recommended_amount", { precision: 15, scale: 2 }).notNull(),
+  targetRunwayMonths: integer("target_runway_months").default(18),
+  currentRunwayMonths: numeric("current_runway_months", { precision: 5, scale: 1 }),
+  avgMonthlyBurn: numeric("avg_monthly_burn", { precision: 15, scale: 2 }),
+  reasoning: text("reasoning"), // AI explanation
+  milestones: jsonb("milestones"), // Key milestones to hit with raise
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 // Budgets
 export const budgets = pgTable("budgets", {
@@ -387,7 +472,7 @@ export const actionItemsRelations = relations(actionItems, ({ one }) => ({
 }));
 
 // Zod schemas for inserts
-export const upsertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
+export const upsertUserSchema = createInsertSchema(users).omit({ createdAt: true, updatedAt: true }); // Keep id for upsert
 export const insertOrganizationSchema = createInsertSchema(organizations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertOrganizationMemberSchema = createInsertSchema(organizationMembers).omit({ id: true, createdAt: true });
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true, updatedAt: true });
@@ -403,6 +488,10 @@ export const insertInsightSchema = createInsertSchema(insights).omit({ id: true,
 export const insertIntegrationConnectionSchema = createInsertSchema(integrationConnections).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true, createdAt: true });
 export const insertMonthlyMetricSchema = createInsertSchema(monthlyMetrics).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPlannedHireSchema = createInsertSchema(plannedHires).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBurnMetricSchema = createInsertSchema(burnMetrics).omit({ id: true, createdAt: true });
+export const insertRaiseRecommendationSchema = createInsertSchema(raiseRecommendations).omit({ id: true, createdAt: true });
 
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
@@ -437,6 +526,14 @@ export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
 export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
 export type MonthlyMetric = typeof monthlyMetrics.$inferSelect;
 export type InsertMonthlyMetric = z.infer<typeof insertMonthlyMetricSchema>;
+export type BankAccount = typeof bankAccounts.$inferSelect;
+export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
+export type PlannedHire = typeof plannedHires.$inferSelect;
+export type InsertPlannedHire = z.infer<typeof insertPlannedHireSchema>;
+export type BurnMetric = typeof burnMetrics.$inferSelect;
+export type InsertBurnMetric = z.infer<typeof insertBurnMetricSchema>;
+export type RaiseRecommendation = typeof raiseRecommendations.$inferSelect;
+export type InsertRaiseRecommendation = z.infer<typeof insertRaiseRecommendationSchema>;
 
 // Extended types with relations
 export type TransactionWithRelations = Transaction & {

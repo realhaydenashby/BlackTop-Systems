@@ -1,0 +1,912 @@
+# BlackTop Financial Analytics - Complete MVP Build Specification
+
+## 🎯 CORE OBJECTIVE
+Build a startup financial analytics platform with **TWO MODES**:
+1. **Demo Mode**: Full-featured dashboard with dummy data for sales demos (keep existing features)
+2. **Live Mode**: Streamlined 4-page MVP with real bank connection via Yodlee (new build)
+
+Users can toggle between modes or have separate login paths.
+
+---
+
+## 🏗️ ARCHITECTURE OVERVIEW
+
+**Tech Stack:**
+- Backend: Python (Flask or FastAPI)
+- Frontend: React
+- Database: PostgreSQL (already configured in Replit)
+- APIs: Yodlee (bank connection), Groq (AI classification), Stripe (optional revenue sync)
+
+**Environment Variables Already Set:**
+- `DATABASE_URL`, `PGDATABASE`, `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`
+- `YODLEE_CLIENTID`, `YODLEE_SECRET`
+- `GROQ_API_KEY`
+- `STRIPE_SECRET_KEY`, `VITE_STRIPE_PUBLIC_KEY` (optional)
+
+---
+
+## 🔄 TWO-MODE SYSTEM
+
+### **Mode Toggle Implementation:**
+```
+/demo → Demo mode (existing features, dummy data)
+/app → Live mode (new MVP, real data)
+```
+
+**OR**
+
+```
+Login page with two options:
+- "Try Demo" → demo@blacktop.com (hardcoded, dummy data)
+- "Sign In" → Real user login (connects bank, real data)
+```
+
+**Recommendation:** Use route-based separation (`/demo` vs `/app`) to keep code isolated.
+
+---
+
+## 📊 DEMO MODE (KEEP AS-IS)
+
+**Preserve existing features with dummy data:**
+- ✅ Dashboard with KPI cards
+- ✅ Document Vault
+- ✅ Transactions list
+- ✅ Full Analytics (Spend, Revenue, Profitability, Forecasting)
+- ✅ Cash Flow page
+- ✅ Budgets module
+- ✅ Action Plans
+- ✅ Settings (all 5 tabs)
+- ✅ CSV upload with monthly metrics by department
+
+**Demo Data Requirements:**
+- 12 months of dummy transactions (~500-1000 rows)
+- Realistic vendors (AWS, Google Ads, Stripe, Gusto, WeWork, etc.)
+- Monthly revenue range: $50K-$200K
+- Monthly expenses: $80K-$150K
+- Multiple categories: SaaS, Marketing, Payroll, Rent, etc.
+- Sample budgets and action plans pre-generated
+
+**Demo Login:**
+- Email: `demo@blacktop.com`
+- Password: `demo123` (or no password required)
+- Loads instantly with pre-populated data
+
+---
+
+## 🚀 LIVE MODE (NEW MVP BUILD)
+
+### **Navigation Structure:**
+```
+/app/onboarding → Bank connection
+/app/transactions → Review & classify transactions
+/app/performance → Metrics dashboard
+/app/runway → Burn & runway calculator
+/app/snapshot → Investor one-pager
+/app/settings → Minimal settings (company name, current cash)
+```
+
+---
+
+## 📋 LIVE MODE: DETAILED SPECIFICATIONS
+
+### **1. ONBOARDING FLOW** (`/app/onboarding`)
+
+**Empty State (First-Time User):**
+```
+┌─────────────────────────────────────┐
+│   Connect Your Bank Account         │
+│                                      │
+│   [Icon: Bank Building]              │
+│                                      │
+│   Get instant insights from your     │
+│   actual financial data.             │
+│                                      │
+│   ┌─────────────────────────────┐   │
+│   │  Connect Bank (Yodlee)      │   │
+│   └─────────────────────────────┘   │
+│                                      │
+│   Or upload CSV as fallback          │
+└─────────────────────────────────────┘
+```
+
+**Yodlee Integration Steps:**
+1. User clicks "Connect Bank"
+2. Backend generates Yodlee FastLink token
+3. Open Yodlee FastLink modal (iframe or popup)
+4. User authenticates with bank (Yodlee handles OAuth)
+5. On success, Yodlee webhook hits `/api/yodlee/webhook`
+6. Backend fetches transactions via Yodlee API
+7. Store in `transactions` table
+8. Queue for Groq classification
+9. Redirect to `/app/transactions` with loading state
+
+**CSV Fallback:**
+- Small link: "Upload CSV instead"
+- Opens simple upload modal
+- Parse CSV → map columns → insert into same `transactions` table
+- Mark `source = 'csv'` vs `source = 'yodlee'`
+
+---
+
+### **2. TRANSACTIONS PAGE** (`/app/transactions`)
+
+**Purpose:** Review and manage all transactions, manual classification overrides.
+
+**UI Components:**
+
+**Header:**
+```
+Transactions
+┌────────────────────────────────────────┐
+│ ✅ Bank: Chase ****1234                 │
+│ Last synced: 2 hours ago                │
+│ [Sync Now Button]                       │
+└────────────────────────────────────────┘
+```
+
+**Filters Row:**
+```
+[Date Range Picker] [Category Dropdown] [Search Vendor]
+```
+
+**Transaction Table:**
+```
+| Date       | Vendor (normalized) | Amount    | Category  | Recurring | Actions |
+|------------|---------------------|-----------|-----------|-----------|---------|
+| 2024-11-15 | AWS                 | -$2,400   | SaaS      | Yes       | [Edit]  |
+| 2024-11-14 | Google Ads          | -$1,850   | Marketing | No        | [Edit]  |
+| 2024-11-13 | Stripe (Revenue)    | +$15,200  | Revenue   | No        | [Edit]  |
+```
+
+**Processing States:**
+- Show spinner during classification: "Classifying 47 transactions..."
+- Once done: "✅ All transactions classified"
+
+**Classification Logic (Groq):**
+```python
+# For each transaction:
+1. Normalize vendor name using Groq
+   - Input: "AMZN AWS*CLOUD" → Output: "AWS"
+   
+2. Assign category using Groq
+   - Input: vendor + description
+   - Output: category from list (SaaS, Marketing, Payroll, Rent, Revenue, etc.)
+   
+3. Detect recurring
+   - Rule: Same vendor + similar amount (±10%) + ~30 days apart
+   - Mark is_recurring = true
+```
+
+**Manual Override:**
+- Click category dropdown → select new category
+- Update in DB immediately
+- Show "✅ Updated" confirmation
+
+---
+
+### **3. PERFORMANCE PAGE** (`/app/performance`)
+
+**Purpose:** High-level financial health snapshot.
+
+**Layout:**
+
+**KPI Cards (Top Row):**
+```
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│  Revenue     │  │  Expenses    │  │  Net Burn    │
+│  $142K       │  │  $98K        │  │  -$44K       │
+│  ↑ 12% MoM   │  │  ↓ 5% MoM    │  │  This month  │
+└──────────────┘  └──────────────┘  └──────────────┘
+```
+
+**Chart 1: Revenue vs Expenses Over Time**
+- Line chart (Recharts)
+- X-axis: Last 12 months
+- Y-axis: Dollar amount
+- Two lines: Revenue (green), Expenses (red)
+- Optional third line: Net Burn (gray)
+
+**Chart 2: Spending by Category**
+- Horizontal bar chart
+- Categories: SaaS, Marketing, Payroll, Rent, etc.
+- Sorted by total spend (descending)
+
+**Insights Section (Below Charts):**
+```
+💡 Key Insights
+───────────────
+⚠️ Marketing spend up 32% vs last month (driven by Google Ads)
+✅ SaaS costs down 8% after canceling unused tools
+🔴 Burn rate increased to $44K/month (was $38K last month)
+```
+
+**Insight Generation:**
+- Use Groq to analyze spend changes month-over-month
+- Prompt: "Analyze these spending changes and provide 3-5 actionable insights. Focus on largest increases, decreases, and trends."
+- Display as cards with severity icons (⚠️ warning, ✅ positive, 🔴 critical)
+
+**Calculations:**
+```python
+revenue_this_month = sum(transactions where category='Revenue' and month=current)
+expenses_this_month = sum(-amount where category!='Revenue' and month=current)
+net_burn = expenses_this_month - revenue_this_month
+
+# Month-over-month growth
+revenue_mom = ((revenue_this_month - revenue_last_month) / revenue_last_month) * 100
+```
+
+---
+
+### **4. BURN & RUNWAY PAGE** (`/app/runway`)
+
+**Purpose:** Calculate runway, model hiring impact, project cash flow.
+
+**Layout:**
+
+**Input Section (Left Panel):**
+```
+Current Cash on Hand
+┌─────────────────────┐
+│ $850,000            │  [Auto-pulled from bank balance if available]
+└─────────────────────┘
+
+Add Planned Hires (Optional)
+┌─────────────────────────────────┐
+│ Role: [Senior Engineer     ▼]   │
+│ Monthly Cost: [$12,000]          │
+│ Start Date: [Jan 2025]           │
+│ [+ Add Another Hire]             │
+└─────────────────────────────────┘
+```
+
+**Output Section (Right Panel):**
+```
+📊 Current Runway
+─────────────────
+Average Monthly Burn: $44,200
+Current Runway: 19.2 months
+Runway End Date: June 2026
+
+💼 With Planned Hires
+─────────────────────
+New Monthly Burn: $56,200
+New Runway: 15.1 months
+Runway End Date: February 2026
+Impact: -4.1 months
+```
+
+**90-Day Cash Projection Chart:**
+- Line chart showing cash decline
+- X-axis: Next 90 days
+- Y-axis: Cash balance
+- Two lines: "Current burn" vs "With planned hires"
+- Horizontal red line at $0 (runway cliff)
+
+**Calculations:**
+```python
+# Average burn (last 3 months)
+avg_burn = sum(net_burn_last_3_months) / 3
+
+# Current runway
+current_runway_months = current_cash / avg_burn
+
+# With hires
+new_monthly_cost = sum(hire['monthly_cost'] for hire in planned_hires)
+new_burn = avg_burn + new_monthly_cost
+new_runway_months = current_cash / new_burn
+
+# 90-day projection
+for day in range(90):
+    projected_cash = current_cash - (avg_burn / 30 * day)
+```
+
+**Insights:**
+```
+💡 Runway Insights
+──────────────────
+🔴 At current burn, you'll run out of cash in 19.2 months
+⚠️ Adding 2 engineers reduces runway to 15.1 months
+💰 To maintain 18 months runway with new hires, you need to raise $180K
+```
+
+---
+
+### **5. INVESTOR SNAPSHOT PAGE** (`/app/snapshot`)
+
+**Purpose:** One-pager for fundraising, board meetings, investor updates.
+
+**Layout (Print-Friendly):**
+```
+╔═══════════════════════════════════════════════════════════╗
+║              [Company Name] - Financial Snapshot          ║
+║              Generated: November 23, 2024                 ║
+╠═══════════════════════════════════════════════════════════╣
+║                                                            ║
+║  📈 Revenue & Growth                                       ║
+║  ─────────────────────                                     ║
+║  LTM Revenue: $1.4M                                        ║
+║  MoM Growth: 12%                                           ║
+║  ARR: $1.68M                                               ║
+║                                                            ║
+║  💰 Burn & Runway                                          ║
+║  ─────────────────                                         ║
+║  Monthly Burn: $44K                                        ║
+║  Current Cash: $850K                                       ║
+║  Runway: 19.2 months                                       ║
+║                                                            ║
+║  💳 Top Expenses                                           ║
+║  ────────────────                                          ║
+║  1. Payroll: $32K/month                                    ║
+║  2. AWS: $8K/month                                         ║
+║  3. Google Ads: $6K/month                                  ║
+║  4. Office Rent: $4K/month                                 ║
+║  5. SaaS Tools: $3K/month                                  ║
+║                                                            ║
+║  ⚠️ Key Risks                                              ║
+║  ──────────                                                ║
+║  1. Burn rate increased 15% in Q4                          ║
+║  2. Marketing CAC up 22% vs target                         ║
+║  3. Need to raise by Q2 2025 to maintain 12mo buffer       ║
+║                                                            ║
+║  ✅ Action Plan                                            ║
+║  ─────────────                                             ║
+║  1. Negotiate AWS contract (potential $2K/mo savings)      ║
+║  2. Pause non-essential hiring until revenue grows         ║
+║  3. Begin fundraising conversations in Q1 2025             ║
+║                                                            ║
+╚═══════════════════════════════════════════════════════════╝
+
+                [Download PDF Button]
+```
+
+**PDF Export:**
+- Use library like `react-to-pdf` or `puppeteer`
+- OR style with print-friendly CSS and let users Print to PDF
+- Filename: `{company_name}_financial_snapshot_{date}.pdf`
+
+---
+
+### **6. SETTINGS PAGE** (`/app/settings`)
+
+**Minimal Settings - Only Essentials:**
+
+```
+⚙️ Settings
+───────────
+
+Company Information
+┌─────────────────────────┐
+│ Company Name            │
+│ [BlackTop Inc.]         │
+└─────────────────────────┘
+
+Financial Settings
+┌─────────────────────────┐
+│ Current Cash on Hand    │
+│ [$850,000]              │
+│ (Used for runway calc)  │
+└─────────────────────────┘
+
+Connected Accounts
+┌─────────────────────────┐
+│ 🏦 Chase ****1234       │
+│ Connected 3 days ago    │
+│ [Disconnect]            │
+└─────────────────────────┘
+
+[Save Changes]
+```
+
+**Do NOT include:**
+- Profile/user management
+- Team members
+- Notifications
+- Billing
+- Security settings (2FA, etc.)
+
+---
+
+## 🗄️ DATABASE SCHEMA
+
+### **Core Tables:**
+
+```sql
+-- Users table (simple for MVP)
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255),  -- Can be NULL for demo user
+  company_name VARCHAR(255),
+  current_cash DECIMAL(15,2),
+  is_demo BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Bank connections
+CREATE TABLE bank_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id),
+  yodlee_account_id VARCHAR(255),
+  bank_name VARCHAR(255),
+  account_number_masked VARCHAR(50),  -- e.g., "****1234"
+  account_type VARCHAR(50),  -- checking, savings
+  current_balance DECIMAL(15,2),
+  last_synced_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Transactions (core table)
+CREATE TABLE transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id),
+  bank_account_id UUID REFERENCES bank_accounts(id),
+  yodlee_transaction_id VARCHAR(255),  -- NULL if CSV upload
+  date DATE NOT NULL,
+  description TEXT,
+  amount DECIMAL(15,2) NOT NULL,  -- Positive = income, Negative = expense
+  vendor_original VARCHAR(255),
+  vendor_normalized VARCHAR(255),
+  category VARCHAR(100),  -- SaaS, Marketing, Payroll, Revenue, etc.
+  is_recurring BOOLEAN DEFAULT false,
+  source VARCHAR(50) DEFAULT 'yodlee',  -- yodlee, csv, stripe
+  metadata JSONB,  -- For additional data
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_transactions_user_date ON transactions(user_id, date DESC);
+CREATE INDEX idx_transactions_category ON transactions(category);
+
+-- Planned hires (for runway calculator)
+CREATE TABLE planned_hires (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id),
+  role VARCHAR(255),
+  monthly_cost DECIMAL(15,2),
+  start_date DATE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### **Demo Data Seeding:**
+
+```sql
+-- Insert demo user
+INSERT INTO users (email, company_name, current_cash, is_demo)
+VALUES ('demo@blacktop.com', 'Acme Startup Inc', 850000, true);
+
+-- Insert 500+ demo transactions spanning 12 months
+-- (Generate programmatically with realistic vendors and amounts)
+```
+
+---
+
+## 🔌 API ENDPOINTS
+
+### **Authentication:**
+```
+POST /api/auth/login
+POST /api/auth/register
+POST /api/auth/logout
+GET  /api/auth/me
+```
+
+### **Yodlee Integration:**
+```
+POST /api/yodlee/generate-token        # Generate FastLink token
+POST /api/yodlee/webhook                # Yodlee callback
+GET  /api/yodlee/accounts               # List connected accounts
+POST /api/yodlee/sync                   # Manual sync transactions
+POST /api/yodlee/disconnect             # Disconnect bank
+```
+
+### **Transactions:**
+```
+GET  /api/transactions                  # List all (with filters)
+POST /api/transactions/upload-csv       # CSV upload fallback
+PUT  /api/transactions/:id              # Update (manual override)
+DELETE /api/transactions/:id
+POST /api/transactions/classify         # Trigger Groq classification
+```
+
+### **Metrics:**
+```
+GET  /api/metrics/performance           # Revenue, expenses, burn
+GET  /api/metrics/runway                # Burn rate, runway calc
+POST /api/metrics/runway/simulate       # Simulate with planned hires
+GET  /api/metrics/snapshot              # Investor snapshot data
+```
+
+### **Settings:**
+```
+GET  /api/settings
+PUT  /api/settings
+```
+
+---
+
+## 🤖 GROQ CLASSIFICATION IMPLEMENTATION
+
+### **Vendor Normalization:**
+
+```python
+def normalize_vendor(original_vendor: str) -> str:
+    prompt = f"""
+    Normalize this vendor name to a clean, standard format.
+    
+    Original: "{original_vendor}"
+    
+    Rules:
+    - Remove bank codes, asterisks, transaction IDs
+    - Standardize common names (AWS, Google, Microsoft, etc.)
+    - Return only the normalized vendor name, nothing else
+    
+    Examples:
+    "AMZN AWS*CLOUD" → "AWS"
+    "GOOGLE *ADS" → "Google Ads"
+    "SQ *COFFEE SHOP" → "Square"
+    """
+    
+    response = groq_client.chat.completions.create(
+        model="mixtral-8x7b-32768",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1
+    )
+    
+    return response.choices[0].message.content.strip()
+```
+
+### **Category Classification:**
+
+```python
+CATEGORIES = [
+    "SaaS",
+    "Marketing",
+    "Payroll",
+    "Rent",
+    "Office",
+    "Revenue",
+    "Legal",
+    "Travel",
+    "Meals",
+    "Miscellaneous"
+]
+
+def classify_category(vendor: str, description: str, amount: float) -> str:
+    prompt = f"""
+    Classify this transaction into one of these categories: {', '.join(CATEGORIES)}
+    
+    Vendor: {vendor}
+    Description: {description}
+    Amount: ${amount}
+    
+    Return ONLY the category name, nothing else.
+    """
+    
+    response = groq_client.chat.completions.create(
+        model="mixtral-8x7b-32768",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1
+    )
+    
+    category = response.choices[0].message.content.strip()
+    
+    # Validate category
+    if category not in CATEGORIES:
+        return "Miscellaneous"
+    
+    return category
+```
+
+### **Recurring Detection (Rule-Based):**
+
+```python
+def detect_recurring(user_id: str, vendor: str, amount: float, date: date) -> bool:
+    # Find similar transactions from same vendor
+    similar_transactions = db.query(
+        "SELECT date, amount FROM transactions "
+        "WHERE user_id = %s AND vendor_normalized = %s "
+        "AND date < %s "
+        "ORDER BY date DESC LIMIT 12",
+        (user_id, vendor, date)
+    )
+    
+    if len(similar_transactions) < 2:
+        return False
+    
+    # Check if amounts are similar (±10%) and ~30 days apart
+    for prev_tx in similar_transactions:
+        amount_diff = abs(prev_tx['amount'] - amount) / amount
+        days_diff = (date - prev_tx['date']).days
+        
+        if amount_diff < 0.1 and 25 <= days_diff <= 35:
+            return True
+    
+    return False
+```
+
+---
+
+## 🔄 YODLEE INTEGRATION DETAILS
+
+### **FastLink Implementation:**
+
+```javascript
+// Frontend: Open Yodlee FastLink modal
+const openYodleeConnect = async () => {
+  // 1. Get FastLink token from backend
+  const { token } = await fetch('/api/yodlee/generate-token').then(r => r.json());
+  
+  // 2. Open FastLink
+  window.fastlink.open({
+    fastLinkURL: `https://node.sandbox.yodlee.com/authenticate/restserver/`,
+    accessToken: `Bearer ${token}`,
+    params: {
+      configName: 'Aggregation'
+    },
+    onSuccess: (data) => {
+      console.log('Bank connected:', data);
+      // Trigger sync
+      fetch('/api/yodlee/sync', { method: 'POST' });
+      // Redirect to transactions page
+      window.location.href = '/app/transactions';
+    },
+    onError: (error) => {
+      console.error('Connection failed:', error);
+      alert('Failed to connect bank. Please try again.');
+    },
+    onClose: () => {
+      console.log('FastLink closed');
+    }
+  });
+};
+```
+
+### **Backend: Generate Token:**
+
+```python
+@app.route('/api/yodlee/generate-token', methods=['POST'])
+def generate_yodlee_token():
+    # 1. Authenticate with Yodlee
+    auth_response = requests.post(
+        'https://sandbox.api.yodlee.com/ysl/auth/token',
+        headers={'Content-Type': 'application/x-www-form-urlencoded'},
+        data={
+            'clientId': os.getenv('YODLEE_CLIENTID'),
+            'secret': os.getenv('YODLEE_SECRET')
+        }
+    )
+    
+    access_token = auth_response.json()['token']['accessToken']
+    
+    # 2. Create user session (or use existing)
+    user_response = requests.post(
+        'https://sandbox.api.yodlee.com/ysl/user/register',
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        },
+        json={
+            'user': {
+                'loginName': f'user_{current_user.id}',
+                'email': current_user.email
+            }
+        }
+    )
+    
+    user_token = user_response.json()['user']['accessTokens'][0]['value']
+    
+    return jsonify({'token': user_token})
+```
+
+### **Backend: Sync Transactions:**
+
+```python
+@app.route('/api/yodlee/sync', methods=['POST'])
+def sync_yodlee_transactions():
+    # 1. Get user's Yodlee access token
+    user_token = get_yodlee_user_token(current_user.id)
+    
+    # 2. Fetch accounts
+    accounts_response = requests.get(
+        'https://sandbox.api.yodlee.com/ysl/accounts',
+        headers={'Authorization': f'Bearer {user_token}'}
+    )
+    
+    accounts = accounts_response.json()['account']
+    
+    # 3. For each account, fetch transactions
+    for account in accounts:
+        # Store account info
+        save_bank_account(current_user.id, account)
+        
+        # Fetch transactions (last 12 months)
+        transactions_response = requests.get(
+            'https://sandbox.api.yodlee.com/ysl/transactions',
+            headers={'Authorization': f'Bearer {user_token}'},
+            params={
+                'accountId': account['id'],
+                'fromDate': (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'),
+                'toDate': datetime.now().strftime('%Y-%m-%d')
+            }
+        )
+        
+        transactions = transactions_response.json()['transaction']
+        
+        # 4. Store transactions and queue for classification
+        for tx in transactions:
+            transaction_id = save_transaction(current_user.id, account['id'], tx)
+            queue_for_classification(transaction_id)
+    
+    return jsonify({'success': True, 'message': 'Sync complete'})
+```
+
+---
+
+## 🎨 UI/UX REQUIREMENTS
+
+### **Design System:**
+- Use Tailwind CSS for styling
+- Color palette:
+  - Primary: Blue (#3B82F6)
+  - Success: Green (#10B981)
+  - Warning: Yellow (#F59E0B)
+  - Danger: Red (#EF4444)
+  - Neutral: Gray shades
+- Typography: Inter or similar sans-serif
+- Charts: Recharts library (consistent styling)
+
+### **Loading States:**
+- Skeleton loaders for data tables
+- Spinners for button actions
+- Progress bars for sync operations
+- "Processing X transactions..." messages
+
+### **Error Handling:**
+- Toast notifications for errors
+- Inline validation for forms
+- Graceful degradation if API fails
+- "Sync failed" with retry button
+
+### **Mobile Responsive:**
+- All pages should work on mobile
+- Stack charts vertically on small screens
+- Collapsible filters on mobile
+- Touch-friendly buttons
+
+---
+
+## ✅ ACCEPTANCE CRITERIA
+
+### **Demo Mode:**
+- [ ] Accessible at `/demo` or via demo login
+- [ ] All existing features work with dummy data
+- [ ] No real bank connections or API calls
+- [ ] Loads instantly (<1 second)
+
+### **Live Mode - Onboarding:**
+- [ ] User can connect bank via Yodlee FastLink
+- [ ] CSV upload fallback works
+- [ ] Transactions sync within 30 seconds
+- [ ] Groq classification completes within 2 minutes for 500 transactions
+
+### **Live Mode - Transactions:**
+- [ ] Table displays all transactions with filters
+- [ ] Vendor normalization is accurate (>90%)
+- [ ] Category classification is reasonable (>85% accuracy)
+- [ ] Manual override updates immediately
+- [ ] Recurring detection flags subscriptions
+
+### **Live Mode - Performance:**
+- [ ] KPI cards show correct monthly totals
+- [ ] Charts render with real data
+- [ ] 3-5 insights generated by Groq
+- [ ] Insights are actionable and specific
+
+### **Live Mode - Burn & Runway:**
+- [ ] Average burn calculated from last 3 months
+- [ ] Runway calculation is correct (cash / burn)
+- [ ] Hiring simulator updates runway dynamically
+- [ ] 90-day projection chart displays correctly
+
+### **Live Mode - Investor Snapshot:**
+- [ ] One-pager displays all key metrics
+- [ ] PDF export works (or print-to-PDF)
+- [ ] Layout is professional and readable
+- [ ] Data matches Performance page
+
+### **Live Mode - Settings:**
+- [ ] User can update company name and current cash
+- [ ] Bank account connection status shows
+- [ ] Changes save correctly
+
+---
+
+## 🚀 DEPLOYMENT CHECKLIST
+
+- [ ] Environment variables configured in Replit
+- [ ] PostgreSQL database initialized with schema
+- [ ] Demo data seeded for demo mode
+- [ ] Yodlee sandbox credentials tested
+- [ ] Groq API key tested and rate limits understood
+- [ ] Frontend builds without errors
+- [ ] Backend runs without errors
+- [ ] Both modes accessible and functional
+- [ ] Error logging configured (e.g., Sentry)
+- [ ] Basic monitoring for API health
+
+---
+
+## 📝 NOTES FOR REPLIT AGENT
+
+1. **Prioritize Live Mode MVP** - This is the core product. Demo mode already exists, just preserve it.
+
+2. **Start with Yodlee integration** - This is the biggest technical lift. Get bank connection working first.
+
+3. **Use Groq efficiently** - Batch classify transactions, don't make 500 individual API calls.
+
+4. **Keep it simple** - No fancy animations, complex state management, or over-engineering. Focus on functionality.
+
+5. **Test with real-ish data** - Use Yodlee sandbox banks to test the full flow.
+
+6. **Error handling is critical** - Banks fail, APIs timeout, users enter bad data. Handle gracefully.
+
+7. **Performance matters** - Transactions page with 1000 rows should load quickly. Use pagination if needed.
+
+8. **Code organization:**
+   - `/backend/routes/` - API endpoints
+   - `/backend/services/` - Yodlee, Groq, classification logic
+   - `/frontend/src/pages/demo/` - Demo mode pages
+   - `/frontend/src/pages/app/` - Live mode pages
+   - `/frontend/src/components/` - Shared components
+
+9. **Security:**
+   - Hash passwords (bcrypt)
+   - Sanitize SQL queries (use parameterized queries)
+   - Validate all user inputs
+   - Don't expose Yodlee/Groq keys in frontend
+
+10. **Future considerations** (don't build now, but keep in mind):
+    - Multi-user accounts
+    - Team collaboration
+    - Multiple bank accounts
+    - QuickBooks integration
+    - Stripe revenue sync
+    - Email reports
+    - Mobile app
+
+---
+
+## 🎯 SUCCESS METRICS
+
+**Technical:**
+- Bank connection success rate >95%
+- Transaction classification accuracy >85%
+- Page load times <2 seconds
+- API response times <500ms
+
+**User Experience:**
+- Demo → live conversion rate
+- Time to first insight <5 minutes
+- Runway calculation accuracy (manual verification)
+- PDF downloads per user
+
+**Business:**
+- Founders can make hiring decisions based on runway impact
+- Investor snapshots are shared in fundraising conversations
+- Users connect bank and stay engaged (retention)
+
+---
+
+## END OF SPECIFICATION
+
+This document contains everything needed to build the BlackTop MVP. Focus on the Live Mode (`/app/*`) as the core product, while preserving the existing Demo Mode for sales demos.
+
+**Next steps:**
+1. Implement Yodlee bank connection flow
+2. Build transaction sync and classification pipeline
+3. Create the 4 core pages (Transactions, Performance, Runway, Snapshot)
+4. Test with real Yodlee sandbox data
+5. Polish UI and error handling
+6. Deploy and get first users testing

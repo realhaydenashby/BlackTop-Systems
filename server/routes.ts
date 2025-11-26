@@ -1825,6 +1825,278 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== LIVE MODE API ROUTES ====================
+  // These routes are for the Live Mode (bank-connected) experience
+
+  // Get user's bank accounts
+  app.get("/api/live/bank-accounts", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const accounts = await storage.getUserBankAccounts(user.id);
+      res.json(accounts);
+    } catch (error: any) {
+      console.error("Get bank accounts error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch bank accounts" });
+    }
+  });
+
+  // Delete bank account
+  app.delete("/api/live/bank-accounts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const account = await storage.getBankAccount(req.params.id);
+      
+      if (!account || account.userId !== user.id) {
+        return res.status(404).json({ message: "Bank account not found" });
+      }
+
+      await storage.deleteBankAccount(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete bank account error:", error);
+      res.status(500).json({ message: error.message || "Failed to delete bank account" });
+    }
+  });
+
+  // Generate Yodlee FastLink URL for Live Mode
+  app.post("/api/live/yodlee/fastlink", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { yodleeService } = await import("./yodleeService");
+      
+      const result = await yodleeService.generateFastLink(user.id);
+      res.json(result);
+    } catch (error: any) {
+      console.error("FastLink generation error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate FastLink" });
+    }
+  });
+
+  // Sync accounts after FastLink connection
+  app.post("/api/live/yodlee/sync-accounts", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { yodleeService } = await import("./yodleeService");
+
+      // Get cached or fresh user session (more efficient than generateFastLink)
+      const userSession = await yodleeService.getUserSession(user.id);
+      
+      // Fetch accounts from Yodlee
+      const yodleeAccounts = await yodleeService.getAccounts(userSession);
+
+      // Sync to our database
+      const accounts = [];
+      for (const acc of yodleeAccounts) {
+        // Check if account already exists
+        const existing = await storage.getBankAccountByYodleeId(acc.id.toString());
+        
+        // Map Yodlee account type to our enum
+        let accountType: "checking" | "savings" | "credit_card" | "investment" | "loan" | "other" = "other";
+        const yodleeType = acc.accountType?.toLowerCase() || "";
+        if (yodleeType.includes("checking")) accountType = "checking";
+        else if (yodleeType.includes("savings")) accountType = "savings";
+        else if (yodleeType.includes("credit")) accountType = "credit_card";
+        else if (yodleeType.includes("investment") || yodleeType.includes("brokerage")) accountType = "investment";
+        else if (yodleeType.includes("loan") || yodleeType.includes("mortgage")) accountType = "loan";
+
+        if (existing) {
+          // Update existing account
+          await storage.updateBankAccount(existing.id, {
+            currentBalance: acc.balance?.amount?.toString() || null,
+            lastSyncedAt: new Date(),
+            status: "active",
+          });
+          accounts.push(existing);
+        } else {
+          // Create new account
+          const newAccount = await storage.createBankAccount({
+            userId: user.id,
+            yodleeAccountId: acc.id.toString(),
+            yodleeProviderAccountId: acc.providerAccountId?.toString() || null,
+            bankName: acc.accountName?.split(" ")[0] || "Bank",
+            accountName: acc.accountName,
+            accountNumberMasked: acc.accountNumber ? `****${acc.accountNumber.slice(-4)}` : null,
+            accountType,
+            currentBalance: acc.balance?.amount?.toString() || null,
+            availableBalance: null,
+            currency: acc.balance?.currency || "USD",
+            status: "active",
+            lastSyncedAt: new Date(),
+          });
+          accounts.push(newAccount);
+        }
+      }
+
+      res.json({ accounts, count: accounts.length });
+    } catch (error: any) {
+      console.error("Sync accounts error:", error);
+      res.status(500).json({ message: error.message || "Failed to sync accounts" });
+    }
+  });
+
+  // Sync transactions for a specific bank account
+  app.post("/api/live/yodlee/sync-transactions/:accountId", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { accountId } = req.params;
+      
+      // Verify account belongs to user
+      const account = await storage.getBankAccount(accountId);
+      if (!account || account.userId !== user.id) {
+        return res.status(404).json({ message: "Bank account not found" });
+      }
+
+      const { yodleeService } = await import("./yodleeService");
+
+      // Get cached or fresh user session
+      const userSession = await yodleeService.getUserSession(user.id);
+      
+      // Get organization (create if not exists)
+      let orgMember = await storage.getOrganizationMember(user.id);
+      let organizationId: string;
+      
+      if (!orgMember) {
+        // Create organization for user
+        const org = await storage.createOrganization({
+          name: `${user.firstName || user.email?.split("@")[0] || "User"}'s Company`,
+          industry: "technology",
+          size: "1-10",
+          settings: {},
+        });
+        organizationId = org.id;
+        await storage.addOrganizationMember({
+          organizationId: org.id,
+          userId: user.id,
+          role: "founder",
+        });
+      } else {
+        organizationId = orgMember.organizationId;
+      }
+      
+      // Fetch last 90 days of transactions
+      const transactions = await yodleeService.syncTransactions(organizationId, userSession, 90);
+      
+      // Filter to only transactions from this account
+      const accountTransactions = transactions.filter(
+        (t: any) => t.metadata?.accountId?.toString() === account.yodleeAccountId
+      );
+
+      let imported = 0;
+      for (const txn of accountTransactions) {
+        // Check for duplicate by Yodlee transaction ID
+        const yodleeId = txn.metadata?.sourceId;
+        if (yodleeId) {
+          // Simple dedup check using description + date + amount
+          const existingTxns = await storage.getOrganizationTransactions(organizationId, {
+            startDate: new Date(txn.date.getTime() - 1000),
+            endDate: new Date(txn.date.getTime() + 1000),
+          });
+          
+          const isDuplicate = existingTxns.some(
+            (e: any) => e.yodleeTransactionId === yodleeId
+          );
+          
+          if (isDuplicate) continue;
+        }
+
+        // Find or create category
+        const category = await storage.findOrCreateCategory(organizationId, txn.categoryName);
+        
+        // Create transaction
+        await storage.createTransaction({
+          organizationId,
+          bankAccountId: account.id,
+          yodleeTransactionId: txn.metadata?.sourceId?.toString() || null,
+          date: txn.date,
+          amount: txn.amount,
+          currency: txn.currency,
+          categoryId: category.id,
+          description: txn.description,
+          vendorOriginal: txn.vendorName,
+          tags: txn.tags,
+          source: "yodlee",
+          metadata: txn.metadata,
+        });
+        imported++;
+      }
+
+      // Update account last synced timestamp
+      await storage.updateBankAccount(account.id, { lastSyncedAt: new Date() });
+
+      res.json({ count: imported, total: accountTransactions.length });
+    } catch (error: any) {
+      console.error("Sync transactions error:", error);
+      res.status(500).json({ message: error.message || "Failed to sync transactions" });
+    }
+  });
+
+  // Get Live Mode transactions for user
+  app.get("/api/live/transactions", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const orgMember = await storage.getOrganizationMember(user.id);
+      
+      if (!orgMember) {
+        return res.json([]);
+      }
+
+      const { startDate, endDate, source } = req.query;
+      
+      const filters: any = {};
+      if (startDate) filters.startDate = new Date(startDate as string);
+      if (endDate) filters.endDate = new Date(endDate as string);
+      
+      let transactions = await storage.getOrganizationTransactions(orgMember.organizationId, filters);
+      
+      // Filter by source if specified (yodlee, csv, manual)
+      if (source) {
+        transactions = transactions.filter((t: any) => t.source === source);
+      }
+
+      res.json(transactions);
+    } catch (error: any) {
+      console.error("Get live transactions error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch transactions" });
+    }
+  });
+
+  // User mode toggle (demo vs live)
+  const userModeSchema = z.object({
+    isLiveMode: z.boolean(),
+  });
+
+  app.patch("/api/user/mode", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      const parseResult = userModeSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid request body", 
+          errors: parseResult.error.errors 
+        });
+      }
+
+      const { isLiveMode } = parseResult.data;
+      const updated = await storage.updateUser(user.id, { isLiveMode });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Update user mode error:", error);
+      res.status(500).json({ message: error.message || "Failed to update user mode" });
+    }
+  });
+
+  // Get current user with mode info
+  app.get("/api/user/me", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      res.json(user);
+    } catch (error: any) {
+      console.error("Get current user error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch user" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

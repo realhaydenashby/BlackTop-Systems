@@ -174,13 +174,39 @@ class YodleeService {
     }
   }
 
+  // Cache user sessions to avoid re-authenticating on every call
+  private userSessionCache: Map<string, { session: string; expiry: number }> = new Map();
+
+  /**
+   * Get or create a Yodlee user session with caching
+   * This is the primary method for obtaining a reusable user session
+   */
+  async getUserSession(userId: string): Promise<string> {
+    // Check cache first
+    const cached = this.userSessionCache.get(userId);
+    if (cached && Date.now() < cached.expiry) {
+      return cached.session;
+    }
+
+    // Get fresh session
+    const session = await this.getOrCreateYodleeUser(userId);
+    
+    // Cache for 25 minutes (sessions typically last 30 minutes)
+    this.userSessionCache.set(userId, {
+      session,
+      expiry: Date.now() + 25 * 60 * 1000,
+    });
+
+    return session;
+  }
+
   /**
    * Generate FastLink URL for user to connect their bank accounts
    */
   async generateFastLink(userId: string): Promise<{ userSession: string; fastLinkUrl: string }> {
     try {
       const cobSession = await this.getCobrandToken();
-      const userSession = await this.getOrCreateYodleeUser(userId);
+      const userSession = await this.getUserSession(userId);
 
       // Generate FastLink URL
       const fastLinkUrl = `${YODLEE_BASE_URL}/fastlink/v4?channelAppName=blacktopsystems&cobSession=${cobSession}&userSession=${userSession}`;

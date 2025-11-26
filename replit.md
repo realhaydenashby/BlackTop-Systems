@@ -1,10 +1,33 @@
-# ClarityOS - Financial Intelligence Platform
+# BlackTop Systems - Financial Intelligence Platform
 
 ## Overview
 
-ClarityOS is an AI-powered financial diagnostic and action platform designed for SMBs and startups. It serves as a pre-accounting/pre-FP&A financial intelligence layer that ingests messy financial inputs (statements, invoices, receipts, subscription emails, payroll summaries, CSVs), extracts and normalizes data, diagnoses financial behavior, and generates budgets and monthly action plans.
+BlackTop Systems (formerly ClarityOS) is an AI-powered financial diagnostic and action platform designed for SMBs and startups. It serves as a pre-accounting/pre-FP&A financial intelligence layer that ingests messy financial inputs (statements, invoices, receipts, subscription emails, payroll summaries, CSVs), extracts and normalizes data, diagnoses financial behavior, and generates budgets and monthly action plans.
 
 The application is a B2B SaaS platform targeting founders, operations managers, and fractional CFOs who need financial intelligence without requiring a dedicated CFO.
+
+## Two-Mode Architecture
+
+The platform supports two distinct modes:
+
+### Demo Mode (Existing Routes)
+- **Routes**: `/dashboard`, `/transactions`, `/analytics/*`, `/fundraising/*`, etc.
+- **Purpose**: Full-featured demo dashboard with sample data
+- **Data Source**: Mock data generators and CSV uploads
+- **Sidebar**: `AppSidebar` component
+
+### Live Mode (New /app/* Routes)
+- **Routes**: `/app/connect`, `/app/transactions`, `/app/performance`, `/app/runway`, `/app/snapshot`
+- **Purpose**: Production-ready MVP with real bank data
+- **Data Source**: Yodlee bank integration, AI categorization (Groq), real transactions
+- **Sidebar**: `LiveSidebar` component
+- **Features**:
+  - Bank account connection via Yodlee FastLink
+  - Automatic transaction syncing
+  - AI-powered transaction categorization
+  - Burn/runway modeling
+  - Raise recommendations
+  - Action plan generation
 
 ## User Preferences
 
@@ -77,10 +100,11 @@ Preferred communication style: Simple, everyday language.
 
 **Financial Data:**
 - `documents` - Uploaded financial documents (PDFs, CSVs, images) with cloud storage URLs
-- `transactions` - Normalized transaction records extracted from documents
+- `transactions` - Normalized transaction records (enhanced with Yodlee fields: `bankAccountId`, `yodleeTransactionId`, `source`, `vendorOriginal`, `vendorNormalized`, `classificationConfidence`, `metadata`)
 - `vendors` - Vendor/supplier master data
 - `categories` - Spending categories for classification
 - `departments` - Organizational departments for allocation
+- `bank_accounts` - Connected bank accounts from Yodlee (Live Mode)
 
 **Intelligence Layer:**
 - `insights` - AI-generated financial insights with severity levels
@@ -88,6 +112,9 @@ Preferred communication style: Simple, everyday language.
 - `budget_lines` - Category-level budget allocations
 - `action_plans` - Monthly action plans with priority levels
 - `action_items` - Specific tasks within action plans
+- `burn_metrics` - Calculated financial metrics (gross burn, net burn, runway, cash balance)
+- `raise_recommendations` - AI-generated fundraising suggestions
+- `planned_hires` - Future headcount plans for runway calculations
 
 **Integrations:**
 - `integration_connections` - Third-party service connections (Stripe, Plaid, QuickBooks)

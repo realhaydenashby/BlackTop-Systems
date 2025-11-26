@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { LiveSidebar } from "@/components/live-sidebar";
 import { TopBar } from "@/components/top-bar";
 import { MarketingLayout } from "@/layouts/MarketingLayout";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,6 +29,8 @@ import ActionPlans from "@/pages/action-plans";
 import Resources from "@/pages/resources";
 import Integrations from "@/pages/integrations";
 import Settings from "@/pages/settings";
+// Live Mode Pages
+import BankConnect from "@/pages/app/bank-connect";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -59,6 +62,27 @@ function AppLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider style={style as React.CSSProperties}>
       <div className="flex h-screen w-full">
         <AppSidebar />
+        <div className="flex flex-col flex-1">
+          <TopBar />
+          <main className="flex-1 overflow-auto">
+            {children}
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+function LiveAppLayout({ children }: { children: React.ReactNode }) {
+  const style = {
+    "--sidebar-width": "16rem",
+    "--sidebar-width-icon": "3rem",
+  };
+
+  return (
+    <SidebarProvider style={style as React.CSSProperties}>
+      <div className="flex h-screen w-full">
+        <LiveSidebar />
         <div className="flex flex-col flex-1">
           <TopBar />
           <main className="flex-1 overflow-auto">
@@ -111,6 +135,18 @@ function ProtectedRouter() {
   );
 }
 
+function LiveModeRouter() {
+  return (
+    <LiveAppLayout>
+      <Switch>
+        <Route path="/app/connect" component={() => <ProtectedRoute component={BankConnect} />} />
+        <Route path="/app/settings" component={() => <ProtectedRoute component={Settings} />} />
+        <Route component={NotFound} />
+      </Switch>
+    </LiveAppLayout>
+  );
+}
+
 function RouterInner() {
   const { user, isLoading } = useAuth();
   const [location] = useLocation();
@@ -127,6 +163,9 @@ function RouterInner() {
     "/company/contact"
   ].some(route => cleanLocation === route || cleanLocation.startsWith(route + "/"));
 
+  // Check if route is a Live Mode route (/app/*)
+  const isLiveModeRoute = cleanLocation.startsWith("/app/");
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -139,6 +178,11 @@ function RouterInner() {
 
   if (isMarketingRoute) {
     return <PublicRouter />;
+  }
+
+  // Route to Live Mode for /app/* paths
+  if (isLiveModeRoute && user) {
+    return <LiveModeRouter />;
   }
 
   return user ? <ProtectedRouter /> : <PublicRouter />;
