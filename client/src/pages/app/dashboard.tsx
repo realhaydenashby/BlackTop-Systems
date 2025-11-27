@@ -23,10 +23,32 @@ import {
   Plus,
   Building2,
   FileSpreadsheet,
+  Calendar,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
 import { format, parseISO } from "date-fns";
+
+interface WeeklyChange {
+  type: string;
+  title: string;
+  description: string;
+  change: number;
+  severity: "info" | "warning" | "success";
+}
+
+interface WeeklyChangesData {
+  changes: WeeklyChange[];
+  period: { start: string | null; end: string | null };
+  stats?: {
+    thisWeekSpend: number;
+    lastWeekSpend: number;
+    thisWeekRevenue: number;
+    lastWeekRevenue: number;
+    transactionCount: number;
+  };
+}
 
 interface DashboardAnalytics {
   hasData: boolean;
@@ -258,6 +280,97 @@ function EmptyState() {
   );
 }
 
+function WeeklyChangesCard() {
+  const { data: weeklyData, isLoading } = useQuery<WeeklyChangesData>({
+    queryKey: ["/api/live/weekly-changes"],
+  });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            <CardTitle className="text-lg">What Changed This Week</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!weeklyData || weeklyData.changes.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            <CardTitle className="text-lg">What Changed This Week</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-center py-4">
+            No significant changes detected this week
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const severityColors = {
+    info: "bg-blue-500/10 border-blue-500/20 text-blue-600",
+    warning: "bg-yellow-500/10 border-yellow-500/20 text-yellow-600",
+    success: "bg-green-500/10 border-green-500/20 text-green-600",
+  };
+
+  const severityIcons = {
+    info: <Calendar className="h-4 w-4" />,
+    warning: <AlertTriangle className="h-4 w-4" />,
+    success: <TrendingUp className="h-4 w-4" />,
+  };
+
+  return (
+    <Card data-testid="card-weekly-changes">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            <CardTitle className="text-lg">What Changed This Week</CardTitle>
+          </div>
+          {weeklyData.period.start && (
+            <Badge variant="outline" className="text-xs">
+              {format(parseISO(weeklyData.period.start), "MMM d")} - {format(new Date(), "MMM d")}
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {weeklyData.changes.map((change, i) => (
+          <div
+            key={i}
+            className={`p-3 rounded-lg border ${severityColors[change.severity]}`}
+            data-testid={`change-item-${i}`}
+          >
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex-shrink-0">
+                {severityIcons[change.severity]}
+              </div>
+              <div>
+                <p className="font-medium text-sm">{change.title}</p>
+                <p className="text-sm opacity-80">{change.description}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AppDashboard() {
   const { user } = useAuth();
 
@@ -305,6 +418,15 @@ export default function AppDashboard() {
     ? format(parseISO(data.runway.zeroDate), "MMMM yyyy")
     : "N/A";
 
+  const runwayMonths = data.runway.months;
+  const runwayStatus = !runwayMonths ? "profitable" : runwayMonths < 6 ? "critical" : runwayMonths < 12 ? "warning" : "healthy";
+  const statusColors = {
+    profitable: "text-green-500",
+    healthy: "text-green-500",
+    warning: "text-yellow-500",
+    critical: "text-red-500",
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -321,7 +443,57 @@ export default function AppDashboard() {
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
+        <CardContent className="pt-8 pb-8 relative">
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted">
+              <Clock className="h-4 w-4" />
+              <span className="text-sm font-medium">Current Runway</span>
+            </div>
+            
+            <div className="space-y-2" data-testid="hero-runway">
+              {runwayMonths ? (
+                <>
+                  <p className={`text-7xl font-bold tracking-tight ${statusColors[runwayStatus]}`}>
+                    {runwayMonths.toFixed(1)}
+                  </p>
+                  <p className="text-xl text-muted-foreground">months</p>
+                </>
+              ) : (
+                <p className={`text-5xl font-bold tracking-tight ${statusColors[runwayStatus]}`}>
+                  Cash flow positive
+                </p>
+              )}
+            </div>
+
+            {runwayMonths && (
+              <p className="text-muted-foreground">
+                Cash runs out {zeroDateFormatted}
+              </p>
+            )}
+
+            <div className="flex items-center justify-center gap-8 pt-4">
+              <div className="text-center">
+                <p className="text-2xl font-semibold">{formatCurrency(data.runway.currentCash)}</p>
+                <p className="text-sm text-muted-foreground">Cash Balance</p>
+              </div>
+              <div className="h-8 w-px bg-border" />
+              <div className="text-center">
+                <p className="text-2xl font-semibold">{formatCurrency(data.burn.net)}</p>
+                <p className="text-sm text-muted-foreground">Monthly Burn</p>
+              </div>
+              <div className="h-8 w-px bg-border" />
+              <div className="text-center">
+                <p className="text-2xl font-semibold">{formatCurrency(data.revenue.total / 3)}</p>
+                <p className="text-sm text-muted-foreground">Monthly Revenue</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard
           title="Cash Balance"
           value={formatCurrency(data.runway.currentCash)}
@@ -339,13 +511,9 @@ export default function AppDashboard() {
           subtitle="3-month average"
           icon={TrendingUp}
         />
-        <MetricCard
-          title="Runway"
-          value={data.runway.months ? `${data.runway.months.toFixed(1)} months` : "Profitable"}
-          subtitle={data.runway.months ? `Zero cash: ${zeroDateFormatted}` : undefined}
-          icon={Clock}
-        />
       </div>
+
+      <WeeklyChangesCard />
 
       {data.insights.length > 0 && (
         <Card>

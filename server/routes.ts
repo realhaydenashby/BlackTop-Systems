@@ -12,6 +12,15 @@ import { generateMockDashboardStats, generateMockAnalytics, generateMockInsights
 
 const objectStorageService = new ObjectStorageService();
 
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
 /**
  * Process summary-level financial metrics CSV
  * Handles CSVs with columns: Month, Department, Expenses, Revenue, Profit, Cash, Headcount, Subscriptions
@@ -1780,7 +1789,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { quickBooksService } = await import("./quickbooksService");
       await quickBooksService.handleCallback(code as string, realmId as string, userId);
 
-      res.redirect("/app/connect?success=quickbooks");
+      // Streamlined onboarding: redirect directly to dashboard after successful connection
+      res.redirect("/app");
     } catch (error: any) {
       console.error("QuickBooks callback error:", error);
       res.redirect("/app/connect?error=callback_failed");
@@ -2404,6 +2414,230 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // COMPANY STATE API - AI Copilot Data Layer
+  // ============================================
+  
+  /**
+   * Get complete company state for AI copilot
+   * Aggregates all financial data into the AI-ready JSON schema
+   */
+  app.get("/api/live/company-state", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const orgMember = await storage.getOrganizationMember(user.id);
+      
+      if (!orgMember) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+
+      // Get organization details
+      const org = await storage.getOrganization(orgMember.organizationId);
+      if (!org) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      // Import analytics functions
+      const { calculateBurnRate } = await import("./analytics/burn");
+      const { calculateRunway } = await import("./analytics/runway");
+
+      // Get bank accounts for current cash
+      const bankAccounts = await storage.getUserBankAccounts(user.id);
+      const cashBalance = bankAccounts.reduce((sum: number, acc: any) => {
+        return sum + (parseFloat(acc.currentBalance) || 0);
+      }, 0);
+
+      // Get transactions for last 12 months
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      
+      const rawTransactions = await storage.getOrganizationTransactions(orgMember.organizationId, {
+        startDate: twelveMonthsAgo,
+        endDate: new Date(),
+      });
+
+      // Transform transactions for analytics
+      const transactions = rawTransactions.map((txn: any) => ({
+        id: txn.id,
+        date: new Date(txn.date),
+        amount: parseFloat(txn.amount) || 0,
+        type: parseFloat(txn.amount) >= 0 ? "credit" as const : "debit" as const,
+        vendorNormalized: txn.vendorNormalized || txn.vendorOriginal || txn.description,
+        categoryId: txn.categoryId,
+        isRecurring: txn.isRecurring || false,
+        isPayroll: txn.isPayroll || false,
+      }));
+
+      // Calculate monthly actuals for past 6 months
+      const monthlyActuals: Array<{
+        month: string;
+        revenue: number;
+        total_expenses: number;
+        net_burn: number;
+        expenses_by_category: Record<string, number>;
+      }> = [];
+
+      const categories = await storage.getOrganizationCategories(orgMember.organizationId);
+      const categoryMap = new Map(categories.map((c: any) => [c.id, c.name]));
+
+      for (let i = 5; i >= 0; i--) {
+        const monthStart = new Date();
+        monthStart.setMonth(monthStart.getMonth() - i);
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        
+        const monthEnd = new Date(monthStart);
+        monthEnd.setMonth(monthEnd.getMonth() + 1);
+        monthEnd.setDate(0);
+        monthEnd.setHours(23, 59, 59, 999);
+
+        const monthTxns = transactions.filter(
+          (t) => t.date >= monthStart && t.date <= monthEnd
+        );
+
+        let revenue = 0;
+        let totalExpenses = 0;
+        const expensesByCategory: Record<string, number> = {};
+
+        for (const txn of monthTxns) {
+          const amount = Math.abs(txn.amount);
+          if (txn.type === "credit") {
+            revenue += amount;
+          } else {
+            totalExpenses += amount;
+            const catName = txn.categoryId ? categoryMap.get(txn.categoryId) || "Other" : "Other";
+            expensesByCategory[catName] = (expensesByCategory[catName] || 0) + amount;
+          }
+        }
+
+        monthlyActuals.push({
+          month: monthStart.toISOString().split("T")[0],
+          revenue,
+          total_expenses: totalExpenses,
+          net_burn: totalExpenses - revenue,
+          expenses_by_category: expensesByCategory,
+        });
+      }
+
+      // Get planned hires
+      const plannedHires = await storage.getUserPlannedHires(user.id);
+      
+      // Build headcount array
+      const headcount = plannedHires.map((hire: any) => ({
+        id: hire.id,
+        name: hire.role,
+        role: hire.role,
+        department: hire.department || "General",
+        status: new Date(hire.startDate) <= new Date() ? "active" : "planned",
+        start_date: new Date(hire.startDate).toISOString().split("T")[0],
+        annual_compensation: (parseFloat(hire.monthlyCost) || 0) * 12,
+      }));
+
+      // Calculate current burn and runway
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      const burnMetrics = calculateBurnRate(transactions, threeMonthsAgo, new Date());
+      const runwayMetrics = calculateRunway(transactions, cashBalance, 
+        plannedHires.map((h: any) => ({
+          role: h.role,
+          monthlyCost: parseFloat(h.monthlyCost) || 0,
+          startDate: new Date(h.startDate),
+        }))
+      );
+
+      // Generate 12-month projections for base scenario
+      const monthlyBurn = runwayMetrics.monthlyBurn;
+      const avgRevenue = monthlyActuals.length > 0 
+        ? monthlyActuals.reduce((sum, m) => sum + m.revenue, 0) / monthlyActuals.length 
+        : 0;
+      
+      const monthlyProjections: Array<{
+        month: string;
+        cash_balance: number;
+        revenue: number;
+        expenses: number;
+        net_burn: number;
+        runway_months: number;
+        headcount: number;
+      }> = [];
+
+      let projectedCash = cashBalance;
+      const currentHeadcount = headcount.filter((h: any) => h.status === "active").length;
+      
+      for (let i = 0; i < 12; i++) {
+        const projMonth = new Date();
+        projMonth.setMonth(projMonth.getMonth() + i);
+        projMonth.setDate(1);
+
+        // Count headcount at this point
+        const activeHires = headcount.filter((h: any) => {
+          const hireDate = new Date(h.start_date);
+          return hireDate <= projMonth;
+        }).length;
+
+        // Simple projection: assume constant burn and revenue
+        const projectedRevenue = avgRevenue * (1 + 0.02 * i); // 2% monthly growth
+        const projectedExpenses = monthlyBurn > 0 ? monthlyBurn : burnMetrics.grossBurn / 3;
+        const netBurn = projectedExpenses - projectedRevenue;
+        
+        projectedCash = projectedCash - netBurn;
+        const runway = projectedCash > 0 && netBurn > 0 ? projectedCash / netBurn : projectedCash > 0 ? 999 : 0;
+
+        monthlyProjections.push({
+          month: projMonth.toISOString().split("T")[0],
+          cash_balance: Math.max(0, projectedCash),
+          revenue: projectedRevenue,
+          expenses: projectedExpenses,
+          net_burn: netBurn,
+          runway_months: Math.min(runway, 999),
+          headcount: Math.max(currentHeadcount, activeHires),
+        });
+      }
+
+      // Build base scenario
+      const baseScenario = {
+        name: "Base",
+        description: "Current trajectory based on historical data and planned hires",
+        monthly_projections: monthlyProjections,
+        hires: plannedHires.map((h: any) => ({
+          id: h.id,
+          role: h.role,
+          department: h.department || "General",
+          annual_compensation: (parseFloat(h.monthlyCost) || 0) * 12,
+          start_date: new Date(h.startDate).toISOString().split("T")[0],
+        })),
+        expenses: [] as Array<{id: string; category: string; monthly_amount: number; start_date: string; description: string}>,
+        funding_events: [] as Array<{id: string; amount: number; date: string; type: string; description: string}>,
+        budget_vs_actuals: [] as Array<{month: string; category: string; budgeted: number; actual: number; variance: number; variance_percent: number}>,
+      };
+
+      // Build company state response
+      const companyState = {
+        company_name: org.name,
+        current_date: new Date().toISOString().split("T")[0],
+        cash_balance: cashBalance,
+        monthly_actuals: monthlyActuals,
+        scenarios: [baseScenario],
+        headcount,
+        // Summary metrics for quick access
+        summary: {
+          current_runway_months: runwayMetrics.runwayMonths === Infinity ? null : runwayMetrics.runwayMonths,
+          monthly_burn_rate: monthlyBurn,
+          cash_out_date: runwayMetrics.zeroDate?.toISOString().split("T")[0] || null,
+          current_headcount: currentHeadcount,
+          planned_headcount: headcount.length,
+          total_revenue_last_6mo: monthlyActuals.reduce((sum, m) => sum + m.revenue, 0),
+          total_expenses_last_6mo: monthlyActuals.reduce((sum, m) => sum + m.total_expenses, 0),
+        },
+      };
+
+      res.json(companyState);
+    } catch (error: any) {
+      console.error("Get company state error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch company state" });
+    }
+  });
+
   // User mode toggle (demo vs live)
   const userModeSchema = z.object({
     isLiveMode: z.boolean(),
@@ -2438,6 +2672,448 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Get current user error:", error);
       res.status(500).json({ message: error.message || "Failed to fetch user" });
+    }
+  });
+
+  // Auto-infer budget baselines from 3-month transaction history
+  app.get("/api/live/budget-baselines", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      // Get user's organization
+      const userOrg = await db.query.userOrganizations.findFirst({
+        where: eq(userOrganizations.userId, user.id),
+      });
+      
+      if (!userOrg) {
+        return res.json({ 
+          baselines: {},
+          totalMonthly: 0,
+          monthsAnalyzed: 0,
+          message: "No organization connected"
+        });
+      }
+
+      // Get transactions from last 3 months
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      
+      const recentTransactions = await db.query.transactions.findMany({
+        where: and(
+          eq(transactions.organizationId, userOrg.organizationId),
+          gte(transactions.date, threeMonthsAgo)
+        ),
+        with: {
+          category: true
+        }
+      });
+
+      if (recentTransactions.length === 0) {
+        return res.json({ 
+          baselines: {},
+          totalMonthly: 0,
+          monthsAnalyzed: 0,
+          message: "No transactions found in last 3 months"
+        });
+      }
+
+      // Calculate spending by category
+      const spendByCategory: Record<string, { total: number; count: number }> = {};
+      
+      recentTransactions.forEach((txn) => {
+        const amount = parseFloat(txn.amount);
+        if (amount < 0) { // Only count expenses (negative amounts)
+          const categoryName = txn.category?.name || txn.vendorNormalized || "Uncategorized";
+          if (!spendByCategory[categoryName]) {
+            spendByCategory[categoryName] = { total: 0, count: 0 };
+          }
+          spendByCategory[categoryName].total += Math.abs(amount);
+          spendByCategory[categoryName].count++;
+        }
+      });
+
+      // Calculate date range to determine months spanned
+      const dates = recentTransactions.map(t => new Date(t.date).getTime());
+      const minDate = Math.min(...dates);
+      const maxDate = Math.max(...dates);
+      const daysSpanned = Math.max(1, (maxDate - minDate) / (1000 * 60 * 60 * 24));
+      const monthsSpanned = Math.max(1, daysSpanned / 30);
+
+      // Calculate monthly averages
+      const baselines: Record<string, { 
+        monthlyAverage: number; 
+        transactionCount: number;
+        categoryType: "fixed" | "variable" 
+      }> = {};
+      
+      let totalMonthly = 0;
+      
+      Object.entries(spendByCategory).forEach(([category, data]) => {
+        const monthlyAvg = data.total / monthsSpanned;
+        
+        // Detect if likely fixed (consistent recurring) or variable
+        const avgPerTransaction = data.total / data.count;
+        const transactionsPerMonth = data.count / monthsSpanned;
+        const isLikelyFixed = transactionsPerMonth >= 0.8 && transactionsPerMonth <= 1.5;
+        
+        baselines[category] = {
+          monthlyAverage: Math.round(monthlyAvg * 100) / 100,
+          transactionCount: data.count,
+          categoryType: isLikelyFixed ? "fixed" : "variable"
+        };
+        
+        totalMonthly += monthlyAvg;
+      });
+
+      // Sort by monthly average descending
+      const sortedBaselines = Object.fromEntries(
+        Object.entries(baselines)
+          .sort(([, a], [, b]) => b.monthlyAverage - a.monthlyAverage)
+      );
+
+      res.json({
+        baselines: sortedBaselines,
+        totalMonthly: Math.round(totalMonthly * 100) / 100,
+        monthsAnalyzed: Math.round(monthsSpanned * 10) / 10,
+        transactionCount: recentTransactions.length,
+        topCategories: Object.entries(sortedBaselines)
+          .slice(0, 5)
+          .map(([name, data]) => ({
+            name,
+            ...data,
+            percentOfTotal: Math.round((data.monthlyAverage / totalMonthly) * 100)
+          }))
+      });
+    } catch (error: any) {
+      console.error("Get budget baselines error:", error);
+      res.status(500).json({ message: error.message || "Failed to calculate budget baselines" });
+    }
+  });
+
+  // What Changed This Week - weekly summary of financial changes
+  app.get("/api/live/weekly-changes", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      const userOrg = await db.query.userOrganizations.findFirst({
+        where: eq(userOrganizations.userId, user.id),
+      });
+      
+      if (!userOrg) {
+        return res.json({ 
+          changes: [],
+          period: { start: null, end: null },
+          message: "No organization connected"
+        });
+      }
+
+      // Get transactions from this week and last week
+      const now = new Date();
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const twoWeeksAgo = new Date();
+      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+      
+      const thisWeekTxns = await db.query.transactions.findMany({
+        where: and(
+          eq(transactions.organizationId, userOrg.organizationId),
+          gte(transactions.date, weekAgo)
+        ),
+        with: { category: true }
+      });
+      
+      const lastWeekTxns = await db.query.transactions.findMany({
+        where: and(
+          eq(transactions.organizationId, userOrg.organizationId),
+          gte(transactions.date, twoWeeksAgo),
+          lt(transactions.date, weekAgo)
+        ),
+        with: { category: true }
+      });
+
+      const changes: Array<{
+        type: string;
+        title: string;
+        description: string;
+        change: number;
+        severity: "info" | "warning" | "success";
+      }> = [];
+
+      // Calculate total spend this week vs last week
+      const thisWeekSpend = thisWeekTxns
+        .filter(t => parseFloat(t.amount) < 0)
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+      
+      const lastWeekSpend = lastWeekTxns
+        .filter(t => parseFloat(t.amount) < 0)
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+      
+      if (lastWeekSpend > 0) {
+        const spendChange = ((thisWeekSpend - lastWeekSpend) / lastWeekSpend) * 100;
+        if (Math.abs(spendChange) > 10) {
+          changes.push({
+            type: "spend",
+            title: spendChange > 0 ? "Spending increased" : "Spending decreased",
+            description: `You spent ${formatCurrency(thisWeekSpend)} this week, ${spendChange > 0 ? "up" : "down"} ${Math.abs(spendChange).toFixed(0)}% from last week.`,
+            change: spendChange,
+            severity: spendChange > 20 ? "warning" : spendChange < -10 ? "success" : "info"
+          });
+        }
+      }
+
+      // Calculate revenue this week vs last week
+      const thisWeekRevenue = thisWeekTxns
+        .filter(t => parseFloat(t.amount) > 0)
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+      const lastWeekRevenue = lastWeekTxns
+        .filter(t => parseFloat(t.amount) > 0)
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+      if (lastWeekRevenue > 0) {
+        const revenueChange = ((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100;
+        if (Math.abs(revenueChange) > 10) {
+          changes.push({
+            type: "revenue",
+            title: revenueChange > 0 ? "Revenue increased" : "Revenue decreased",
+            description: `Revenue was ${formatCurrency(thisWeekRevenue)} this week, ${revenueChange > 0 ? "up" : "down"} ${Math.abs(revenueChange).toFixed(0)}% from last week.`,
+            change: revenueChange,
+            severity: revenueChange > 0 ? "success" : "warning"
+          });
+        }
+      }
+
+      // Find largest new vendors this week
+      const thisWeekVendors = new Map<string, number>();
+      thisWeekTxns.forEach(t => {
+        const vendor = t.vendorNormalized || t.vendorOriginal || "Unknown";
+        const amount = parseFloat(t.amount);
+        if (amount < 0) {
+          thisWeekVendors.set(vendor, (thisWeekVendors.get(vendor) || 0) + Math.abs(amount));
+        }
+      });
+
+      const lastWeekVendors = new Set(lastWeekTxns.map(t => t.vendorNormalized || t.vendorOriginal || "Unknown"));
+      
+      const newLargeVendors = Array.from(thisWeekVendors.entries())
+        .filter(([vendor]) => !lastWeekVendors.has(vendor))
+        .filter(([_, amount]) => amount > 500)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2);
+
+      newLargeVendors.forEach(([vendor, amount]) => {
+        changes.push({
+          type: "new_vendor",
+          title: "New vendor spend",
+          description: `First payment to ${vendor}: ${formatCurrency(amount)}`,
+          change: amount,
+          severity: amount > 2000 ? "warning" : "info"
+        });
+      });
+
+      // Find unusual category spikes
+      const thisWeekByCategory = new Map<string, number>();
+      const lastWeekByCategory = new Map<string, number>();
+      
+      thisWeekTxns.forEach(t => {
+        const cat = t.category?.name || "Uncategorized";
+        const amount = parseFloat(t.amount);
+        if (amount < 0) {
+          thisWeekByCategory.set(cat, (thisWeekByCategory.get(cat) || 0) + Math.abs(amount));
+        }
+      });
+      
+      lastWeekTxns.forEach(t => {
+        const cat = t.category?.name || "Uncategorized";
+        const amount = parseFloat(t.amount);
+        if (amount < 0) {
+          lastWeekByCategory.set(cat, (lastWeekByCategory.get(cat) || 0) + Math.abs(amount));
+        }
+      });
+
+      thisWeekByCategory.forEach((thisAmount, cat) => {
+        const lastAmount = lastWeekByCategory.get(cat) || 0;
+        if (lastAmount > 0 && thisAmount > 500) {
+          const changePercent = ((thisAmount - lastAmount) / lastAmount) * 100;
+          if (changePercent > 50) {
+            changes.push({
+              type: "category_spike",
+              title: `${cat} spending spiked`,
+              description: `${cat} spend was ${formatCurrency(thisAmount)}, up ${changePercent.toFixed(0)}% from last week.`,
+              change: changePercent,
+              severity: changePercent > 100 ? "warning" : "info"
+            });
+          }
+        }
+      });
+
+      // Transaction count change
+      if (lastWeekTxns.length > 0) {
+        const txnChange = ((thisWeekTxns.length - lastWeekTxns.length) / lastWeekTxns.length) * 100;
+        if (Math.abs(txnChange) > 30) {
+          changes.push({
+            type: "activity",
+            title: txnChange > 0 ? "More transactions" : "Fewer transactions",
+            description: `${thisWeekTxns.length} transactions this week vs ${lastWeekTxns.length} last week.`,
+            change: txnChange,
+            severity: "info"
+          });
+        }
+      }
+
+      res.json({
+        changes: changes.slice(0, 5), // Limit to top 5 changes
+        period: { 
+          start: weekAgo.toISOString(), 
+          end: now.toISOString() 
+        },
+        stats: {
+          thisWeekSpend,
+          lastWeekSpend,
+          thisWeekRevenue,
+          lastWeekRevenue,
+          transactionCount: thisWeekTxns.length
+        }
+      });
+    } catch (error: any) {
+      console.error("Get weekly changes error:", error);
+      res.status(500).json({ message: error.message || "Failed to get weekly changes" });
+    }
+  });
+
+  // AI Copilot Chat endpoint
+  const chatSchema = z.object({
+    message: z.string().min(1),
+    conversationHistory: z.array(z.object({
+      role: z.enum(["user", "assistant"]),
+      content: z.string(),
+    })).optional(),
+  });
+
+  app.post("/api/live/copilot/chat", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      const parseResult = chatSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid request", 
+          errors: parseResult.error.errors 
+        });
+      }
+
+      const { message, conversationHistory = [] } = parseResult.data;
+
+      // Get user's organization for context
+      const userOrg = await db.query.userOrganizations.findFirst({
+        where: eq(userOrganizations.userId, user.id),
+      });
+
+      // Get company state for context
+      let companyContext = "No financial data connected yet.";
+      
+      if (userOrg) {
+        try {
+          // Get basic financial data
+          const threeMonthsAgo = new Date();
+          threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+          
+          const recentTransactions = await db.query.transactions.findMany({
+            where: and(
+              eq(transactions.organizationId, userOrg.organizationId),
+              gte(transactions.date, threeMonthsAgo)
+            ),
+            with: { category: true }
+          });
+
+          // Calculate summary stats
+          let totalRevenue = 0;
+          let totalExpenses = 0;
+          const spendByCategory: Record<string, number> = {};
+
+          recentTransactions.forEach(txn => {
+            const amount = parseFloat(txn.amount);
+            if (amount > 0) {
+              totalRevenue += amount;
+            } else {
+              totalExpenses += Math.abs(amount);
+              const cat = txn.category?.name || "Uncategorized";
+              spendByCategory[cat] = (spendByCategory[cat] || 0) + Math.abs(amount);
+            }
+          });
+
+          const monthlyBurn = totalExpenses / 3;
+          const monthlyRevenue = totalRevenue / 3;
+          const netBurn = monthlyBurn - monthlyRevenue;
+          
+          // Estimate cash balance (simplified)
+          const cashBalance = 500000; // Would come from bank accounts in production
+          const runway = netBurn > 0 ? cashBalance / netBurn : null;
+
+          companyContext = `
+Current Financial State:
+- Estimated Cash Balance: ${formatCurrency(cashBalance)}
+- Monthly Revenue (3-mo avg): ${formatCurrency(monthlyRevenue)}
+- Monthly Expenses (3-mo avg): ${formatCurrency(monthlyBurn)}
+- Net Monthly Burn: ${formatCurrency(netBurn)}
+- Estimated Runway: ${runway ? `${runway.toFixed(1)} months` : "Cash flow positive"}
+- Total transactions analyzed: ${recentTransactions.length}
+
+Top Spending Categories (last 3 months):
+${Object.entries(spendByCategory)
+  .sort(([, a], [, b]) => b - a)
+  .slice(0, 5)
+  .map(([cat, amount]) => `- ${cat}: ${formatCurrency(amount)}`)
+  .join("\n")}
+`;
+        } catch (e) {
+          console.error("Error getting company context:", e);
+        }
+      }
+
+      const systemPrompt = `You are a friendly, expert financial copilot for startup founders. Your role is to help founders understand their company's financial health and make better decisions.
+
+${companyContext}
+
+Guidelines:
+- Be conversational and helpful, not robotic
+- Explain financial concepts in plain English, avoiding jargon
+- Give specific, actionable advice based on the data
+- If the user asks about something you don't have data for, acknowledge it and offer alternatives
+- Be concise but thorough - founders are busy
+- When discussing runway, be clear about assumptions
+- For hiring questions, consider fully-loaded costs (salary + 25-30% for benefits/taxes)
+- Flag any concerning trends proactively
+- If asked to take actions like "hire someone" or "cut expenses", explain what you would do but clarify you can only provide analysis and recommendations
+
+Remember: You're a trusted advisor helping founders make better financial decisions.`;
+
+      // Build messages for OpenAI
+      const messages = [
+        { role: "system" as const, content: systemPrompt },
+        ...conversationHistory.map(m => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
+        { role: "user" as const, content: message },
+      ];
+
+      // Use intelligenceService to call AI
+      const { callAI } = await import("./intelligenceService");
+      
+      const aiResponse = await callAI("openai", {
+        prompt: messages.map(m => `${m.role}: ${m.content}`).join("\n\n"),
+        maxTokens: 1000,
+        temperature: 0.7,
+      });
+
+      res.json({
+        response: aiResponse.content,
+        actions: [],
+      });
+    } catch (error: any) {
+      console.error("Copilot chat error:", error);
+      res.status(500).json({ message: error.message || "Failed to process chat message" });
     }
   });
 

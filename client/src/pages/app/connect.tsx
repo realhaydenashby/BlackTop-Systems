@@ -173,6 +173,7 @@ export default function Connect() {
   });
 
   // Sync accounts after FastLink success
+  const [, navigate] = useLocation();
   const syncAccountsMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/live/yodlee/sync-accounts");
@@ -181,11 +182,13 @@ export default function Connect() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/live/bank-accounts"] });
       toast({
-        title: "Accounts Synced",
-        description: `${data.accounts?.length || 0} account(s) synchronized.`,
+        title: "Bank Connected",
+        description: `${data.accounts?.length || 0} account(s) connected. Redirecting to dashboard...`,
       });
       setShowFastLink(false);
       setFastLinkUrl(null);
+      // Streamlined onboarding: redirect to dashboard after successful connection
+      setTimeout(() => navigate("/app"), 1500);
     },
   });
 

@@ -37,6 +37,7 @@ import AppTransactions from "@/pages/app/transactions";
 import AppSettings from "@/pages/app/settings";
 import UploadPage from "@/pages/upload";
 import Workbook from "@/pages/app/forecasting/workbook";
+import Copilot from "@/pages/app/copilot";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -162,6 +163,7 @@ function LiveModeRouter() {
         <Route path="/app/upload" component={() => <ProtectedRoute component={UploadPage} />} />
         <Route path="/app/connect" component={() => <ProtectedRoute component={Connect} />} />
         <Route path="/app/forecasting/workbook" component={() => <ProtectedRoute component={Workbook} />} />
+        <Route path="/app/copilot" component={() => <ProtectedRoute component={Copilot} />} />
         <Route path="/app/settings" component={() => <ProtectedRoute component={AppSettings} />} />
         <Route component={NotFound} />
       </Switch>

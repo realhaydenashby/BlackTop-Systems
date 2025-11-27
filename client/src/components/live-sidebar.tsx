@@ -18,6 +18,7 @@ import {
   Settings,
   Calculator,
   TrendingUp,
+  Sparkles,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,11 @@ const mainMenuItems = [
     title: "Dashboard",
     url: "/app",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Copilot",
+    url: "/app/copilot",
+    icon: Sparkles,
   },
   {
     title: "Transactions",

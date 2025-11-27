@@ -1,9 +1,11 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Table, 
   TableBody, 
@@ -17,8 +19,7 @@ import {
   TrendingUp, 
   RotateCcw,
   Download,
-  Plus,
-  Info
+  Loader2
 } from "lucide-react";
 import { format, subMonths, addMonths } from "date-fns";
 import {
@@ -26,6 +27,26 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+interface CompanyState {
+  company_name: string;
+  current_date: string;
+  cash_balance: number;
+  monthly_actuals: Array<{
+    month: string;
+    revenue: number;
+    total_expenses: number;
+    net_burn: number;
+    expenses_by_category: Record<string, number>;
+  }>;
+  summary: {
+    current_runway_months: number | null;
+    monthly_burn_rate: number;
+    cash_out_date: string | null;
+    current_headcount: number;
+    planned_headcount: number;
+  };
+}
 
 interface MonthRow {
   month: Date;
@@ -55,25 +76,33 @@ function formatMonth(date: Date): string {
   return format(date, "MMM yyyy");
 }
 
-function generateInitialData(): MonthRow[] {
+function generateDataFromCompanyState(companyState: CompanyState | null): MonthRow[] {
   const now = new Date();
   const rows: MonthRow[] = [];
   
   const historicalMonths = 3;
   const projectedMonths = 9;
   
-  let runningCash = 850000;
+  let runningCash = companyState?.cash_balance || 500000;
+  
+  const actuals = companyState?.monthly_actuals || [];
+  const recentActuals = actuals.slice(-historicalMonths);
   
   for (let i = historicalMonths - 1; i >= 0; i--) {
     const month = subMonths(now, i + 1);
-    const revenue = 45000 + Math.floor(Math.random() * 10000);
+    const actualData = recentActuals[historicalMonths - 1 - i];
+    
+    const revenue = actualData?.revenue || 45000 + (i * 2000);
+    const totalExpenses = actualData?.total_expenses || 71000 + (i * 1000);
+    const expensesByCategory = actualData?.expenses_by_category || {};
+    
     const cogs = Math.floor(revenue * 0.25);
     const grossMargin = revenue - cogs;
-    const opexSoftware = 8500 + Math.floor(Math.random() * 1000);
-    const opexPayroll = 52000 + Math.floor(Math.random() * 3000);
-    const opexMarketing = 6000 + Math.floor(Math.random() * 2000);
-    const opexOther = 4500 + Math.floor(Math.random() * 1000);
-    const totalOpex = opexSoftware + opexPayroll + opexMarketing + opexOther;
+    const opexSoftware = expensesByCategory["Software"] || 8500;
+    const opexPayroll = expensesByCategory["Payroll"] || 52000;
+    const opexMarketing = expensesByCategory["Marketing"] || 6000;
+    const opexOther = totalExpenses - opexSoftware - opexPayroll - opexMarketing - cogs;
+    const totalOpex = opexSoftware + opexPayroll + opexMarketing + Math.max(0, opexOther);
     const netChange = grossMargin - totalOpex;
     runningCash += netChange;
     
@@ -89,7 +118,7 @@ function generateInitialData(): MonthRow[] {
       opexSoftware,
       opexPayroll,
       opexMarketing,
-      opexOther,
+      opexOther: Math.max(0, opexOther),
       totalOpex,
       netCash: runningCash,
       runway,
@@ -132,6 +161,10 @@ function generateInitialData(): MonthRow[] {
   }
   
   return rows;
+}
+
+function generateDefaultData(): MonthRow[] {
+  return generateDataFromCompanyState(null);
 }
 
 function EditableCell({
@@ -203,10 +236,23 @@ function EditableCell({
 }
 
 export default function Workbook() {
-  const [rows, setRows] = useState<MonthRow[]>(generateInitialData);
+  const { data: companyState, isLoading } = useQuery<CompanyState>({
+    queryKey: ["/api/live/company-state"],
+  });
+
+  const [rows, setRows] = useState<MonthRow[]>(() => generateDefaultData());
+  const [initialCash, setInitialCash] = useState(500000);
+
+  useEffect(() => {
+    if (companyState) {
+      const newRows = generateDataFromCompanyState(companyState);
+      setRows(newRows);
+      setInitialCash(companyState.cash_balance || 500000);
+    }
+  }, [companyState]);
 
   const recalculateDerived = useCallback((updatedRows: MonthRow[]): MonthRow[] => {
-    let runningCash = 850000;
+    let runningCash = initialCash;
     
     return updatedRows.map((row, index) => {
       const grossMargin = row.revenue - row.cogs;
@@ -230,7 +276,7 @@ export default function Workbook() {
         runway,
       };
     });
-  }, []);
+  }, [initialCash]);
 
   const updateCell = useCallback((rowIndex: number, field: keyof MonthRow, value: number) => {
     setRows((prevRows) => {
@@ -241,8 +287,12 @@ export default function Workbook() {
   }, [recalculateDerived]);
 
   const resetToDefaults = useCallback(() => {
-    setRows(generateInitialData());
-  }, []);
+    if (companyState) {
+      setRows(generateDataFromCompanyState(companyState));
+    } else {
+      setRows(generateDefaultData());
+    }
+  }, [companyState]);
 
   const historicalRows = rows.filter((r) => r.isActual);
   const projectedRows = rows.filter((r) => !r.isActual);
@@ -276,13 +326,20 @@ export default function Workbook() {
         </div>
       </div>
 
+      {isLoading && (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading financial data...
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Starting Cash</p>
-                <p className="text-2xl font-bold">{formatCurrency(850000)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(initialCash)}</p>
               </div>
             </div>
           </CardContent>

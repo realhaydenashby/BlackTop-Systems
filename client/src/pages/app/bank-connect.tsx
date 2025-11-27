@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Building2, Plus, RefreshCw, CheckCircle2, AlertCircle, Trash2, CreditCard, Landmark, Wallet, TrendingUp, Loader2, Upload } from "lucide-react";
 import type { BankAccount } from "@shared/schema";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 function getAccountIcon(accountType: string | null) {
   switch (accountType) {
@@ -36,6 +36,7 @@ function formatCurrency(amount: number | string | null, currency = "USD") {
 
 export default function BankConnect() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [showFastLink, setShowFastLink] = useState(false);
   const [fastLinkUrl, setFastLinkUrl] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -73,11 +74,13 @@ export default function BankConnect() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/live/bank-accounts"] });
       toast({
-        title: "Accounts Synced",
-        description: `${data.accounts?.length || 0} account(s) synchronized successfully.`,
+        title: "Bank Connected",
+        description: `${data.accounts?.length || 0} account(s) connected. Redirecting to dashboard...`,
       });
       setShowFastLink(false);
       setFastLinkUrl(null);
+      // Streamlined onboarding: redirect to dashboard after successful connection
+      setTimeout(() => navigate("/app"), 1500);
     },
   });
 
