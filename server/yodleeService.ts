@@ -59,9 +59,21 @@ class YodleeService {
   }
 
   /**
+   * Check if Yodlee credentials are configured
+   */
+  isConfigured(): boolean {
+    return !!(process.env.YODLEE_CLIENTID && process.env.YODLEE_SECRET);
+  }
+
+  /**
    * Get cobrand session token (required for all Yodlee API calls)
    */
   private async getCobrandToken(): Promise<string> {
+    // Check if credentials are configured
+    if (!this.isConfigured()) {
+      throw new Error("Bank connection is not configured. Please contact support to enable this feature.");
+    }
+
     // Check if we have a valid token
     if (this.cobrandToken && this.cobrandTokenExpiry && Date.now() < this.cobrandTokenExpiry) {
       return this.cobrandToken;
@@ -82,8 +94,15 @@ class YodleeService {
 
       return sessionToken;
     } catch (error: any) {
-      console.error("Yodlee cobrand auth error:", error.response?.data || error.message);
-      throw new Error("Failed to authenticate with Yodlee");
+      const errorCode = error.response?.data?.errorCode;
+      const errorMessage = error.response?.data?.errorMessage || error.message;
+      console.error("Yodlee cobrand auth error:", { errorCode, errorMessage, details: error.response?.data });
+      
+      // Provide user-friendly error messages
+      if (errorCode === "Y010" || errorCode === "Y001") {
+        throw new Error("Bank connection credentials are invalid or expired. Please contact support.");
+      }
+      throw new Error("Unable to connect to banking service. Please try again later.");
     }
   }
 
