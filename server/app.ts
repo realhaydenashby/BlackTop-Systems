@@ -18,9 +18,7 @@ const apiLimiter = rateLimit({
   message: { message: "Too many requests, please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return req.user?.id || req.ip || 'anonymous';
-  },
+  validate: { xForwardedForHeader: false },
 });
 
 const aiLimiter = rateLimit({
@@ -29,17 +27,16 @@ const aiLimiter = rateLimit({
   message: { message: "AI request limit reached. Please wait a minute." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return req.user?.id || req.ip || 'anonymous';
-  },
+  validate: { xForwardedForHeader: false },
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 50,
   message: { message: "Too many login attempts. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
 });
 
 export function log(message: string, source = "express") {

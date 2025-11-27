@@ -47,13 +47,21 @@ export async function callOpenAI(request: AIRequest): Promise<AIResponse> {
   
   messages.push({ role: "user", content: request.prompt });
 
+  console.log("[aiService] Calling OpenAI with", messages.length, "messages");
+  console.log("[aiService] User prompt length:", request.prompt?.length || 0);
+
   const completion = await openaiClient.chat.completions.create({
     model: "gpt-5",
     messages,
     max_completion_tokens: request.maxTokens || 8192,
-    temperature: request.temperature || 0.7,
     ...(request.jsonMode && { response_format: { type: "json_object" } }),
   });
+
+  console.log("[aiService] OpenAI completion:", JSON.stringify({
+    choicesCount: completion.choices?.length,
+    finishReason: completion.choices?.[0]?.finish_reason,
+    contentLength: completion.choices?.[0]?.message?.content?.length,
+  }));
 
   return {
     content: completion.choices[0]?.message?.content || "",

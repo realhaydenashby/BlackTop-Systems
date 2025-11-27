@@ -19,7 +19,8 @@ import {
   TrendingUp, 
   RotateCcw,
   Download,
-  Loader2
+  Loader2,
+  Info
 } from "lucide-react";
 import { format, subMonths, addMonths } from "date-fns";
 import {

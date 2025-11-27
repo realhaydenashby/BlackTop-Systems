@@ -1,10 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
 import { isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
-import { User, insertOrganizationSchema, insertDocumentSchema, insertTransactionSchema } from "@shared/schema";
+import { User, insertOrganizationSchema, insertDocumentSchema, insertTransactionSchema, organizationMembers, transactions } from "@shared/schema";
+import { eq, and, gte } from "drizzle-orm";
 import * as pdfParse from "pdf-parse";
 import Papa from "papaparse";
 import { subDays, startOfMonth, endOfMonth, addMonths } from "date-fns";
@@ -3005,8 +3007,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { message, conversationHistory = [] } = parseResult.data;
 
       // Get user's organization for context
-      const userOrg = await db.query.userOrganizations.findFirst({
-        where: eq(userOrganizations.userId, user.id),
+      const userOrg = await db.query.organizationMembers.findFirst({
+        where: eq(organizationMembers.userId, user.id),
       });
 
       // Get company state for context
@@ -3088,24 +3090,27 @@ Guidelines:
 
 Remember: You're a trusted advisor helping founders make better financial decisions.`;
 
-      // Build messages for OpenAI
-      const messages = [
-        { role: "system" as const, content: systemPrompt },
-        ...conversationHistory.map(m => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        })),
-        { role: "user" as const, content: message },
-      ];
+      // Build conversation history as a user prompt
+      let userPrompt = "";
+      if (conversationHistory.length > 0) {
+        userPrompt = conversationHistory.map(m => 
+          `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`
+        ).join("\n\n") + "\n\nUser: ";
+      }
+      userPrompt += message;
 
-      // Use intelligenceService to call AI
-      const { callAI } = await import("./intelligenceService");
+      // Use aiService to call AI
+      const { callAI } = await import("./aiService");
+      
+      console.log("[copilot] Calling AI with message:", message.substring(0, 100));
       
       const aiResponse = await callAI("openai", {
-        prompt: messages.map(m => `${m.role}: ${m.content}`).join("\n\n"),
-        maxTokens: 1000,
-        temperature: 0.7,
+        systemPrompt,
+        prompt: userPrompt,
+        maxTokens: 1500,
       });
+      
+      console.log("[copilot] AI response length:", aiResponse.content?.length || 0);
 
       res.json({
         response: aiResponse.content,
