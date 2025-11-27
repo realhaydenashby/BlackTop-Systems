@@ -90,13 +90,14 @@ Routes: `/dashboard`, `/transactions`, `/upload`, `/analytics`, `/fundraising`, 
 - Full-featured demo for evaluation before connecting real accounts
 
 ### Live Mode (/app/* - Auth Required)
-Routes: `/app`, `/app/transactions`, `/app/upload`, `/app/settings`, `/app/connect`
+Routes: `/app`, `/app/transactions`, `/app/upload`, `/app/settings`, `/app/connect`, `/app/forecasting/workbook`
 - Protected routes requiring Replit Auth (uses ProtectedRoute)
 - Uses real API calls via `liveDataService.ts`
 - TopBar shows "Live workspace" badge
 - **Dashboard**: Single page with collapsible sections (Spend, Revenue, Burn, Runway, Forecast, Raise, Hiring)
 - **Transactions**: Spreadsheet-style view with search, filter, categorization
 - **Connect**: Bank account connection via Yodlee FastLink
+- **Forecasting Workbook**: Spreadsheet-style scenario modeling with 12-month projections
 - **Settings**: Notifications, company info, integrations
 
 ### Mode Switching
@@ -130,6 +131,15 @@ Generates 3-5 actionable insights per sync:
 - Automatic category classification with confidence scores
 - Recurring transaction detection
 - Payroll identification
+
+### Scenario Modeling Workbook
+Located at `/app/forecasting/workbook`:
+- Spreadsheet-style interface with 3 historical + 9 projected months
+- Editable cells for projections (Revenue, COGS, OpEx categories)
+- Auto-calculating derived fields (Gross Margin, Net Cash, Runway)
+- Summary cards showing aggregated metrics
+- Reset and export functionality
+- Client-side state management with `useState` and `useCallback`
 
 ## Data Model
 
