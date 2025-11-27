@@ -216,6 +216,18 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async updateUserStripeInfo(userId: string, stripeInfo: {
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+  }): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({ ...stripeInfo, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
   async createOrganization(orgData: InsertOrganization): Promise<Organization> {
     const [org] = await db.insert(organizations).values(orgData).returning();
     return org;
