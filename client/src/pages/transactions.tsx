@@ -166,7 +166,7 @@ export default function Transactions() {
                   <TableHead>Category</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
-                  {isLive && <TableHead className="text-right">Actions</TableHead>}
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -193,19 +193,17 @@ export default function Transactions() {
                     <TableCell className={`text-right font-medium ${txn.type === "credit" ? "text-emerald-500" : ""}`}>
                       {txn.type === "credit" ? "+" : "-"}${Math.abs(txn.amount).toLocaleString()}
                     </TableCell>
-                    {isLive && (
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deleteMutation.mutate(txn.id)}
-                          disabled={deleteMutation.isPending}
-                          data-testid={`button-delete-${txn.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    )}
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteMutation.mutate(txn.id)}
+                        disabled={deleteMutation.isPending}
+                        data-testid={`button-delete-${txn.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

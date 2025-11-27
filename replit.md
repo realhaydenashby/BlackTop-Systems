@@ -80,15 +80,34 @@ Integrations → Ingestion → Normalize → Analytics → Insights → Notifs
 
 ## Two-Mode Architecture
 
-### Live Mode (/app/*)
+The app uses strict route-based separation between Demo and Live modes.
+
+### Demo Mode (Base Routes - No Auth Required)
+Routes: `/dashboard`, `/transactions`, `/upload`, `/analytics`, `/fundraising`, `/settings`, `/documents`, `/cash-flow`, `/budgets`, `/action-plans`, `/resources`, `/integrations`
+- Accessible without authentication (uses DemoRouter)
+- Uses `demoDataService.ts` for static mock data
+- TopBar shows "Demo workspace" badge
+- Full-featured demo for evaluation before connecting real accounts
+
+### Live Mode (/app/* - Auth Required)
+Routes: `/app`, `/app/transactions`, `/app/upload`, `/app/settings`, `/app/connect`
+- Protected routes requiring Replit Auth (uses ProtectedRoute)
+- Uses real API calls via `liveDataService.ts`
+- TopBar shows "Live workspace" badge
 - **Dashboard**: Single page with collapsible sections (Spend, Revenue, Burn, Runway, Forecast, Raise, Hiring)
 - **Transactions**: Spreadsheet-style view with search, filter, categorization
 - **Connect**: Bank account connection via Yodlee FastLink
 - **Settings**: Notifications, company info, integrations
 
-### Demo Mode (Existing Routes)
-- Full-featured demo with sample data
-- Useful for evaluation before connecting real accounts
+### Mode Switching
+- Landing page: "Explore Demo" → `/dashboard`, "Log in" → auth flow → `/app`
+- TopBar: Mode switcher dropdown navigates between equivalent demo/live routes
+- AppModeContext: Syncs mode from URL on load and popstate events
+
+### Data Services
+- `client/src/services/demoDataService.ts`: Centralized mock data (transactions, spend, burn, runway, vendors)
+- `client/src/services/liveDataService.ts`: Placeholder functions for real API calls
+- `client/src/services/notificationsService.ts`: Stub for Slack/SMS alerts (console logging)
 
 ## Key Features
 
