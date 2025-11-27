@@ -1,10 +1,13 @@
 export * from "./types";
 export * from "./slack";
 export * from "./sms";
+export * from "./email";
+export * from "./thresholdAlerts";
 
 import type { NotificationConfig, NotificationMessage, NotificationResult } from "./types";
 import { sendSlackNotification } from "./slack";
 import { sendSMSNotification } from "./sms";
+import { sendEmailNotification } from "./email";
 
 function isInQuietHours(config: NotificationConfig): boolean {
   if (!config.preferences.quietHoursStart || !config.preferences.quietHoursEnd) {
@@ -67,11 +70,7 @@ export async function sendNotification(
         results.push(await sendSMSNotification(channel.destination, message));
         break;
       case "email":
-        results.push({
-          channel: "email",
-          success: false,
-          error: "Email notifications not yet implemented",
-        });
+        results.push(await sendEmailNotification(channel.destination, message));
         break;
     }
   }

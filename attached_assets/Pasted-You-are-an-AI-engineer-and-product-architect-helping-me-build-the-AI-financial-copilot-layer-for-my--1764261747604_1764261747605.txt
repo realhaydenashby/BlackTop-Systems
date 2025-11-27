@@ -1,0 +1,138 @@
+You are an AI engineer and product architect helping me build the AI financial copilot layer for my app, BlackTop Systems.
+BlackTop is a pre‑accounting / pre‑FP&A “financial copilot” for SMBs and early‑stage startups (0–75 employees) that:
+
+Ingests messy financial inputs (bank data, PDFs, CSVs, invoices, receipts, later email)
+
+Normalizes them into a single transaction schema
+
+Runs diagnostics (“financial MRI”)
+
+Produces a budget, simple forecast, and a ranked monthly action plan
+
+I already have (or will have) a backend with:
+
+A Postgres‑class DB
+
+Entities like: User, Company, IntegrationConnection, Actuals, Scenario, ScenarioItem (Hire, Expense, FundingEvent), RawDocument, ParsedTransaction, Vendor, Category, Subscription, Anomaly, Budget, BudgetLine, ActionPlan, ActionItem
+
+REST or JSON APIs to:
+
+Fetch normalized transactions and monthly actuals
+
+Manage scenarios and scenario items
+
+Recompute forecasts, budgets, diagnostics, and action plans
+
+Your job in this conversation is to design and implement the AI copilot layer end‑to‑end, using a company_state object plus tools/functions.
+
+Step 1 – Design the AI surface
+Propose an explicit JSON schema for company_state that the backend will expose to the AI layer. It should include at least:
+
+cash_balance, current_date
+
+monthly_actuals[] (revenue, expenses, net burn by category)
+
+normalized_transactions[] (id, date, amount, vendor, category, source, subscription flag, anomaly tags)
+
+forecast_scenarios[] (Base, Aggressive, Conservative) with scenario items (hires, expenses, funding events) and computed monthly projections (cash, burn, runway, lowest cash point)
+
+diagnostics_summary (subscription creep, vendor outliers, department over/under‑spend, top anomalies)
+
+budget (budget ranges, allocations by category/department)
+
+action_plan (ranked action items with short descriptions and estimated dollar impact)
+
+Define clear AI tools/functions that the copilot can call, including:
+
+add_or_update_hire
+
+add_or_update_expense
+
+add_or_update_funding_event
+
+recompute_forecast_and_budget
+
+get_scenario_summary
+
+get_budget_vs_actuals
+
+For each tool, specify:
+
+Input parameters and types
+
+Output shape
+
+What backend API or DB operation it should map to
+
+Write high‑level prompt instructions that will be sent to the model on every request, including:
+
+Role and scope (“startup & SMB finance copilot”)
+
+Guardrails:
+
+Never fabricate numbers; only use values present in company_state or tool responses
+
+No legal or tax advice; focus on operational finance and cash decisions
+
+Tone = “here is what the data shows and the trade‑offs,” not rigid prescriptions
+
+Step 2 – Generate concrete implementation code
+Assume I’m building this as a small service that sits between the LLM and my backend.
+
+Pick a stack: either
+
+Option A: Node/TypeScript with Express + a tools router, or
+
+Option B: Python (FastAPI) with pydantic models and tool endpoints
+
+Generate real code for:
+
+The company_state pydantic / TypeScript interfaces
+
+The tool function definitions (request/response types)
+
+Stub implementations for each tool that:
+
+Accept input
+
+Call placeholder backend functions like get_company_state(company_id), update_scenario_item(...), run_forecast(...), etc.
+
+Return responses in the expected shape
+
+Show an example “AI request flow”:
+
+Input: a natural language user question like “If I hire a $90k engineer in April, how does that change my runway?”
+
+How the orchestrator:
+
+Calls the LLM with system prompt + company_state + tool specs
+
+Receives a tool call (e.g., add_or_update_hire then recompute_forecast_and_budget)
+
+Returns a final natural‑language answer that references actual numbers from the updated company_state
+
+You do not need to build the whole backend; focus on the glue between the LLM and my existing APIs and DB.
+
+Step 3 – Iterative refinement
+Once you’ve produced the initial design and code:
+
+Suggest how to test this locally with a dummy company_state JSON and mocked tool functions.
+
+Suggest how to harden this for production (logging, error handling, retry logic, input validation, red‑team style safety checks).
+
+Suggest how to evolve this later for:
+
+Multi‑entity companies
+
+More complex scenarios (equity rounds, debt, multi‑currency)
+
+Additional tools (e.g., “generate board‑ready monthly summary” from company_state alone)
+
+Important:
+
+Start by outputting: (1) the company_state schema, (2) full tool specs, and (3) the system prompt for the copilot.
+
+Then generate the code (TypeScript or Python) in separate, clearly labeled sections so that I can copy/paste into my repo.
+
+Treat this as production‑grade design, not a toy example.
+

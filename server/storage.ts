@@ -39,6 +39,8 @@ import type {
   InsertBurnMetric,
   RaiseRecommendation,
   InsertRaiseRecommendation,
+  ShareableReport,
+  InsertShareableReport,
 } from "@shared/schema";
 import {
   users,
@@ -60,6 +62,8 @@ import {
   plannedHires,
   burnMetrics,
   raiseRecommendations,
+  notificationPreferences,
+  shareableReports,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -179,6 +183,17 @@ export interface IStorage {
 
   // Helper methods
   getOrganizationMember(userId: string): Promise<OrganizationMember | undefined>;
+
+  // Notification Preferences
+  getNotificationPreferences(userId: string): Promise<any | undefined>;
+  upsertNotificationPreferences(userId: string, prefs: any): Promise<any>;
+
+  // Shareable Reports
+  createShareableReport(report: InsertShareableReport): Promise<ShareableReport>;
+  getShareableReport(id: string): Promise<ShareableReport | undefined>;
+  getOrganizationShareableReports(organizationId: string): Promise<ShareableReport[]>;
+  incrementReportViewCount(id: string): Promise<void>;
+  deleteShareableReport(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -778,6 +793,62 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return updated;
+  }
+
+  // Notification Preferences
+  async getNotificationPreferences(userId: string): Promise<any | undefined> {
+    return await db.query.notificationPreferences.findFirst({
+      where: eq(notificationPreferences.userId, userId),
+    });
+  }
+
+  async upsertNotificationPreferences(userId: string, prefs: any): Promise<any> {
+    const existing = await this.getNotificationPreferences(userId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(notificationPreferences)
+        .set({ ...prefs, updatedAt: new Date() })
+        .where(eq(notificationPreferences.userId, userId))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db
+      .insert(notificationPreferences)
+      .values({ userId, ...prefs })
+      .returning();
+    return created;
+  }
+
+  // Shareable Reports
+  async createShareableReport(reportData: InsertShareableReport): Promise<ShareableReport> {
+    const [report] = await db.insert(shareableReports).values(reportData).returning();
+    return report;
+  }
+
+  async getShareableReport(id: string): Promise<ShareableReport | undefined> {
+    return await db.query.shareableReports.findFirst({
+      where: eq(shareableReports.id, id),
+    });
+  }
+
+  async getOrganizationShareableReports(organizationId: string): Promise<ShareableReport[]> {
+    return await db.query.shareableReports.findMany({
+      where: eq(shareableReports.organizationId, organizationId),
+      orderBy: [desc(shareableReports.createdAt)],
+    });
+  }
+
+  async incrementReportViewCount(id: string): Promise<void> {
+    await db
+      .update(shareableReports)
+      .set({ viewCount: sql`${shareableReports.viewCount} + 1` })
+      .where(eq(shareableReports.id, id));
+  }
+
+  async deleteShareableReport(id: string): Promise<void> {
+    await db.delete(shareableReports).where(eq(shareableReports.id, id));
   }
 }
 

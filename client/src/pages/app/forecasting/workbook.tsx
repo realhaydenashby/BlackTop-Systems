@@ -28,6 +28,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ScenarioComparison } from "@/components/scenario-comparison";
 
 interface CompanyState {
   company_name: string;
@@ -543,6 +544,12 @@ export default function Workbook() {
         </CardContent>
       </Card>
 
+      <ScenarioComparison
+        currentCash={companyState?.cash_balance || 500000}
+        currentMonthlyBurn={companyState?.summary?.monthly_burn_rate || 65000}
+        currentMonthlyRevenue={rows.length > 0 ? rows[rows.length - 1].revenue : 45000}
+      />
+
       <Card>
         <CardContent className="py-6">
           <div className="flex items-start gap-4">
@@ -554,7 +561,7 @@ export default function Workbook() {
               <p className="text-sm text-muted-foreground">
                 This workbook lets you create "what-if" scenarios by adjusting projected revenue and expenses. 
                 Changes automatically recalculate derived fields like Gross Margin, Total OpEx, Net Cash, and Runway. 
-                In future versions, you'll be able to save multiple scenarios, add planned hires, and compare outcomes side-by-side.
+                Use the Scenario Comparison section above to compare Base, Conservative, and Aggressive growth plans side-by-side.
               </p>
             </div>
           </div>

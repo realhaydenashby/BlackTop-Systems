@@ -235,47 +235,222 @@ function Section({
 
 function EmptyState() {
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="text-center py-12">
-        <div className="rounded-full bg-muted p-6 inline-flex mb-6">
-          <Building2 className="h-12 w-12 text-muted-foreground" />
-        </div>
-        <h2 className="text-2xl font-bold mb-2">Connect Your Financial Data</h2>
-        <p className="text-muted-foreground max-w-md mx-auto mb-8">
-          Link your QuickBooks account or bank accounts to see your financial health dashboard with real data.
-        </p>
-        <div className="flex items-center justify-center gap-4">
-          <Link href="/app/connect">
-            <Button size="lg" data-testid="button-connect-accounts">
-              <Plus className="h-4 w-4 mr-2" />
-              Connect Accounts
-            </Button>
-          </Link>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 text-left max-w-3xl mx-auto">
-          <div className="p-4 rounded-lg bg-muted/50">
-            <FileSpreadsheet className="h-6 w-6 text-muted-foreground mb-2" />
-            <h4 className="font-medium mb-1">QuickBooks</h4>
-            <p className="text-sm text-muted-foreground">
-              Sync your revenue, expenses, and vendor data from QuickBooks.
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+      {/* Hero Section */}
+      <Card className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent" />
+        <CardContent className="pt-8 pb-8 relative">
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted">
+              <Sparkles className="h-4 w-4" />
+              <span className="text-sm font-medium">Get Started in 60 Seconds</span>
+            </div>
+            
+            <h1 className="text-4xl font-bold tracking-tight">
+              Your Financial Autopilot Awaits
+            </h1>
+            
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Connect your bank accounts or QuickBooks and we'll instantly build your complete 
+              financial model — burn rate, runway, forecasts, and AI-powered insights. No spreadsheets. No setup.
             </p>
+            
+            <div className="flex items-center justify-center gap-4 pt-4">
+              <Link href="/app/connect">
+                <Button size="lg" className="h-12 px-8" data-testid="button-connect-accounts">
+                  <Building2 className="h-5 w-5 mr-2" />
+                  Connect Bank Accounts
+                </Button>
+              </Link>
+              <Link href="/app/copilot">
+                <Button size="lg" variant="outline" className="h-12 px-8" data-testid="button-talk-to-ai">
+                  <Sparkles className="h-5 w-5 mr-2" />
+                  Talk to AI Copilot
+                </Button>
+              </Link>
+            </div>
           </div>
-          <div className="p-4 rounded-lg bg-muted/50">
-            <Building2 className="h-6 w-6 text-muted-foreground mb-2" />
-            <h4 className="font-medium mb-1">Bank Accounts</h4>
-            <p className="text-sm text-muted-foreground">
-              Connect 10,000+ banks to import transactions automatically.
-            </p>
-          </div>
-          <div className="p-4 rounded-lg bg-muted/50">
-            <TrendingUp className="h-6 w-6 text-muted-foreground mb-2" />
-            <h4 className="font-medium mb-1">Insights</h4>
-            <p className="text-sm text-muted-foreground">
-              Get AI-powered insights on spend, runway, and financial health.
-            </p>
-          </div>
-        </div>
+        </CardContent>
+      </Card>
+
+      {/* What You'll Get */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="border-dashed">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-full bg-green-500/10">
+                <DollarSign className="h-5 w-5 text-green-500" />
+              </div>
+              <span className="font-medium">Runway</span>
+            </div>
+            <p className="text-2xl font-bold text-muted-foreground/50">—</p>
+            <p className="text-xs text-muted-foreground mt-1">Auto-calculated from your data</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-dashed">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-full bg-red-500/10">
+                <TrendingDown className="h-5 w-5 text-red-500" />
+              </div>
+              <span className="font-medium">Monthly Burn</span>
+            </div>
+            <p className="text-2xl font-bold text-muted-foreground/50">—</p>
+            <p className="text-xs text-muted-foreground mt-1">Gross & net burn breakdown</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-dashed">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-full bg-blue-500/10">
+                <Target className="h-5 w-5 text-blue-500" />
+              </div>
+              <span className="font-medium">12-Mo Forecast</span>
+            </div>
+            <p className="text-2xl font-bold text-muted-foreground/50">—</p>
+            <p className="text-xs text-muted-foreground mt-1">AI-generated projections</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-dashed">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-full bg-yellow-500/10">
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              </div>
+              <span className="font-medium">Insights</span>
+            </div>
+            <p className="text-2xl font-bold text-muted-foreground/50">—</p>
+            <p className="text-xs text-muted-foreground mt-1">Proactive alerts & anomalies</p>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* AI Starter Insights */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            What Your AI Copilot Can Do
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <div className="flex items-start gap-3">
+              <Clock className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-blue-600 dark:text-blue-400">Runway Planning</p>
+                <p className="text-sm text-muted-foreground">
+                  "How much runway do I have?" → Instant calculation based on your bank balance and burn rate
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+            <div className="flex items-start gap-3">
+              <Users className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-green-600 dark:text-green-400">Hiring Analysis</p>
+                <p className="text-sm text-muted-foreground">
+                  "What if I hire a $120k engineer?" → Full impact on burn, runway, and when to fundraise
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-yellow-600 dark:text-yellow-400">Anomaly Detection</p>
+                <p className="text-sm text-muted-foreground">
+                  Automatic alerts when vendors spike, burn accelerates, or unusual transactions appear
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Connection Methods */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Connect Your Data Source</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Link href="/app/connect">
+              <div className="p-6 rounded-lg border-2 border-dashed hover-elevate cursor-pointer transition-colors hover:border-primary/50">
+                <Building2 className="h-8 w-8 text-muted-foreground mb-3" />
+                <h4 className="font-semibold mb-1">Bank Accounts</h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Connect 10,000+ banks via Yodlee. Transactions sync automatically.
+                </p>
+                <Badge variant="secondary">Recommended</Badge>
+              </div>
+            </Link>
+            
+            <Link href="/app/settings">
+              <div className="p-6 rounded-lg border-2 border-dashed hover-elevate cursor-pointer transition-colors hover:border-primary/50">
+                <FileSpreadsheet className="h-8 w-8 text-muted-foreground mb-3" />
+                <h4 className="font-semibold mb-1">QuickBooks</h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Sync categorized transactions, invoices, and vendor data.
+                </p>
+                <Badge variant="outline">Coming Soon</Badge>
+              </div>
+            </Link>
+            
+            <Link href="/app/transactions">
+              <div className="p-6 rounded-lg border-2 border-dashed hover-elevate cursor-pointer transition-colors hover:border-primary/50">
+                <Calendar className="h-8 w-8 text-muted-foreground mb-3" />
+                <h4 className="font-semibold mb-1">CSV Upload</h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Upload bank statements or accounting exports manually.
+                </p>
+                <Badge variant="outline">Available</Badge>
+              </div>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Startup Finance Tips */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Startup Finance Benchmarks
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+            <div className="p-3 rounded-lg bg-muted/50">
+              <p className="font-medium mb-1">Healthy Runway</p>
+              <p className="text-2xl font-bold">12-18 mo</p>
+              <p className="text-xs text-muted-foreground">Standard for Series A</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50">
+              <p className="font-medium mb-1">Seed Burn Rate</p>
+              <p className="text-2xl font-bold">$50-150k</p>
+              <p className="text-xs text-muted-foreground">Per month typical</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50">
+              <p className="font-medium mb-1">Payroll %</p>
+              <p className="text-2xl font-bold">60-80%</p>
+              <p className="text-xs text-muted-foreground">Of total OpEx</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50">
+              <p className="font-medium mb-1">Start Fundraising</p>
+              <p className="text-2xl font-bold">6-9 mo</p>
+              <p className="text-xs text-muted-foreground">Before runway ends</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

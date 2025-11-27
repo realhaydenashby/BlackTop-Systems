@@ -71,6 +71,33 @@ export const organizationMembers = pgTable("organization_members", {
   unique().on(table.userId, table.organizationId)
 ]);
 
+// Notification Preferences - per user notification settings
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  emailEnabled: boolean("email_enabled").default(true),
+  weeklyDigestEnabled: boolean("weekly_digest_enabled").default(true),
+  
+  slackEnabled: boolean("slack_enabled").default(false),
+  slackWebhookUrl: varchar("slack_webhook_url"),
+  
+  smsEnabled: boolean("sms_enabled").default(false),
+  smsPhoneNumber: varchar("sms_phone_number"),
+  
+  minSeverity: varchar("min_severity", { length: 20 }).default("warning"),
+  quietHoursStart: varchar("quiet_hours_start", { length: 10 }),
+  quietHoursEnd: varchar("quiet_hours_end", { length: 10 }),
+  timezone: varchar("timezone", { length: 50 }).default("America/Los_Angeles"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreferences = typeof notificationPreferences.$inferInsert;
+export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({ id: true, createdAt: true, updatedAt: true });
+
 // Vendors
 export const vendors = pgTable("vendors", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -265,6 +292,23 @@ export const budgetLines = pgTable("budget_lines", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Forecasts (AI-generated 12-month projections)
+export const forecasts = pgTable("forecasts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  month: varchar("month", { length: 7 }).notNull(), // YYYY-MM format
+  projectedRevenue: numeric("projected_revenue", { precision: 15, scale: 2 }),
+  projectedExpenses: numeric("projected_expenses", { precision: 15, scale: 2 }),
+  projectedNetCash: numeric("projected_net_cash", { precision: 15, scale: 2 }),
+  projectedRunway: varchar("projected_runway", { length: 10 }),
+  assumptions: jsonb("assumptions"),
+  scenario: varchar("scenario", { length: 50 }).default("base"), // base, optimistic, pessimistic
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_forecasts_org_month").on(table.organizationId, table.month),
+]);
+
 // Action Plans
 export const actionPlanStatusEnum = pgEnum("action_plan_status", ["draft", "active", "completed"]);
 
@@ -397,6 +441,26 @@ export const monthlyMetrics = pgTable("monthly_metrics", {
   index("idx_monthly_metrics_department").on(table.departmentId),
 ]);
 
+// Shareable Reports
+export const shareableReports = pgTable("shareable_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  createdBy: varchar("created_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  reportData: jsonb("report_data").notNull(),
+  isPublic: boolean("is_public").default(true),
+  expiresAt: timestamp("expires_at"),
+  viewCount: integer("view_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_shareable_reports_org").on(table.organizationId),
+  index("idx_shareable_reports_created_by").on(table.createdBy),
+]);
+
+export type ShareableReport = typeof shareableReports.$inferSelect;
+export type InsertShareableReport = typeof shareableReports.$inferInsert;
+export const insertShareableReportSchema = createInsertSchema(shareableReports).omit({ id: true, createdAt: true, viewCount: true });
+
 // Drizzle Relations
 export const usersRelations = relations(users, ({ many }) => ({
   organizationMembers: many(organizationMembers),
@@ -472,6 +536,13 @@ export const budgetLinesRelations = relations(budgetLines, ({ one }) => ({
   }),
 }));
 
+export const forecastsRelations = relations(forecasts, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [forecasts.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
 export const actionPlansRelations = relations(actionPlans, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [actionPlans.organizationId],
@@ -502,6 +573,7 @@ export const insertCategorySchema = createInsertSchema(categories).omit({ id: tr
 export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true, createdAt: true });
 export const insertBudgetSchema = createInsertSchema(budgets).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBudgetLineSchema = createInsertSchema(budgetLines).omit({ id: true, createdAt: true });
+export const insertForecastSchema = createInsertSchema(forecasts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertActionPlanSchema = createInsertSchema(actionPlans).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertActionItemSchema = createInsertSchema(actionItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInsightSchema = createInsertSchema(insights).omit({ id: true, createdAt: true });
@@ -535,6 +607,8 @@ export type Budget = typeof budgets.$inferSelect;
 export type InsertBudget = z.infer<typeof insertBudgetSchema>;
 export type BudgetLine = typeof budgetLines.$inferSelect;
 export type InsertBudgetLine = z.infer<typeof insertBudgetLineSchema>;
+export type Forecast = typeof forecasts.$inferSelect;
+export type InsertForecast = z.infer<typeof insertForecastSchema>;
 export type ActionPlan = typeof actionPlans.$inferSelect;
 export type InsertActionPlan = z.infer<typeof insertActionPlanSchema>;
 export type ActionItem = typeof actionItems.$inferSelect;

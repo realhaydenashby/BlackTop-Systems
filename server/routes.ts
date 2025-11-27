@@ -2178,10 +2178,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update account last synced timestamp
       await storage.updateBankAccount(account.id, { lastSyncedAt: new Date() });
 
+      // Trigger auto-model pipeline and threshold check in background (non-blocking)
+      if (imported > 0) {
+        const { autoModelPipeline } = await import("./autoModelPipeline");
+        autoModelPipeline.runFullPipeline(organizationId).then(result => {
+          console.log("[AutoModel] Pipeline complete:", result);
+        }).catch(err => {
+          console.error("[AutoModel] Pipeline error:", err);
+        });
+
+        const { checkThresholds, sendThresholdAlerts } = await import("./notifs/thresholdAlerts");
+        checkThresholds(organizationId, user.id).then(async (alerts) => {
+          if (alerts.length > 0) {
+            console.log("[ThresholdAlerts] Found alerts:", alerts.map(a => a.type));
+            const result = await sendThresholdAlerts(user.id, alerts);
+            console.log("[ThresholdAlerts] Sent:", result.sent);
+          }
+        }).catch(err => {
+          console.error("[ThresholdAlerts] Error:", err);
+        });
+      }
+
       res.json({ count: imported, total: accountTransactions.length });
     } catch (error: any) {
       console.error("Sync transactions error:", error);
       res.status(500).json({ message: error.message || "Failed to sync transactions" });
+    }
+  });
+
+  // Run auto-model pipeline manually
+  app.post("/api/live/auto-model/run", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const orgMember = await storage.getOrganizationMember(user.id);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found. Connect bank accounts first." });
+      }
+
+      const { autoModelPipeline } = await import("./autoModelPipeline");
+      const result = await autoModelPipeline.runFullPipeline(orgMember.organizationId);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Auto-model error:", error);
+      res.status(500).json({ message: error.message || "Failed to run auto-model pipeline" });
     }
   });
 
@@ -2341,9 +2382,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // Generate simple insights
+      // Generate insights with anomaly detection
       const insights: Array<{ type: string; message: string; severity: string }> = [];
       
+      // Import anomaly detection functions
+      const { detectVendorSpikes, detectSubscriptionCreep, detectPayrollDrift, detectAmountAnomalies } = await import("./insights/anomalies");
+      
+      // Transform transactions for anomaly detection (need id field)
+      const anomalyTxns = rawTransactions.map((txn: any) => ({
+        id: txn.id,
+        date: new Date(txn.date),
+        amount: parseFloat(txn.amount) || 0,
+        type: parseFloat(txn.amount) >= 0 ? "credit" : "debit" as "credit" | "debit",
+        vendorNormalized: txn.vendorNormalized || txn.vendorOriginal || txn.description,
+        categoryId: txn.categoryId,
+        isRecurring: txn.isRecurring || false,
+        isPayroll: txn.isPayroll || false,
+      }));
+      
+      // Detect vendor spikes
+      const vendorSpikes = detectVendorSpikes({ transactions: anomalyTxns }, 25);
+      for (const spike of vendorSpikes.slice(0, 3)) {
+        insights.push({
+          type: "vendor_spike",
+          message: `${spike.vendor} spend spiked ${spike.changePercent.toFixed(0)}% vs last month ($${spike.previousPeriod.toLocaleString()} → $${spike.currentPeriod.toLocaleString()})`,
+          severity: spike.changePercent > 50 ? "warning" : "info",
+        });
+      }
+      
+      // Detect subscription creep
+      const subCreep = detectSubscriptionCreep({ transactions: anomalyTxns });
+      if (subCreep.change > 15 && subCreep.totalRecurring > 1000) {
+        insights.push({
+          type: "subscription_creep",
+          message: `Recurring SaaS spend is up ${subCreep.change.toFixed(0)}% to $${subCreep.totalRecurring.toLocaleString()}/mo. Consider an audit.`,
+          severity: subCreep.change > 30 ? "warning" : "info",
+        });
+      }
+      
+      // Detect payroll drift
+      const payrollDrift = detectPayrollDrift({ transactions: anomalyTxns });
+      if (Math.abs(payrollDrift.drift) > 10 && payrollDrift.currentPayroll > 5000) {
+        const direction = payrollDrift.drift > 0 ? "up" : "down";
+        insights.push({
+          type: "payroll_drift",
+          message: `Payroll is ${direction} ${Math.abs(payrollDrift.drift).toFixed(0)}% vs expected ($${payrollDrift.currentPayroll.toLocaleString()} vs $${payrollDrift.expectedPayroll.toLocaleString()})`,
+          severity: Math.abs(payrollDrift.drift) > 20 ? "warning" : "info",
+        });
+      }
+      
+      // Detect unusual transactions
+      const anomalies = detectAmountAnomalies({ transactions: anomalyTxns }, 2.5);
+      if (anomalies.length > 0) {
+        const top = anomalies[0];
+        insights.push({
+          type: "amount_anomaly",
+          message: `Unusual charge from ${top.vendor}: $${top.amount.toLocaleString()} (normally ~$${top.expectedAmount.toLocaleString()})`,
+          severity: top.deviation > 3 ? "warning" : "info",
+        });
+      }
+      
+      // Runway warnings
       if (runwayMetrics.runwayMonths < 6 && runwayMetrics.runwayMonths !== Infinity) {
         insights.push({
           type: "runway",
@@ -2367,6 +2466,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           severity: "info",
         });
       }
+      
+      // Limit to top 5 most actionable insights
+      insights.sort((a, b) => {
+        const severityOrder: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+        return (severityOrder[a.severity] || 3) - (severityOrder[b.severity] || 3);
+      });
+      const topInsights = insights.slice(0, 5);
 
       res.json({
         hasData: true,
@@ -2407,7 +2513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             netFlow: m.cashFlow.netFlow,
           })),
         },
-        insights,
+        insights: topInsights,
         vendors,
       });
     } catch (error: any) {
@@ -3012,109 +3118,240 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Get company state for context
-      let companyContext = "No financial data connected yet.";
+      let companyContext = `STATUS: No financial data connected yet.
+      
+To provide accurate financial analysis, please connect your:
+1. Bank accounts (via Connect page) - for real-time cash balance and transaction data
+2. QuickBooks (via Integrations) - for accounting data and categorized expenses
+
+Once connected, I can analyze your burn rate, runway, spending patterns, and provide specific recommendations.`;
       
       if (userOrg) {
         try {
-          // Get basic financial data
-          const threeMonthsAgo = new Date();
-          threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+          // Get bank accounts for real cash balance
+          const bankAccounts = await storage.getUserBankAccounts(user.id);
+          const cashBalance = bankAccounts.reduce((sum: number, acc: any) => {
+            return sum + (parseFloat(acc.currentBalance) || 0);
+          }, 0);
+          
+          // Get transactions from last 6 months for better analysis
+          const sixMonthsAgo = new Date();
+          sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
           
           const recentTransactions = await db.query.transactions.findMany({
             where: and(
               eq(transactions.organizationId, userOrg.organizationId),
-              gte(transactions.date, threeMonthsAgo)
+              gte(transactions.date, sixMonthsAgo)
             ),
-            with: { category: true }
+            with: { category: true, vendor: true }
           });
 
-          // Calculate summary stats
+          if (recentTransactions.length === 0 && cashBalance === 0) {
+            // No data connected - keep default context with setup guide
+            companyContext = `STATUS: No financial data connected yet.
+            
+To provide accurate financial analysis, please connect your:
+1. Bank accounts (via Connect page) - for real-time cash balance and transaction data
+2. QuickBooks (via Integrations) - for accounting data and categorized expenses
+
+Once connected, I can analyze your burn rate, runway, spending patterns, and provide specific recommendations.
+
+In the meantime, I can help you with:
+- General startup finance questions
+- Burn rate and runway calculations (if you share numbers)
+- Hiring cost analysis
+- Fundraising timing and strategy`;
+          } else {
+
+          // Calculate comprehensive stats
           let totalRevenue = 0;
           let totalExpenses = 0;
           const spendByCategory: Record<string, number> = {};
+          const spendByVendor: Record<string, number> = {};
+          const monthlyData: Record<string, { revenue: number; expenses: number }> = {};
+          let payrollExpenses = 0;
+          let softwareExpenses = 0;
+          let recurringExpenses = 0;
 
           recentTransactions.forEach(txn => {
             const amount = parseFloat(txn.amount);
+            const monthKey = new Date(txn.date).toISOString().substring(0, 7);
+            
+            if (!monthlyData[monthKey]) {
+              monthlyData[monthKey] = { revenue: 0, expenses: 0 };
+            }
+            
             if (amount > 0) {
               totalRevenue += amount;
+              monthlyData[monthKey].revenue += amount;
             } else {
-              totalExpenses += Math.abs(amount);
+              const absAmount = Math.abs(amount);
+              totalExpenses += absAmount;
+              monthlyData[monthKey].expenses += absAmount;
+              
               const cat = txn.category?.name || "Uncategorized";
-              spendByCategory[cat] = (spendByCategory[cat] || 0) + Math.abs(amount);
+              const vendor = txn.vendor?.name || txn.vendorOriginal || "Unknown";
+              
+              spendByCategory[cat] = (spendByCategory[cat] || 0) + absAmount;
+              spendByVendor[vendor] = (spendByVendor[vendor] || 0) + absAmount;
+              
+              // Track specific categories
+              if (cat.toLowerCase().includes("payroll") || cat.toLowerCase().includes("salary")) {
+                payrollExpenses += absAmount;
+              }
+              if (cat.toLowerCase().includes("software") || cat.toLowerCase().includes("saas")) {
+                softwareExpenses += absAmount;
+              }
+              if (txn.isRecurring) {
+                recurringExpenses += absAmount;
+              }
             }
           });
 
-          const monthlyBurn = totalExpenses / 3;
-          const monthlyRevenue = totalRevenue / 3;
+          // Calculate months of data
+          const monthsOfData = Object.keys(monthlyData).length || 1;
+          const monthlyBurn = totalExpenses / monthsOfData;
+          const monthlyRevenue = totalRevenue / monthsOfData;
           const netBurn = monthlyBurn - monthlyRevenue;
+          const grossMargin = monthlyRevenue > 0 ? ((monthlyRevenue - (totalExpenses * 0.25 / monthsOfData)) / monthlyRevenue * 100) : 0;
           
-          // Estimate cash balance (simplified)
-          const cashBalance = 500000; // Would come from bank accounts in production
+          // Calculate runway
           const runway = netBurn > 0 ? cashBalance / netBurn : null;
+          const runwayStatus = !runway ? "Cash flow positive" : 
+            runway < 6 ? "CRITICAL - Less than 6 months" :
+            runway < 12 ? "Caution - Under 12 months" :
+            runway < 18 ? "Healthy" : "Strong - 18+ months";
+          
+          // Calculate burn trend (is it increasing?)
+          const sortedMonths = Object.keys(monthlyData).sort();
+          let burnTrend = "stable";
+          if (sortedMonths.length >= 3) {
+            const recent = monthlyData[sortedMonths[sortedMonths.length - 1]]?.expenses || 0;
+            const prior = monthlyData[sortedMonths[sortedMonths.length - 3]]?.expenses || 0;
+            if (prior > 0) {
+              const change = ((recent - prior) / prior) * 100;
+              burnTrend = change > 10 ? `increasing (+${change.toFixed(0)}%)` : 
+                         change < -10 ? `decreasing (${change.toFixed(0)}%)` : "stable";
+            }
+          }
 
+          // Top vendors
+          const topVendors = Object.entries(spendByVendor)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 8);
+
+          // Format company context
           companyContext = `
-Current Financial State:
-- Estimated Cash Balance: ${formatCurrency(cashBalance)}
-- Monthly Revenue (3-mo avg): ${formatCurrency(monthlyRevenue)}
-- Monthly Expenses (3-mo avg): ${formatCurrency(monthlyBurn)}
-- Net Monthly Burn: ${formatCurrency(netBurn)}
-- Estimated Runway: ${runway ? `${runway.toFixed(1)} months` : "Cash flow positive"}
-- Total transactions analyzed: ${recentTransactions.length}
+## FINANCIAL SNAPSHOT (Last ${monthsOfData} months of data)
 
-Top Spending Categories (last 3 months):
+**Cash Position**
+- Current Cash Balance: ${formatCurrency(cashBalance)}
+- Connected Bank Accounts: ${bankAccounts.length}
+
+**Burn & Runway**
+- Monthly Burn (Gross): ${formatCurrency(monthlyBurn)}
+- Monthly Revenue: ${formatCurrency(monthlyRevenue)}
+- Net Monthly Burn: ${formatCurrency(netBurn)}
+- Runway: ${runway ? `${runway.toFixed(1)} months` : "N/A"} — ${runwayStatus}
+- Burn Trend: ${burnTrend}
+
+**Expense Breakdown**
+- Payroll & Salaries: ${formatCurrency(payrollExpenses / monthsOfData)}/mo (${((payrollExpenses / totalExpenses) * 100).toFixed(0)}% of spend)
+- Software & SaaS: ${formatCurrency(softwareExpenses / monthsOfData)}/mo (${((softwareExpenses / totalExpenses) * 100).toFixed(0)}% of spend)
+- Recurring Expenses: ${formatCurrency(recurringExpenses / monthsOfData)}/mo
+
+**Spending by Category**
 ${Object.entries(spendByCategory)
   .sort(([, a], [, b]) => b - a)
-  .slice(0, 5)
-  .map(([cat, amount]) => `- ${cat}: ${formatCurrency(amount)}`)
+  .slice(0, 6)
+  .map(([cat, amount]) => `- ${cat}: ${formatCurrency(amount / monthsOfData)}/mo`)
   .join("\n")}
+
+**Top Vendors (Total Spend)**
+${topVendors
+  .map(([vendor, amount]) => `- ${vendor}: ${formatCurrency(amount)}`)
+  .join("\n")}
+
+**Data Quality**
+- Transactions analyzed: ${recentTransactions.length}
+- Date range: ${sortedMonths[0] || "N/A"} to ${sortedMonths[sortedMonths.length - 1] || "N/A"}
 `;
+          }
         } catch (e) {
           console.error("Error getting company context:", e);
         }
       }
 
-      const systemPrompt = `You are a friendly, expert financial copilot for startup founders. Your role is to help founders understand their company's financial health and make better decisions.
+      const systemPrompt = `You are BlackTop's AI Financial Copilot — a world-class startup finance expert with deep knowledge of venture-backed company operations, burn management, and fundraising strategy.
 
+## YOUR EXPERTISE
+You have the financial acumen of a top-tier CFO combined with VC pattern recognition. You understand:
+- Burn rate benchmarks: Seed stage ($50-150k/mo), Series A ($150-400k/mo), Series B ($400k-1M+/mo)
+- Runway thresholds: <6 months is critical (fundraise now), 12-18 months is healthy, 24+ months is conservative
+- SaaS metrics: CAC payback should be <18 months, LTV:CAC should be >3:1, net revenue retention >100% is excellent
+- Headcount costs: Always calculate fully-loaded (salary × 1.25-1.35 for benefits, taxes, equipment)
+- Fundraising timing: Start raising 6-9 months before runway ends, process takes 3-6 months
+- Vendor benchmarks: Software spend typically 5-15% of OpEx, AWS/infra 3-8%, marketing 10-30% depending on stage
+
+## CURRENT COMPANY DATA
 ${companyContext}
 
-Guidelines:
-- Be conversational and helpful, not robotic
-- Explain financial concepts in plain English, avoiding jargon
-- Give specific, actionable advice based on the data
-- If the user asks about something you don't have data for, acknowledge it and offer alternatives
-- Be concise but thorough - founders are busy
-- When discussing runway, be clear about assumptions
-- For hiring questions, consider fully-loaded costs (salary + 25-30% for benefits/taxes)
-- Flag any concerning trends proactively
-- If asked to take actions like "hire someone" or "cut expenses", explain what you would do but clarify you can only provide analysis and recommendations
+## YOUR APPROACH
+1. ALWAYS use specific numbers from the data above — never fabricate or estimate without stating assumptions
+2. When data is missing, say exactly what's needed and guide the user to connect it
+3. Proactively flag concerns: runway < 12 months, burn acceleration, vendor spikes, payroll creep
+4. Give ACTIONABLE advice with dollar impact: "Cutting X would extend runway by Y months"
+5. For hiring questions: calculate total annual cost (salary × 1.3), monthly burn impact, runway reduction
+6. Compare to benchmarks: "Your burn of $X is [above/below] typical for [stage] companies"
+7. Think like a board member: What would a savvy investor want to know?
 
-Remember: You're a trusted advisor helping founders make better financial decisions.`;
+## COMMUNICATION STYLE
+- Lead with the insight, then explain the reasoning
+- Use plain English, no finance jargon unless necessary
+- Be direct and confident — founders want clarity, not hedging
+- Format numbers clearly: $50,000/month not $50000
+- When uncertain, state assumptions explicitly
 
-      // Build conversation history as a user prompt
-      let userPrompt = "";
-      if (conversationHistory.length > 0) {
-        userPrompt = conversationHistory.map(m => 
-          `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`
-        ).join("\n\n") + "\n\nUser: ";
-      }
-      userPrompt += message;
+## AVAILABLE TOOLS
+You have access to these scenario modeling tools:
+- **add_planned_hire**: Model the impact of hiring (e.g., "What if I hire a $90k engineer?")
+- **add_recurring_expense**: Model new recurring costs (e.g., "What if we add Datadog for $500/mo?")
+- **calculate_scenario**: Run "what-if" scenarios for cash and runway
+- **get_vendor_analysis**: Deep dive on specific vendor spending
+- **get_category_breakdown**: Analyze spending by category
+- **fundraising_calculator**: Calculate how much to raise and when
 
-      // Use aiService to call AI
-      const { callAI } = await import("./aiService");
+When a user asks "What if..." or wants to model scenarios, USE THESE TOOLS to provide real calculations rather than estimates.
+
+## GUARDRAILS
+- Never provide tax, legal, or accounting advice — recommend they consult professionals
+- Never fabricate numbers — only use data provided or clearly state estimates with assumptions
+- When you execute a tool, explain what you calculated and the key takeaways
+
+You are the financial co-pilot every founder wishes they had. Be brilliant, be helpful, be specific.`;
+
+      // Use tool-calling chat for enhanced capabilities
+      const { chatWithTools } = await import("./copilot/tools");
       
-      console.log("[copilot] Calling AI with message:", message.substring(0, 100));
+      console.log("[copilot] Calling AI with tools, message:", message.substring(0, 100));
       
-      const aiResponse = await callAI("openai", {
+      const result = await chatWithTools(
+        user.id,
+        userOrg?.organizationId || null,
         systemPrompt,
-        prompt: userPrompt,
-        maxTokens: 1500,
-      });
+        conversationHistory,
+        message
+      );
       
-      console.log("[copilot] AI response length:", aiResponse.content?.length || 0);
+      console.log("[copilot] AI response length:", result.response?.length || 0);
+      console.log("[copilot] Tool results:", result.toolResults.length);
 
       res.json({
-        response: aiResponse.content,
-        actions: [],
+        response: result.response,
+        actions: result.toolResults.filter(r => r.success).map(r => ({
+          type: r.message,
+          data: r.data,
+        })),
       });
     } catch (error: any) {
       console.error("Copilot chat error:", error);
@@ -3260,6 +3497,398 @@ Remember: You're a trusted advisor helping founders make better financial decisi
     } catch (error: any) {
       console.error("Create portal error:", error);
       res.status(500).json({ message: "Failed to create portal session" });
+    }
+  });
+
+  // ============================================
+  // NOTIFICATION PREFERENCES & WEEKLY DIGEST
+  // ============================================
+
+  // Get notification preferences
+  app.get("/api/live/notifications/preferences", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      let prefs = await storage.getNotificationPreferences(user.id);
+      
+      if (!prefs) {
+        prefs = await storage.upsertNotificationPreferences(user.id, {
+          emailEnabled: true,
+          weeklyDigestEnabled: true,
+          slackEnabled: false,
+          smsEnabled: false,
+          minSeverity: "warning",
+          timezone: "America/Los_Angeles",
+        });
+      }
+      
+      res.json(prefs);
+    } catch (error: any) {
+      console.error("Get notification preferences error:", error);
+      res.status(500).json({ message: error.message || "Failed to get notification preferences" });
+    }
+  });
+
+  // Update notification preferences
+  app.patch("/api/live/notifications/preferences", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const prefs = await storage.upsertNotificationPreferences(user.id, req.body);
+      res.json(prefs);
+    } catch (error: any) {
+      console.error("Update notification preferences error:", error);
+      res.status(500).json({ message: error.message || "Failed to update notification preferences" });
+    }
+  });
+
+  // Send weekly digest (admin/cron endpoint)
+  app.post("/api/live/notifications/weekly-digest", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const orgMember = await storage.getOrganizationMember(user.id);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const prefs = await storage.getNotificationPreferences(user.id);
+      if (!prefs?.weeklyDigestEnabled) {
+        return res.json({ success: false, message: "Weekly digest is disabled" });
+      }
+
+      const dbUser = await storage.getUser(user.id);
+      if (!dbUser?.email) {
+        return res.status(400).json({ message: "No email address on file" });
+      }
+
+      const org = await storage.getOrganization(orgMember.organizationId);
+      
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const rawTransactions = await storage.getOrganizationTransactions(orgMember.organizationId, {
+        startDate: sixMonthsAgo,
+        endDate: new Date(),
+      });
+
+      const { calculateBurnRate } = await import("./analytics/burn");
+      const { calculateRunway } = await import("./analytics/runway");
+      const { detectVendorSpikes, detectSubscriptionCreep, detectPayrollDrift } = await import("./insights/anomalies");
+
+      const transactions = rawTransactions.map((txn: any) => ({
+        id: txn.id,
+        date: new Date(txn.date),
+        amount: parseFloat(txn.amount) || 0,
+        type: parseFloat(txn.amount) >= 0 ? "credit" : "debit" as "credit" | "debit",
+        vendorNormalized: txn.vendorNormalized || txn.vendorOriginal || txn.description,
+        categoryId: txn.categoryId,
+        isRecurring: txn.isRecurring || false,
+        isPayroll: txn.isPayroll || false,
+      }));
+
+      const bankAccounts = await storage.getUserBankAccounts(user.id);
+      const currentCash = bankAccounts.reduce((sum: number, acc: any) => {
+        return sum + (parseFloat(acc.currentBalance) || 0);
+      }, 0);
+
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      const burnMetrics = calculateBurnRate(transactions, threeMonthsAgo, new Date());
+      const runwayMetrics = calculateRunway(transactions, currentCash);
+
+      const lastMonthBurn = calculateBurnRate(
+        transactions,
+        new Date(new Date().setMonth(new Date().getMonth() - 2)),
+        new Date(new Date().setMonth(new Date().getMonth() - 1))
+      );
+      const burnChange = lastMonthBurn.grossBurn > 0 
+        ? ((burnMetrics.grossBurn - lastMonthBurn.grossBurn) / lastMonthBurn.grossBurn) * 100 
+        : 0;
+
+      const insights: Array<{ type: string; message: string; severity: string }> = [];
+      
+      const vendorSpikes = detectVendorSpikes({ transactions }, 25);
+      for (const spike of vendorSpikes.slice(0, 2)) {
+        insights.push({
+          type: "vendor_spike",
+          message: `${spike.vendor} spend spiked ${spike.changePercent.toFixed(0)}% vs last month`,
+          severity: spike.changePercent > 50 ? "warning" : "info",
+        });
+      }
+
+      if (runwayMetrics.runwayMonths < 6 && runwayMetrics.runwayMonths !== Infinity) {
+        insights.push({
+          type: "runway",
+          message: `Runway is ${runwayMetrics.runwayMonths.toFixed(1)} months. Consider raising funds or reducing spend.`,
+          severity: runwayMetrics.runwayMonths < 3 ? "critical" : "warning",
+        });
+      }
+
+      const vendorSpend: Record<string, number> = {};
+      for (const txn of transactions) {
+        if (txn.type === "debit" && txn.vendorNormalized) {
+          vendorSpend[txn.vendorNormalized] = (vendorSpend[txn.vendorNormalized] || 0) + Math.abs(txn.amount);
+        }
+      }
+      const topVendors = Object.entries(vendorSpend)
+        .map(([name, amount]) => ({ name, amount }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 5);
+
+      const weekEnd = new Date();
+      const weekStart = new Date(weekEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const { sendWeeklyDigest, WeeklyDigestData } = await import("./notifs/email");
+      const digestData: WeeklyDigestData = {
+        companyName: org?.name || "Your Company",
+        currentCash,
+        runwayMonths: runwayMetrics.runwayMonths === Infinity ? null : runwayMetrics.runwayMonths,
+        monthlyBurn: burnMetrics.grossBurn,
+        burnChange,
+        insights,
+        topVendors,
+        weekStartDate: weekStart,
+        weekEndDate: weekEnd,
+      };
+
+      const result = await sendWeeklyDigest(dbUser.email, digestData);
+
+      res.json({ success: result.success, message: result.error || "Weekly digest sent" });
+    } catch (error: any) {
+      console.error("Send weekly digest error:", error);
+      res.status(500).json({ message: error.message || "Failed to send weekly digest" });
+    }
+  });
+
+  // Check thresholds and get alerts
+  app.get("/api/live/notifications/alerts", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const orgMember = await storage.getOrganizationMember(user.id);
+      
+      if (!orgMember) {
+        return res.json({ alerts: [], message: "No organization found" });
+      }
+
+      const { checkThresholds } = await import("./notifs/thresholdAlerts");
+      const alerts = await checkThresholds(orgMember.organizationId, user.id);
+
+      res.json({ alerts });
+    } catch (error: any) {
+      console.error("Check thresholds error:", error);
+      res.status(500).json({ message: error.message || "Failed to check thresholds" });
+    }
+  });
+
+  // Manually trigger threshold alerts
+  app.post("/api/live/notifications/check-thresholds", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const orgMember = await storage.getOrganizationMember(user.id);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { checkThresholds, sendThresholdAlerts } = await import("./notifs/thresholdAlerts");
+      const alerts = await checkThresholds(orgMember.organizationId, user.id);
+      
+      if (alerts.length === 0) {
+        return res.json({ success: true, message: "No alerts to send", alerts: [] });
+      }
+
+      const result = await sendThresholdAlerts(user.id, alerts);
+
+      res.json({ 
+        success: true, 
+        alerts,
+        sent: result.sent,
+        message: `${result.sent} notifications sent for ${alerts.length} alerts`
+      });
+    } catch (error: any) {
+      console.error("Check thresholds error:", error);
+      res.status(500).json({ message: error.message || "Failed to check thresholds" });
+    }
+  });
+
+  // Send threshold alert (critical runway, vendor spikes, etc.)
+  app.post("/api/live/notifications/alert", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { title, message, severity = "warning" } = req.body;
+
+      if (!title || !message) {
+        return res.status(400).json({ message: "Title and message are required" });
+      }
+
+      const prefs = await storage.getNotificationPreferences(user.id);
+      if (!prefs) {
+        return res.json({ success: false, message: "No notification preferences found" });
+      }
+
+      const results: any[] = [];
+      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
+
+      if (prefs.emailEnabled) {
+        const dbUser = await storage.getUser(user.id);
+        if (dbUser?.email) {
+          const { sendEmailNotification } = await import("./notifs/email");
+          results.push(await sendEmailNotification(dbUser.email, {
+            title,
+            body: message,
+            severity,
+            actionUrl: `${baseUrl}/app`,
+          }));
+        }
+      }
+
+      if (prefs.slackEnabled && prefs.slackWebhookUrl) {
+        const { sendSlackNotification } = await import("./notifs/slack");
+        results.push(await sendSlackNotification(prefs.slackWebhookUrl, {
+          title,
+          body: message,
+          severity,
+          actionUrl: `${baseUrl}/app`,
+        }));
+      }
+
+      if (prefs.smsEnabled && prefs.smsPhoneNumber) {
+        const { sendSMSNotification } = await import("./notifs/sms");
+        results.push(await sendSMSNotification(prefs.smsPhoneNumber, {
+          title,
+          body: message,
+          severity,
+        }));
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      res.json({ 
+        success: successCount > 0, 
+        results,
+        message: `Sent ${successCount}/${results.length} notifications`
+      });
+    } catch (error: any) {
+      console.error("Send alert error:", error);
+      res.status(500).json({ message: error.message || "Failed to send alert" });
+    }
+  });
+
+  // ========== Shareable Reports ==========
+
+  // Create a new shareable report
+  app.post("/api/live/reports", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { title, expiresAt } = req.body;
+
+      const orgMember = await storage.getOrganizationMember(user.id);
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { generateReportData } = await import("./reports/shareableReport");
+      const reportData = await generateReportData(user.id, orgMember.organizationId);
+
+      const report = await storage.createShareableReport({
+        organizationId: orgMember.organizationId,
+        createdBy: user.id,
+        title: title || `Financial Report - ${new Date().toLocaleDateString()}`,
+        reportData: reportData as any,
+        isPublic: true,
+        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      });
+
+      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
+      res.json({ 
+        success: true, 
+        report,
+        shareUrl: `${baseUrl}/reports/${report.id}`
+      });
+    } catch (error: any) {
+      console.error("Create report error:", error);
+      res.status(500).json({ message: error.message || "Failed to create report" });
+    }
+  });
+
+  // List shareable reports
+  app.get("/api/live/reports", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+
+      const orgMember = await storage.getOrganizationMember(user.id);
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const reports = await storage.getOrganizationShareableReports(orgMember.organizationId);
+      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
+
+      res.json({ 
+        reports: reports.map(r => ({
+          ...r,
+          shareUrl: `${baseUrl}/reports/${r.id}`
+        }))
+      });
+    } catch (error: any) {
+      console.error("List reports error:", error);
+      res.status(500).json({ message: error.message || "Failed to list reports" });
+    }
+  });
+
+  // Delete a shareable report
+  app.delete("/api/live/reports/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { id } = req.params;
+
+      const report = await storage.getShareableReport(id);
+      if (!report) {
+        return res.status(404).json({ message: "Report not found" });
+      }
+
+      const orgMember = await storage.getOrganizationMember(user.id);
+      if (!orgMember || orgMember.organizationId !== report.organizationId) {
+        return res.status(403).json({ message: "Not authorized to delete this report" });
+      }
+
+      await storage.deleteShareableReport(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete report error:", error);
+      res.status(500).json({ message: error.message || "Failed to delete report" });
+    }
+  });
+
+  // Public endpoint - view shareable report (no auth required)
+  app.get("/api/reports/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const format = req.query.format as string || "html";
+
+      const report = await storage.getShareableReport(id);
+      if (!report) {
+        return res.status(404).json({ message: "Report not found" });
+      }
+
+      if (!report.isPublic) {
+        return res.status(403).json({ message: "This report is not public" });
+      }
+
+      if (report.expiresAt && new Date(report.expiresAt) < new Date()) {
+        return res.status(410).json({ message: "This report has expired" });
+      }
+
+      await storage.incrementReportViewCount(id);
+
+      if (format === "json") {
+        const { generateReportJSON } = await import("./reports/shareableReport");
+        return res.json(generateReportJSON(report.reportData as any));
+      }
+
+      const { generateReportHTML } = await import("./reports/shareableReport");
+      res.setHeader("Content-Type", "text/html");
+      res.send(generateReportHTML(report.reportData as any));
+    } catch (error: any) {
+      console.error("View report error:", error);
+      res.status(500).json({ message: error.message || "Failed to load report" });
     }
   });
 
