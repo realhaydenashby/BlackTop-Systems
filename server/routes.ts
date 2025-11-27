@@ -1752,6 +1752,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // QuickBooks Integration endpoints
+  app.get("/api/quickbooks/auth-url", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { quickBooksService } = await import("./quickbooksService");
+      const authUrl = quickBooksService.getAuthUrl(user.id);
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error("QuickBooks auth URL error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate auth URL" });
+    }
+  });
+
+  app.get("/api/quickbooks/callback", async (req, res) => {
+    try {
+      const { code, realmId, state } = req.query;
+      
+      if (!code || !realmId || !state) {
+        return res.redirect("/app/connect?error=missing_params");
+      }
+
+      // Decode state to get userId
+      const stateData = JSON.parse(Buffer.from(state as string, "base64").toString());
+      const userId = stateData.userId;
+
+      const { quickBooksService } = await import("./quickbooksService");
+      await quickBooksService.handleCallback(code as string, realmId as string, userId);
+
+      res.redirect("/app/connect?success=quickbooks");
+    } catch (error: any) {
+      console.error("QuickBooks callback error:", error);
+      res.redirect("/app/connect?error=callback_failed");
+    }
+  });
+
+  app.get("/api/quickbooks/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { quickBooksService } = await import("./quickbooksService");
+      const status = await quickBooksService.getConnectionStatus(user.id);
+      res.json(status);
+    } catch (error: any) {
+      console.error("QuickBooks status error:", error);
+      res.status(500).json({ message: error.message || "Failed to get connection status" });
+    }
+  });
+
+  app.post("/api/quickbooks/sync", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { startDate, endDate } = req.body;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Start and end dates are required" });
+      }
+
+      const { quickBooksService } = await import("./quickbooksService");
+      const result = await quickBooksService.syncTransactions(user.id, startDate, endDate);
+      res.json(result);
+    } catch (error: any) {
+      console.error("QuickBooks sync error:", error);
+      res.status(500).json({ message: error.message || "Failed to sync transactions" });
+    }
+  });
+
+  app.get("/api/quickbooks/accounts", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { quickBooksService } = await import("./quickbooksService");
+      const accounts = await quickBooksService.getAccounts(user.id);
+      res.json({ accounts });
+    } catch (error: any) {
+      console.error("QuickBooks accounts error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch accounts" });
+    }
+  });
+
+  app.get("/api/quickbooks/profit-loss", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { startDate, endDate } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Start and end dates are required" });
+      }
+
+      const { quickBooksService } = await import("./quickbooksService");
+      const report = await quickBooksService.getProfitAndLoss(user.id, startDate as string, endDate as string);
+      res.json(report);
+    } catch (error: any) {
+      console.error("QuickBooks P&L error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch P&L report" });
+    }
+  });
+
+  app.get("/api/quickbooks/balance-sheet", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { asOfDate } = req.query;
+
+      if (!asOfDate) {
+        return res.status(400).json({ message: "As of date is required" });
+      }
+
+      const { quickBooksService } = await import("./quickbooksService");
+      const report = await quickBooksService.getBalanceSheet(user.id, asOfDate as string);
+      res.json(report);
+    } catch (error: any) {
+      console.error("QuickBooks balance sheet error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch balance sheet" });
+    }
+  });
+
+  app.get("/api/quickbooks/cash-flow", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { startDate, endDate } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Start and end dates are required" });
+      }
+
+      const { quickBooksService } = await import("./quickbooksService");
+      const report = await quickBooksService.getCashFlow(user.id, startDate as string, endDate as string);
+      res.json(report);
+    } catch (error: any) {
+      console.error("QuickBooks cash flow error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch cash flow report" });
+    }
+  });
+
+  app.post("/api/quickbooks/disconnect", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { quickBooksService } = await import("./quickbooksService");
+      await quickBooksService.disconnect(user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("QuickBooks disconnect error:", error);
+      res.status(500).json({ message: error.message || "Failed to disconnect" });
+    }
+  });
+
   // AI endpoints
   app.post("/api/ai/:provider", isAuthenticated, async (req, res) => {
     try {
@@ -2057,6 +2200,207 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Get live transactions error:", error);
       res.status(500).json({ message: error.message || "Failed to fetch transactions" });
+    }
+  });
+
+  // Get Live Mode dashboard analytics
+  app.get("/api/live/analytics/dashboard", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const orgMember = await storage.getOrganizationMember(user.id);
+      
+      if (!orgMember) {
+        return res.json({
+          hasData: false,
+          spend: { total: 0, trend: [], byCategory: [] },
+          revenue: { total: 0, trend: [] },
+          burn: { gross: 0, net: 0, payroll: 0, nonPayroll: 0 },
+          runway: { months: 0, currentCash: 0, zeroDate: null },
+          cashFlow: { inflows: 0, outflows: 0, netFlow: 0, trend: [] },
+          insights: [],
+          vendors: [],
+        });
+      }
+
+      // Import analytics functions
+      const { calculateBurnRate, calculateBurnTrend } = await import("./analytics/burn");
+      const { calculateRunway } = await import("./analytics/runway");
+      const { calculateCashFlow, calculateMonthlyCashFlow, calculateCashFlowByCategory } = await import("./analytics/cashflow");
+      
+      // Get all transactions (last 6 months for calculations)
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const rawTransactions = await storage.getOrganizationTransactions(orgMember.organizationId, {
+        startDate: sixMonthsAgo,
+        endDate: new Date(),
+      });
+
+      if (rawTransactions.length === 0) {
+        return res.json({
+          hasData: false,
+          spend: { total: 0, trend: [], byCategory: [] },
+          revenue: { total: 0, trend: [] },
+          burn: { gross: 0, net: 0, payroll: 0, nonPayroll: 0 },
+          runway: { months: 0, currentCash: 0, zeroDate: null },
+          cashFlow: { inflows: 0, outflows: 0, netFlow: 0, trend: [] },
+          insights: [],
+          vendors: [],
+        });
+      }
+
+      // Transform transactions for analytics functions
+      const transactions = rawTransactions.map((txn: any) => ({
+        date: new Date(txn.date),
+        amount: parseFloat(txn.amount) || 0,
+        type: parseFloat(txn.amount) >= 0 ? "credit" : "debit",
+        vendorNormalized: txn.vendorNormalized || txn.vendorOriginal || txn.description,
+        categoryId: txn.categoryId,
+        isRecurring: txn.isRecurring || false,
+        isPayroll: txn.isPayroll || false,
+      }));
+
+      // Calculate current cash from bank accounts
+      const bankAccounts = await storage.getUserBankAccounts(user.id);
+      const currentCash = bankAccounts.reduce((sum: number, acc: any) => {
+        return sum + (parseFloat(acc.currentBalance) || 0);
+      }, 0);
+
+      // Calculate burn metrics (last 3 months)
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      const burnMetrics = calculateBurnRate(transactions, threeMonthsAgo, new Date());
+      const burnTrend = calculateBurnTrend(transactions, 6);
+
+      // Calculate runway
+      const runwayMetrics = calculateRunway(transactions, currentCash);
+
+      // Calculate cash flow
+      const cashFlowMetrics = calculateCashFlow(transactions, threeMonthsAgo, new Date(), currentCash);
+      const monthlyCashFlow = calculateMonthlyCashFlow(transactions, 6, currentCash);
+
+      // Calculate spend by category
+      const categorySpend = calculateCashFlowByCategory(transactions, threeMonthsAgo, new Date());
+      const categories = await storage.getOrganizationCategories(orgMember.organizationId);
+      const spendByCategory = Object.entries(categorySpend)
+        .filter(([_, data]) => data.outflows > 0)
+        .map(([catId, data]) => {
+          const cat = categories.find((c: any) => c.id === catId);
+          return {
+            id: catId,
+            name: cat?.name || "Other",
+            amount: data.outflows,
+            color: cat?.color || "#888888",
+          };
+        })
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 10);
+
+      // Calculate top vendors
+      const vendorSpend: Record<string, number> = {};
+      for (const txn of transactions) {
+        if (txn.type === "debit" && txn.vendorNormalized) {
+          vendorSpend[txn.vendorNormalized] = (vendorSpend[txn.vendorNormalized] || 0) + Math.abs(txn.amount);
+        }
+      }
+      const vendors = Object.entries(vendorSpend)
+        .map(([name, amount]) => ({ name, amount }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 10);
+
+      // Calculate revenue (credits)
+      const revenue = transactions
+        .filter((t: any) => t.type === "credit")
+        .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+
+      // Monthly revenue trend
+      const revenueTrend = burnTrend.map((m) => {
+        const monthTxns = transactions.filter((t: any) => {
+          const txnMonth = t.date.getMonth();
+          const txnYear = t.date.getFullYear();
+          return txnMonth === m.month.getMonth() && txnYear === m.month.getFullYear();
+        });
+        const monthRevenue = monthTxns
+          .filter((t: any) => t.type === "credit")
+          .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+        return {
+          month: m.month.toISOString(),
+          amount: monthRevenue,
+        };
+      });
+
+      // Generate simple insights
+      const insights: Array<{ type: string; message: string; severity: string }> = [];
+      
+      if (runwayMetrics.runwayMonths < 6 && runwayMetrics.runwayMonths !== Infinity) {
+        insights.push({
+          type: "runway",
+          message: `Runway is ${runwayMetrics.runwayMonths.toFixed(1)} months. Consider raising funds or reducing spend.`,
+          severity: runwayMetrics.runwayMonths < 3 ? "critical" : "warning",
+        });
+      }
+
+      if (burnMetrics.netBurn > burnMetrics.revenue * 1.5 && burnMetrics.revenue > 0) {
+        insights.push({
+          type: "burn",
+          message: "Burn rate is significantly higher than revenue. Review expenses.",
+          severity: "warning",
+        });
+      }
+
+      if (vendors.length > 0 && vendors[0].amount > burnMetrics.grossBurn * 0.2) {
+        insights.push({
+          type: "vendor",
+          message: `${vendors[0].name} accounts for over 20% of spend ($${vendors[0].amount.toLocaleString()}).`,
+          severity: "info",
+        });
+      }
+
+      res.json({
+        hasData: true,
+        spend: {
+          total: burnMetrics.grossBurn,
+          trend: burnTrend.map((b) => ({
+            month: b.month.toISOString(),
+            amount: b.burn,
+          })),
+          byCategory: spendByCategory,
+        },
+        revenue: {
+          total: revenue,
+          trend: revenueTrend,
+        },
+        burn: {
+          gross: burnMetrics.grossBurn,
+          net: burnMetrics.netBurn,
+          payroll: burnMetrics.payroll,
+          nonPayroll: burnMetrics.nonPayroll,
+          recurring: burnMetrics.recurring,
+          oneTime: burnMetrics.oneTime,
+        },
+        runway: {
+          months: runwayMetrics.runwayMonths === Infinity ? null : runwayMetrics.runwayMonths,
+          currentCash,
+          zeroDate: runwayMetrics.zeroDate?.toISOString() || null,
+          monthlyBurn: runwayMetrics.monthlyBurn,
+        },
+        cashFlow: {
+          inflows: cashFlowMetrics.inflows,
+          outflows: cashFlowMetrics.outflows,
+          netFlow: cashFlowMetrics.netFlow,
+          trend: monthlyCashFlow.map((m) => ({
+            month: m.month.toISOString(),
+            inflows: m.cashFlow.inflows,
+            outflows: m.cashFlow.outflows,
+            netFlow: m.cashFlow.netFlow,
+          })),
+        },
+        insights,
+        vendors,
+      });
+    } catch (error: any) {
+      console.error("Get live analytics error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch analytics" });
     }
   });
 

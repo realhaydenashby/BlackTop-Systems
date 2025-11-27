@@ -1,0 +1,77 @@
+Parallel is a web app that connects to a startup’s accounting system (like QuickBooks) and turns that raw data into an always‑up‑to‑date financial model with simple knobs for “what if” planning, hiring, and fundraising decisions.[1]
+
+## One‑sentence product description
+
+A strategic finance cockpit for early‑stage startups that pulls in actuals from accounting, lets founders model scenarios (hires, expenses, rounds), and shows burn, runway, and key metrics in real time.[1]
+
+## Core user workflow
+
+For Replit, describe the product around this flow:
+
+1) Onboarding and data sync  
+- User signs up, creates a company profile, and connects an accounting integration (start with QuickBooks Online via OAuth).  
+- Backend imports chart of accounts, GL, P&L, balance sheet, and cash transactions, then normalizes and stores them.  
+- A “forecast model” object is created that ties to these historical actuals and sets some default assumptions (growth rates, hiring plan, baseline expenses).
+
+2) Always‑on burn/runway view  
+- The app computes burn rate, cash balance, and runway using imported actuals plus forecast assumptions.  
+- Dashboard shows: current cash, monthly burn, projected runway in months, and simple visuals of cash‑over‑time and burn‑over‑time.  
+- This dashboard auto‑updates whenever new accounting data is synced (e.g., nightly or on demand).[1]
+
+3) Scenario modeling (“what if” engine)  
+- User can create multiple “scenarios” (Base, Aggressive, Conservative).  
+- Within a scenario, user can:  
+  - Add/edit hires (role, start date, salary, benefits, taxes).  
+  - Add/edit expenses (tools, rent, marketing, etc., with start/end dates and recurrence).  
+  - Add/edit fundraising events (round amount, date, dilution is optional at first).  
+- The engine recomputes cash and runway curves per scenario and shows side‑by‑side metrics: months of runway, peak burn, cash low point, etc.[1]
+
+4) Headcount planning layer  
+- Separate “Headcount” screen that lists all team members (existing + planned) with cost per month and start date.  
+- Editing a hire here automatically updates that scenario’s forecast.  
+- Show team cost vs. total burn so founders see how much of burn is people vs. other spend.[1]
+
+5) Budget vs actuals  
+- For each month, compare forecasted revenue/expenses vs imported actuals.  
+- Highlight variance (e.g., % over budget) and surface “alerts” when spending categories overshoot assumptions.  
+- Provide a quick action to “roll forward” actuals into the forecast (update future assumptions based on recent trends).[1]
+
+6) Reporting and sharing  
+- Ability to generate a simple, clean financial summary for investors or the team based on any scenario (PDF or share link).  
+- Include: cash/runway chart, key metrics (MRR if applicable, burn, net income), and hiring plan highlights.  
+- Optionally, let users give read‑only access to investors or advisors.[1]
+
+## High‑level technical design (for Replit)
+
+You could describe it to Replit like this:
+
+- Frontend  
+  - Web app (React/Next or similar) with:  
+    - Auth and company selection.  
+    - Dashboards for burn/runway.  
+    - Scenario editor UI (forms for hires, expenses, rounds).  
+    - Headcount planner.  
+    - Budget vs actuals view and simple report builder.  
+
+- Backend  
+  - REST or GraphQL API.  
+  - Integrations service for QuickBooks (handle OAuth, token refresh, data fetch).  
+  - Data model:  
+    - User, Company  
+    - IntegrationConnection (QuickBooks credentials)  
+    - Actuals (transactions, P&L lines, balances)  
+    - ForecastModel  
+    - Scenario (belongs to ForecastModel)  
+    - ScenarioItem: Hire, Expense, FundraiseEvent  
+  - Forecast engine that:  
+    - Reads actuals + scenario assumptions.  
+    - Generates monthly projections for cash, burn, and key metrics.  
+    - Stores or computes on the fly for dashboards and reports.[1]
+
+- Sync and automation  
+  - Background jobs to sync accounting data periodically.  
+  - Recompute projections when: new actuals arrive, scenario changes, or user requests a refresh.[1]
+
+If you want, the next step can be: “help me write an initial spec + data model for a v0 in Replit,” and this can be turned into concrete endpoints and database schemas.
+
+[1](https://getparallel.com/)

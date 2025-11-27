@@ -342,6 +342,26 @@ export const integrationConnections = pgTable("integration_connections", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// QuickBooks OAuth Tokens
+export const quickbooksTokens = pgTable("quickbooks_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  realmId: varchar("realm_id", { length: 100 }).notNull(), // QuickBooks company ID
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  accessTokenExpiresAt: timestamp("access_token_expires_at").notNull(),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at").notNull(),
+  companyName: varchar("company_name", { length: 255 }),
+  lastSyncedAt: timestamp("last_synced_at"),
+  status: varchar("status", { length: 50 }).default("active"), // active, expired, revoked
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_qb_tokens_user").on(table.userId),
+  index("idx_qb_tokens_realm").on(table.realmId),
+]);
+
 // Subscription Plans
 export const subscriptionPlans = pgTable("subscription_plans", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -492,6 +512,7 @@ export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({ i
 export const insertPlannedHireSchema = createInsertSchema(plannedHires).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBurnMetricSchema = createInsertSchema(burnMetrics).omit({ id: true, createdAt: true });
 export const insertRaiseRecommendationSchema = createInsertSchema(raiseRecommendations).omit({ id: true, createdAt: true });
+export const insertQuickbooksTokenSchema = createInsertSchema(quickbooksTokens).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
@@ -534,6 +555,8 @@ export type BurnMetric = typeof burnMetrics.$inferSelect;
 export type InsertBurnMetric = z.infer<typeof insertBurnMetricSchema>;
 export type RaiseRecommendation = typeof raiseRecommendations.$inferSelect;
 export type InsertRaiseRecommendation = z.infer<typeof insertRaiseRecommendationSchema>;
+export type QuickbooksToken = typeof quickbooksTokens.$inferSelect;
+export type InsertQuickbooksToken = z.infer<typeof insertQuickbooksTokenSchema>;
 
 // Extended types with relations
 export type TransactionWithRelations = Transaction & {

@@ -31,7 +31,7 @@ import Resources from "@/pages/resources";
 import Integrations from "@/pages/integrations";
 import Settings from "@/pages/settings";
 // Live Mode Pages
-import BankConnect from "@/pages/app/bank-connect";
+import Connect from "@/pages/app/connect";
 import AppDashboard from "@/pages/app/dashboard";
 import AppTransactions from "@/pages/app/transactions";
 import AppSettings from "@/pages/app/settings";
@@ -159,7 +159,7 @@ function LiveModeRouter() {
         <Route path="/app" component={() => <ProtectedRoute component={AppDashboard} />} />
         <Route path="/app/transactions" component={() => <ProtectedRoute component={AppTransactions} />} />
         <Route path="/app/upload" component={() => <ProtectedRoute component={UploadPage} />} />
-        <Route path="/app/connect" component={() => <ProtectedRoute component={BankConnect} />} />
+        <Route path="/app/connect" component={() => <ProtectedRoute component={Connect} />} />
         <Route path="/app/settings" component={() => <ProtectedRoute component={AppSettings} />} />
         <Route component={NotFound} />
       </Switch>
