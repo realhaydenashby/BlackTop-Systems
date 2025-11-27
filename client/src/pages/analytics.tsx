@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { CHART_COLORS, chartStyles, lineStyles, areaStyles, barStyles } from "@/lib/chartTheme";
 import { ActionPlanModule, type ActionPlanItem } from "@/components/ActionPlanModule";
+import { demoDataService } from "@/services/demoDataService";
 
 function ForecastingChart({ analytics }: { analytics: any }) {
   const [forecastHorizon, setForecastHorizon] = useState("6months");
@@ -175,7 +176,8 @@ export default function Analytics() {
   const [timeRange, setTimeRange] = useState("30");
 
   const { data: analytics, isLoading, error } = useQuery<any>({
-    queryKey: [`/api/analytics?days=${timeRange}`],
+    queryKey: ["analytics", "demo", timeRange],
+    queryFn: () => demoDataService.getAnalytics(),
   });
 
   if (isLoading) {
