@@ -1,0 +1,181 @@
+1. OVERALL DASHBOARD (Home Screen)
+
+Metrics:
+	•	Total revenue (MTD / YTD)
+	•	Net profit
+	•	Cash position
+	•	Total spend (MTD)
+	•	Transactions (count)
+	•	Budget variance %
+	•	Team size (headcount + payroll burn)
+
+Insights block:
+	•	Runway below safety threshold
+	•	AWS costs increased X%
+	•	Duplicate tools detected
+	•	Payroll over budget
+	•	Subscriptions growing faster than revenue
+	•	High-risk cash trend
+
+Actions block:
+	•	“Cut Mixpanel + Amplitude overlap”
+	•	“Renegotiate AWS reserved instances”
+	•	“Correct contractor overage in payroll”
+	•	“Reduce marketing CAC by tightening campaigns”
+
+This page tells the founder the state of the business at a glance.
+
+⸻
+
+2. SPEND ANALYTICS
+
+Metrics:
+	•	Total spend
+	•	Spend by department
+	•	Software burn
+	•	Vendor concentration
+
+Charts:
+	•	Category breakdown (Ops, Eng, GTM, G&A)
+	•	Vendor trend
+	•	Top 10 vendors
+
+Insights:
+	•	“Software spend up 18% MoM”
+	•	“Marketing over budget by $4,200”
+	•	“Vendor overbilling detected”
+
+Actions:
+	•	“Cancel duplicate subscriptions”
+	•	“Move paid ads to lower CPA channel”
+	•	“Evaluate high-cost vendors with low utilization”
+
+⸻
+
+3. REVENUE ANALYTICS
+
+Metrics:
+	•	MRR
+	•	New revenue
+	•	Expansion counts
+	•	Churn
+
+Charts:
+	•	Revenue over time
+	•	Revenue by product
+	•	Top customers
+
+Insights:
+	•	“Revenue dropped 12% due to churn from Product A”
+	•	“Top customer accounts for 26% of total revenue — concentration risk”
+
+Actions:
+	•	“Upsell existing accounts to Product B”
+	•	“Restore lost customer with targeted outreach”
+
+⸻
+
+4. PROFITABILITY
+
+Metrics:
+	•	Gross margin
+	•	Contribution margin per department
+	•	Unit economics
+
+Charts:
+	•	Margin trend
+	•	Cost-to-revenue
+
+Insights:
+	•	“Gross margin squeezed by rising COGS”
+	•	“Contribution margin positive only in engineering”
+
+Actions:
+	•	“Optimize fulfillment costs”
+	•	“Reduce low-ROI spend in G&A”
+
+⸻
+
+5. FORECASTING
+
+Metrics:
+	•	Predicted burn rate
+	•	30/60/90 day cash forecast
+	•	Raise runway
+	•	Hiring impact
+
+Charts:
+	•	Cash-on-hand trajectory
+	•	Burn projections
+
+Insights:
+	•	“At current burn, runway ends in 4.7 months”
+	•	“Hiring 2 engineers reduces runway by 1.8 months”
+
+Actions:
+	•	“Delay hires until revenue stabilizes”
+	•	“Raise $X to reach 18-month runway”
+
+⸻
+
+6. RUNWAY
+
+Metrics:
+	•	Burn per month
+	•	Cash on hand
+	•	Runway length
+
+Insights:
+	•	“High burn from contractor-heavy payroll”
+	•	“Marketing overspend compressing runway”
+
+Actions:
+	•	“Cut $8K in non-essential ads to extend runway by 30 days”
+
+⸻
+
+7. FUNDRAISING
+
+Metrics:
+	•	Raise target recommendation
+	•	Milestone timeline
+	•	Investors readiness score
+
+Insights:
+	•	“Based on burn and milestones, raise $750K”
+	•	“You’re 3 months behind product milestones”
+
+Actions:
+	•	“Accelerate PM hiring for milestone alignment”
+
+⸻
+
+8. HIRING
+
+Metrics:
+	•	Payroll burn
+	•	Overages vs budget
+	•	Avg fully loaded cost per role
+
+Insights:
+	•	“Payroll up 8% due to contractors”
+	•	“Hiring plan mismatched to runway”
+
+Actions:
+	•	“Move contractor into salaried role for savings”
+
+⸻
+
+9. CASH FLOW
+
+Metrics:
+	•	Inflows
+	•	Outflows
+	•	Net cash
+
+Insights:
+	•	“Outflows rising faster than revenue”
+	•	“Vendor payment cluster detected”
+
+Actions:
+	•	“Delay non-essential vendor payments 15 days”
