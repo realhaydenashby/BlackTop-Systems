@@ -140,6 +140,43 @@ Located at `/app/forecasting/workbook`:
 - Summary cards showing aggregated metrics
 - Reset and export functionality
 - Client-side state management with `useState` and `useCallback`
+- **Scenario Comparison**: Side-by-side view of Conservative/Base/Aggressive scenarios
+  - Editable parameters: revenue growth, burn growth, new hires, avg salary
+  - Dynamic runway/burn calculations with visual change indicators
+  - Collapsible section integrated below the financial model table
+
+### AI Copilot with Tool-Calling
+Located in `/server/copilot/tools.ts`:
+- Uses OpenAI function calling for interactive scenario modeling
+- **Available Tools**:
+  - `add_planned_hire`: Add planned hire and recalculate runway
+  - `add_recurring_expense`: Add recurring expense (SaaS, marketing, etc.)
+  - `calculate_scenario`: Run what-if scenario with revenue/expense changes
+  - `get_vendor_analysis`: Analyze spend by vendor with month-over-month changes
+  - `get_category_breakdown`: Breakdown of spend by category
+  - `fundraising_calculator`: Calculate optimal raise amount and timing
+- Users can ask: "What if I hire a $90k engineer?" and get real scenario results
+
+### Shareable Reports
+Located in `/server/reports/shareableReport.ts`:
+- Generate investor-ready HTML reports with runway, burn, and key metrics
+- UUID-based public links (immutable snapshots)
+- Endpoints:
+  - `POST /api/reports/shareable` - Create new report
+  - `GET /api/reports/shareable` - List all reports
+  - `GET /api/reports/:id` - View public HTML report
+  - `DELETE /api/reports/shareable/:id` - Delete report
+- Report includes: cash position, burn rate, runway, trend indicators, top categories
+
+### Notification System
+Multi-channel alerts for proactive monitoring:
+- **Weekly Email Digest**: Runway, burn change, top 3 insights
+- **Threshold Alerts**: 
+  - Runway < 6 months warning
+  - Vendor spike > 20% detection
+  - Burn acceleration alerts
+- Channels: Slack webhooks, Email (SMTP), SMS (Twilio)
+- Configuration in `/server/notifs/`
 
 ## Data Model
 
