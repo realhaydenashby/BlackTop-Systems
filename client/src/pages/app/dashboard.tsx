@@ -25,10 +25,29 @@ import {
   FileSpreadsheet,
   Calendar,
   Sparkles,
+  BarChart3,
+  PieChart as PieChartIcon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, addMonths } from "date-fns";
+import {
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
 
 interface WeeklyChange {
   type: string;
@@ -97,6 +116,361 @@ function formatCurrency(amount: number): string {
 function formatPercent(value: number): string {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
+}
+
+const CHART_COLORS = {
+  primary: "hsl(var(--primary))",
+  green: "#22c55e",
+  red: "#ef4444",
+  blue: "#3b82f6",
+  yellow: "#eab308",
+  purple: "#a855f7",
+  orange: "#f97316",
+  teal: "#14b8a6",
+  pink: "#ec4899",
+};
+
+const CATEGORY_COLORS = [
+  CHART_COLORS.blue,
+  CHART_COLORS.green,
+  CHART_COLORS.purple,
+  CHART_COLORS.orange,
+  CHART_COLORS.teal,
+  CHART_COLORS.pink,
+  CHART_COLORS.yellow,
+];
+
+function formatCompactCurrency(value: number): string {
+  if (value >= 1000000) {
+    return `$${(value / 1000000).toFixed(1)}M`;
+  }
+  if (value >= 1000) {
+    return `$${(value / 1000).toFixed(0)}k`;
+  }
+  return `$${value.toFixed(0)}`;
+}
+
+function CashFlowChart({ data }: { data: Array<{ month: string; inflows: number; outflows: number; netFlow: number }> }) {
+  if (!data || data.length === 0) return null;
+
+  const chartData = data.map(d => ({
+    month: format(parseISO(d.month), "MMM"),
+    inflows: d.inflows,
+    outflows: Math.abs(d.outflows),
+    net: d.netFlow,
+  }));
+
+  return (
+    <Card data-testid="chart-cash-flow">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-medium flex items-center gap-2">
+          <BarChart3 className="h-4 w-4" />
+          Cash Flow Trend
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[200px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} barGap={0} barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis 
+                dataKey="month" 
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                axisLine={{ stroke: "hsl(var(--border))" }}
+                tickLine={false}
+              />
+              <YAxis 
+                tickFormatter={formatCompactCurrency}
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+                width={60}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: "hsl(var(--popover))", 
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                  fontSize: "13px"
+                }}
+                formatter={(value: number, name: string) => [
+                  formatCurrency(value),
+                  name === "inflows" ? "Money In" : name === "outflows" ? "Money Out" : "Net"
+                ]}
+                labelStyle={{ color: "hsl(var(--foreground))" }}
+              />
+              <Bar dataKey="inflows" fill={CHART_COLORS.green} radius={[4, 4, 0, 0]} name="inflows" />
+              <Bar dataKey="outflows" fill={CHART_COLORS.red} radius={[4, 4, 0, 0]} name="outflows" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex justify-center gap-6 mt-3 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: CHART_COLORS.green }} />
+            <span className="text-muted-foreground">Money In</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: CHART_COLORS.red }} />
+            <span className="text-muted-foreground">Money Out</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BurnTrendChart({ data }: { data: Array<{ month: string; amount: number }> }) {
+  if (!data || data.length === 0) return null;
+
+  const chartData = data.map(d => ({
+    month: format(parseISO(d.month), "MMM"),
+    burn: d.amount,
+  }));
+
+  const avgBurn = chartData.reduce((sum, d) => sum + d.burn, 0) / chartData.length;
+
+  return (
+    <Card data-testid="chart-burn-trend">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-medium flex items-center gap-2">
+          <TrendingDown className="h-4 w-4" />
+          Monthly Burn Rate
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[200px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="burnGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={CHART_COLORS.red} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={CHART_COLORS.red} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis 
+                dataKey="month" 
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                axisLine={{ stroke: "hsl(var(--border))" }}
+                tickLine={false}
+              />
+              <YAxis 
+                tickFormatter={formatCompactCurrency}
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+                width={60}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: "hsl(var(--popover))", 
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                  fontSize: "13px"
+                }}
+                formatter={(value: number) => [formatCurrency(value), "Monthly Burn"]}
+                labelStyle={{ color: "hsl(var(--foreground))" }}
+              />
+              <ReferenceLine 
+                y={avgBurn} 
+                stroke="hsl(var(--muted-foreground))" 
+                strokeDasharray="5 5"
+                label={{ 
+                  value: `Avg: ${formatCompactCurrency(avgBurn)}`, 
+                  position: "right",
+                  fill: "hsl(var(--muted-foreground))",
+                  fontSize: 11
+                }}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="burn" 
+                stroke={CHART_COLORS.red}
+                strokeWidth={2}
+                fill="url(#burnGradient)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CategoryDonutChart({ data }: { data: Array<{ id: string; name: string; amount: number; color: string }> }) {
+  if (!data || data.length === 0) return null;
+
+  const total = data.reduce((sum, d) => sum + d.amount, 0);
+  const chartData = data.slice(0, 6).map((d, i) => ({
+    name: d.name,
+    value: d.amount,
+    color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+    percent: total > 0 ? ((d.amount / total) * 100).toFixed(0) : 0,
+  }));
+
+  return (
+    <Card data-testid="chart-category-breakdown">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-medium flex items-center gap-2">
+          <PieChartIcon className="h-4 w-4" />
+          Spending by Category
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center gap-4">
+          <div className="h-[180px] w-[180px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: "hsl(var(--popover))", 
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                    fontSize: "13px"
+                  }}
+                  formatter={(value: number) => [formatCurrency(value), "Spend"]}
+                  labelStyle={{ color: "hsl(var(--foreground))" }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex-1 space-y-2">
+            {chartData.map((item, i) => (
+              <div key={item.name} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-3 h-3 rounded-full" 
+                    style={{ backgroundColor: item.color }} 
+                  />
+                  <span className="text-muted-foreground truncate max-w-[100px]">{item.name}</span>
+                </div>
+                <span className="font-medium">{item.percent}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RunwayProjectionChart({ 
+  currentCash, 
+  monthlyBurn, 
+  runwayMonths 
+}: { 
+  currentCash: number; 
+  monthlyBurn: number;
+  runwayMonths: number | null;
+}) {
+  if (!currentCash || monthlyBurn <= 0) return null;
+
+  const months = Math.min(runwayMonths || 24, 24);
+  const chartData = [];
+  let cash = currentCash;
+  const now = new Date();
+
+  for (let i = 0; i <= months; i++) {
+    chartData.push({
+      month: format(addMonths(now, i), "MMM yy"),
+      cash: Math.max(0, cash),
+      isNow: i === 0,
+    });
+    cash -= monthlyBurn;
+  }
+
+  const dangerThreshold = currentCash * 0.2;
+
+  return (
+    <Card data-testid="chart-runway-projection">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-medium flex items-center gap-2">
+          <Clock className="h-4 w-4" />
+          Runway Projection
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[200px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="runwayGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={CHART_COLORS.blue} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={CHART_COLORS.blue} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis 
+                dataKey="month" 
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                axisLine={{ stroke: "hsl(var(--border))" }}
+                tickLine={false}
+                interval="preserveStartEnd"
+              />
+              <YAxis 
+                tickFormatter={formatCompactCurrency}
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+                width={60}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: "hsl(var(--popover))", 
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                  fontSize: "13px"
+                }}
+                formatter={(value: number) => [formatCurrency(value), "Projected Cash"]}
+                labelStyle={{ color: "hsl(var(--foreground))" }}
+              />
+              <ReferenceLine 
+                y={dangerThreshold} 
+                stroke={CHART_COLORS.yellow}
+                strokeDasharray="5 5"
+                label={{ 
+                  value: "Danger Zone", 
+                  position: "right",
+                  fill: CHART_COLORS.yellow,
+                  fontSize: 11
+                }}
+              />
+              <ReferenceLine 
+                y={0} 
+                stroke={CHART_COLORS.red}
+                strokeWidth={2}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="cash" 
+                stroke={CHART_COLORS.blue}
+                strokeWidth={2}
+                fill="url(#runwayGradient)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        {runwayMonths && (
+          <p className="text-center text-sm text-muted-foreground mt-2">
+            At current burn rate, cash reaches zero in <span className="font-medium text-foreground">{runwayMonths.toFixed(1)} months</span>
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 function MetricCard({
@@ -685,6 +1059,18 @@ export default function AppDashboard() {
           value={formatCurrency(data.revenue.total / 3)}
           subtitle="3-month average"
           icon={TrendingUp}
+        />
+      </div>
+
+      {/* Charts Section - only shows when data is available */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-testid="charts-section">
+        <CashFlowChart data={data.cashFlow.trend} />
+        <BurnTrendChart data={data.spend.trend} />
+        <CategoryDonutChart data={data.spend.byCategory} />
+        <RunwayProjectionChart 
+          currentCash={data.runway.currentCash}
+          monthlyBurn={data.runway.monthlyBurn}
+          runwayMonths={data.runway.months}
         />
       </div>
 
