@@ -2206,6 +2206,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== PLAID INTEGRATION ROUTES ==========
+
+  // Create Plaid Link token
+  app.post("/api/live/plaid/link-token", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { plaidService } = await import("./plaidService");
+      
+      if (!plaidService.isConfigured()) {
+        return res.status(503).json({ message: "Plaid is not configured. Please add PLAID_CLIENT_ID and PLAID_SECRET." });
+      }
+
+      const linkToken = await plaidService.createLinkToken(user.id);
+      res.json({ linkToken });
+    } catch (error: any) {
+      console.error("Plaid link token error:", error);
+      res.status(500).json({ message: error.message || "Failed to create link token" });
+    }
+  });
+
+  // Exchange Plaid public token for access token
+  app.post("/api/live/plaid/exchange-token", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { publicToken } = req.body;
+
+      if (!publicToken) {
+        return res.status(400).json({ message: "Public token is required" });
+      }
+
+      const { plaidService } = await import("./plaidService");
+      const result = await plaidService.exchangePublicToken(user.id, publicToken);
+
+      // Create organization if doesn't exist
+      let orgMember = await storage.getOrganizationMember(user.id);
+      let organizationId: string;
+      
+      if (!orgMember) {
+        const org = await storage.createOrganization({
+          name: `${user.firstName || user.email?.split("@")[0] || "User"}'s Company`,
+          industry: "technology",
+          size: "1-10",
+          settings: {},
+        });
+        organizationId = org.id;
+        await storage.addOrganizationMember({
+          organizationId: org.id,
+          userId: user.id,
+          role: "founder",
+        });
+      } else {
+        organizationId = orgMember.organizationId;
+      }
+
+      // Update all bank accounts with organization ID
+      const accounts = await plaidService.getAccounts(user.id);
+      for (const account of accounts) {
+        if (!account.organizationId) {
+          await storage.updateBankAccount(account.id, { organizationId });
+        }
+      }
+
+      res.json({ success: true, itemId: result.itemId, accountCount: result.accounts.length });
+    } catch (error: any) {
+      console.error("Plaid token exchange error:", error);
+      res.status(500).json({ message: error.message || "Failed to connect bank account" });
+    }
+  });
+
+  // Sync Plaid transactions
+  app.post("/api/live/plaid/sync", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { plaidService } = await import("./plaidService");
+
+      const synced = await plaidService.syncTransactions(user.id);
+
+      // Trigger auto-model pipeline if transactions were synced
+      if (synced > 0) {
+        const orgMember = await storage.getOrganizationMember(user.id);
+        if (orgMember) {
+          const { autoModelPipeline } = await import("./autoModelPipeline");
+          autoModelPipeline.runFullPipeline(orgMember.organizationId).then(result => {
+            console.log("[AutoModel] Pipeline complete:", result);
+          }).catch(err => {
+            console.error("[AutoModel] Pipeline error:", err);
+          });
+
+          const { checkThresholds, sendThresholdAlerts } = await import("./notifs/thresholdAlerts");
+          checkThresholds(orgMember.organizationId, user.id).then(async (alerts) => {
+            if (alerts.length > 0) {
+              const result = await sendThresholdAlerts(user.id, alerts);
+              console.log("[ThresholdAlerts] Sent:", result.sent);
+            }
+          }).catch(err => {
+            console.error("[ThresholdAlerts] Error:", err);
+          });
+        }
+      }
+
+      res.json({ synced });
+    } catch (error: any) {
+      console.error("Plaid sync error:", error);
+      res.status(500).json({ message: error.message || "Failed to sync transactions" });
+    }
+  });
+
+  // Get Plaid accounts
+  app.get("/api/live/plaid/accounts", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { plaidService } = await import("./plaidService");
+      const accounts = await plaidService.getAccounts(user.id);
+      res.json(accounts);
+    } catch (error: any) {
+      console.error("Plaid accounts error:", error);
+      res.status(500).json({ message: error.message || "Failed to get accounts" });
+    }
+  });
+
+  // Check Plaid configuration status
+  app.get("/api/live/plaid/status", isAuthenticated, async (req, res) => {
+    try {
+      const { plaidService } = await import("./plaidService");
+      res.json({ configured: plaidService.isConfigured() });
+    } catch (error: any) {
+      res.json({ configured: false });
+    }
+  });
+
+  // ========== END PLAID ROUTES ==========
+
   // Run auto-model pipeline manually
   app.post("/api/live/auto-model/run", isAuthenticated, async (req, res) => {
     try {

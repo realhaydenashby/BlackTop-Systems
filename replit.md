@@ -96,7 +96,7 @@ Routes: `/app`, `/app/transactions`, `/app/upload`, `/app/settings`, `/app/conne
 - TopBar shows "Live workspace" badge
 - **Dashboard**: Single page with collapsible sections (Spend, Revenue, Burn, Runway, Forecast, Raise, Hiring)
 - **Transactions**: Spreadsheet-style view with search, filter, categorization
-- **Connect**: Bank account connection via Yodlee FastLink
+- **Connect**: Bank account connection via Plaid (primary) or Yodlee FastLink (fallback)
 - **Forecasting Workbook**: Spreadsheet-style scenario modeling with 12-month projections
 - **Settings**: Notifications, company info, integrations
 
@@ -183,10 +183,12 @@ Multi-channel alerts for proactive monitoring:
 ### Core Entities
 - `users` - Replit Auth profiles
 - `organizations` - Tenant entities
-- `bank_accounts` - Connected accounts (Yodlee)
+- `bank_accounts` - Connected accounts (Plaid/Yodlee)
+- `plaid_items` - Plaid access tokens and cursors for incremental sync
 - `transactions` - Unified transaction records with:
   - `externalId` - Provider's transaction ID
-  - `source` - yodlee | csv | stripe | manual
+  - `plaidTransactionId` - Plaid's transaction ID for deduplication
+  - `source` - plaid | yodlee | csv | stripe | manual
   - `vendorOriginal` - Raw vendor string
   - `vendorNormalized` - AI-cleaned vendor name
   - `classificationConfidence` - AI confidence 0-1
@@ -215,7 +217,8 @@ Multi-channel alerts for proactive monitoring:
 - AI: Groq/Gemini for normalization
 
 ### Integrations
-- Yodlee FastLink for bank connections
+- Plaid for bank connections (primary)
+- Yodlee FastLink for bank connections (fallback)
 - Stripe for revenue data
 - Slack/SMS for notifications
 

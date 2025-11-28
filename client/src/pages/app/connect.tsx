@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,14 @@ import { SiQuickbooks } from "react-icons/si";
 import type { BankAccount } from "@shared/schema";
 import { Link, useLocation } from "wouter";
 import { format, subMonths } from "date-fns";
+
+declare global {
+  interface Window {
+    Plaid?: {
+      create: (config: any) => { open: () => void; exit: () => void; destroy: () => void };
+    };
+  }
+}
 
 function getAccountIcon(accountType: string | null) {
   switch (accountType) {
@@ -65,6 +73,29 @@ export default function Connect() {
   const [showFastLink, setShowFastLink] = useState(false);
   const [fastLinkUrl, setFastLinkUrl] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [plaidReady, setPlaidReady] = useState(false);
+  const plaidHandlerRef = useRef<any>(null);
+
+  // Load Plaid Link script
+  useEffect(() => {
+    if (document.getElementById("plaid-link-script")) {
+      setPlaidReady(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "plaid-link-script";
+    script.src = "https://cdn.plaid.com/link/v2/stable/link-initialize.js";
+    script.async = true;
+    script.onload = () => setPlaidReady(true);
+    document.body.appendChild(script);
+
+    return () => {
+      if (plaidHandlerRef.current) {
+        plaidHandlerRef.current.destroy();
+      }
+    };
+  }, []);
 
   // Check URL params for success/error messages
   useEffect(() => {
@@ -227,6 +258,106 @@ export default function Connect() {
     },
   });
 
+  // Check Plaid configuration status
+  const { data: plaidStatus } = useQuery<{ configured: boolean }>({
+    queryKey: ["/api/live/plaid/status"],
+  });
+
+  // Create Plaid Link token
+  const createPlaidLinkMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/live/plaid/link-token");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (window.Plaid && data.linkToken) {
+        const handler = window.Plaid.create({
+          token: data.linkToken,
+          onSuccess: (publicToken: string, metadata: any) => {
+            exchangePlaidTokenMutation.mutate(publicToken);
+          },
+          onExit: (err: any) => {
+            if (err) {
+              console.error("Plaid Link exit error:", err);
+              toast({
+                title: "Connection Cancelled",
+                description: "Bank connection was not completed.",
+                variant: "destructive",
+              });
+            }
+          },
+          onEvent: (eventName: string) => {
+            console.log("Plaid event:", eventName);
+          },
+        });
+        plaidHandlerRef.current = handler;
+        handler.open();
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Unable to start bank connection.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Exchange Plaid public token
+  const exchangePlaidTokenMutation = useMutation({
+    mutationFn: async (publicToken: string) => {
+      const res = await apiRequest("POST", "/api/live/plaid/exchange-token", { publicToken });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/live/bank-accounts"] });
+      toast({
+        title: "Bank Connected",
+        description: `${data.accountCount} account(s) connected successfully.`,
+      });
+      // Sync transactions immediately
+      syncPlaidMutation.mutate();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Unable to connect bank account.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Sync Plaid transactions
+  const syncPlaidMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/live/plaid/sync");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.synced > 0) {
+        toast({
+          title: "Transactions Synced",
+          description: `${data.synced} transaction(s) imported.`,
+        });
+      }
+      // Redirect to dashboard after successful sync
+      setTimeout(() => navigate("/app"), 1500);
+    },
+  });
+
+  // Connect bank handler - uses Plaid if configured, otherwise falls back to Yodlee
+  const handleConnectBank = useCallback(() => {
+    if (plaidStatus?.configured) {
+      createPlaidLinkMutation.mutate();
+    } else {
+      generateFastLinkMutation.mutate();
+    }
+  }, [plaidStatus, createPlaidLinkMutation, generateFastLinkMutation]);
+
+  const isConnectingBank = createPlaidLinkMutation.isPending || 
+    exchangePlaidTokenMutation.isPending || 
+    generateFastLinkMutation.isPending;
+
   // Handle FastLink postMessage events
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -364,11 +495,11 @@ export default function Connect() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => generateFastLinkMutation.mutate()}
-              disabled={generateFastLinkMutation.isPending}
+              onClick={handleConnectBank}
+              disabled={isConnectingBank || !plaidReady}
               data-testid="button-add-bank"
             >
-              {generateFastLinkMutation.isPending ? (
+              {isConnectingBank ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Plus className="h-4 w-4 mr-2" />
@@ -390,11 +521,11 @@ export default function Connect() {
                 Connect your business bank accounts to automatically import transactions.
               </p>
               <Button
-                onClick={() => generateFastLinkMutation.mutate()}
-                disabled={generateFastLinkMutation.isPending}
+                onClick={handleConnectBank}
+                disabled={isConnectingBank || !plaidReady}
                 data-testid="button-connect-first-bank"
               >
-                {generateFastLinkMutation.isPending ? (
+                {isConnectingBank ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <Plus className="h-4 w-4 mr-2" />
@@ -451,11 +582,17 @@ export default function Connect() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => syncTransactionsMutation.mutate(account.id)}
-                        disabled={syncTransactionsMutation.isPending}
+                        onClick={() => {
+                          if ((account as any).provider === "plaid") {
+                            syncPlaidMutation.mutate();
+                          } else {
+                            syncTransactionsMutation.mutate(account.id);
+                          }
+                        }}
+                        disabled={syncTransactionsMutation.isPending || syncPlaidMutation.isPending}
                         data-testid={`button-sync-${account.id}`}
                       >
-                        <RefreshCw className={`h-4 w-4 mr-1 ${syncTransactionsMutation.isPending ? "animate-spin" : ""}`} />
+                        <RefreshCw className={`h-4 w-4 mr-1 ${syncTransactionsMutation.isPending || syncPlaidMutation.isPending ? "animate-spin" : ""}`} />
                         Sync
                       </Button>
                       <Button

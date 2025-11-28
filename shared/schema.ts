@@ -161,16 +161,35 @@ export const documents = pgTable("documents", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Bank Accounts (Yodlee connections)
+// Bank Accounts (Yodlee/Plaid connections)
 export const bankAccountTypeEnum = pgEnum("bank_account_type", ["checking", "savings", "credit_card", "investment", "loan", "other"]);
 export const bankAccountStatusEnum = pgEnum("bank_account_status", ["active", "disconnected", "error"]);
+export const bankConnectionProviderEnum = pgEnum("bank_connection_provider", ["yodlee", "plaid"]);
+
+// Plaid Items (stores access tokens for connected institutions)
+export const plaidItems = pgTable("plaid_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  plaidItemId: varchar("plaid_item_id").notNull().unique(),
+  accessToken: varchar("access_token").notNull(),
+  institutionId: varchar("institution_id"),
+  institutionName: varchar("institution_name"),
+  cursor: varchar("cursor"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_plaid_items_user").on(table.userId),
+]);
 
 export const bankAccounts = pgTable("bank_accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  provider: bankConnectionProviderEnum("provider").default("yodlee"),
   yodleeAccountId: varchar("yodlee_account_id"), // Yodlee's account ID
   yodleeProviderAccountId: varchar("yodlee_provider_account_id"), // Yodlee's provider account ID
+  plaidAccountId: varchar("plaid_account_id"), // Plaid's account ID
+  plaidItemId: varchar("plaid_item_id").references(() => plaidItems.id, { onDelete: "cascade" }),
   bankName: varchar("bank_name", { length: 255 }),
   accountName: varchar("account_name", { length: 255 }),
   accountNumberMasked: varchar("account_number_masked", { length: 50 }), // e.g., "****1234"
@@ -185,18 +204,20 @@ export const bankAccounts = pgTable("bank_accounts", {
 }, (table) => [
   index("idx_bank_accounts_user").on(table.userId),
   index("idx_bank_accounts_yodlee").on(table.yodleeAccountId),
+  index("idx_bank_accounts_plaid").on(table.plaidAccountId),
 ]);
 
-// Transaction source enum for distinguishing Yodlee vs CSV vs manual
-export const transactionSourceEnum = pgEnum("transaction_source", ["yodlee", "csv", "manual", "stripe"]);
+// Transaction source enum for distinguishing Yodlee vs Plaid vs CSV vs manual
+export const transactionSourceEnum = pgEnum("transaction_source", ["yodlee", "plaid", "csv", "manual", "stripe"]);
 
-// Transactions (updated with Yodlee fields)
+// Transactions (updated with Yodlee/Plaid fields)
 export const transactions = pgTable("transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   documentId: varchar("document_id").references(() => documents.id, { onDelete: "set null" }),
   bankAccountId: varchar("bank_account_id").references(() => bankAccounts.id, { onDelete: "set null" }), // Link to bank account
   yodleeTransactionId: varchar("yodlee_transaction_id"), // Yodlee's transaction ID (for deduplication)
+  plaidTransactionId: varchar("plaid_transaction_id"), // Plaid's transaction ID (for deduplication)
   date: timestamp("date").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).default("USD"),
@@ -219,6 +240,7 @@ export const transactions = pgTable("transactions", {
   index("idx_transactions_vendor").on(table.vendorId),
   index("idx_transactions_category").on(table.categoryId),
   index("idx_transactions_yodlee").on(table.yodleeTransactionId),
+  index("idx_transactions_plaid").on(table.plaidTransactionId),
   index("idx_transactions_bank_account").on(table.bankAccountId),
 ]);
 
@@ -581,6 +603,7 @@ export const insertIntegrationConnectionSchema = createInsertSchema(integrationC
 export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true, createdAt: true });
 export const insertMonthlyMetricSchema = createInsertSchema(monthlyMetrics).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPlaidItemSchema = createInsertSchema(plaidItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPlannedHireSchema = createInsertSchema(plannedHires).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBurnMetricSchema = createInsertSchema(burnMetrics).omit({ id: true, createdAt: true });
 export const insertRaiseRecommendationSchema = createInsertSchema(raiseRecommendations).omit({ id: true, createdAt: true });
@@ -623,6 +646,8 @@ export type MonthlyMetric = typeof monthlyMetrics.$inferSelect;
 export type InsertMonthlyMetric = z.infer<typeof insertMonthlyMetricSchema>;
 export type BankAccount = typeof bankAccounts.$inferSelect;
 export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
+export type PlaidItem = typeof plaidItems.$inferSelect;
+export type InsertPlaidItem = z.infer<typeof insertPlaidItemSchema>;
 export type PlannedHire = typeof plannedHires.$inferSelect;
 export type InsertPlannedHire = z.infer<typeof insertPlannedHireSchema>;
 export type BurnMetric = typeof burnMetrics.$inferSelect;
