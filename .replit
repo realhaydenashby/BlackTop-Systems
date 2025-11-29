@@ -27,6 +27,10 @@ localPort = 33961
 externalPort = 3000
 
 [[ports]]
+localPort = 36221
+externalPort = 6000
+
+[[ports]]
 localPort = 36773
 externalPort = 4200
 
@@ -70,3 +74,4 @@ integrations = ["javascript_openai_ai_integrations:1.0.0", "javascript_database:
 [userenv.shared]
 TESTING_VITE_STRIPE_PUBLIC_KEY = "pk_test_51SVkwnCAxyopqaOvwVReFmSxEoIdtmAbt7TIjmiZlVV8RqigTikbojWkBtztvcGZmLYYuq8Dde5ZojizjobRtHht00uPU811iX"
 TESTING_STRIPE_SECRET_KEY = "sk_test_51SVkwnCAxyopqaOvHVlyzT8banzUX2GQdgeuTQUTfPRtq3mcHuuwsjjF8uJwCU8FPjdPvis1U3n3YKwMrPzBiW7s00wgjkS9W8"
+PLAID_ENV = "sandbox"
