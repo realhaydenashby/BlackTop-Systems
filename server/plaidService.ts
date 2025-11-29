@@ -1,4 +1,4 @@
-import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } from "plaid";
+import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode, LinkTokenCreateRequest } from "plaid";
 import { db } from "./db";
 import { plaidItems, bankAccounts, transactions, organizationMembers } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
@@ -38,14 +38,24 @@ class PlaidService {
   async createLinkToken(userId: string): Promise<string> {
     const client = this.getClient();
 
-    const response = await client.linkTokenCreate({
+    console.log("[Plaid] Creating link token for user:", userId);
+    console.log("[Plaid] PLAID_CLIENT_ID exists:", !!process.env.PLAID_CLIENT_ID);
+    console.log("[Plaid] PLAID_SECRET exists:", !!process.env.PLAID_SECRET);
+    console.log("[Plaid] PLAID_ENV:", process.env.PLAID_ENV || "sandbox");
+
+    const request: LinkTokenCreateRequest = {
       user: { client_user_id: userId },
       client_name: "BlackTop Systems",
       products: [Products.Transactions],
       country_codes: [CountryCode.Us],
       language: "en",
-    });
+    };
+    
+    console.log("[Plaid] Link token request:", JSON.stringify(request, null, 2));
+    
+    const response = await client.linkTokenCreate(request);
 
+    console.log("[Plaid] Link token created successfully");
     return response.data.link_token;
   }
 
