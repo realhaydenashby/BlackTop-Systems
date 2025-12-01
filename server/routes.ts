@@ -1813,9 +1813,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/quickbooks/status", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
       const { quickBooksService } = await import("./quickbooksService");
-      const status = await quickBooksService.getConnectionStatus(user.id);
+      const status = await quickBooksService.getConnectionStatus(userId);
       res.json(status);
     } catch (error: any) {
       console.error("QuickBooks status error:", error);
@@ -1825,15 +1831,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quickbooks/sync", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
+      const user = req.user as any;
+      const userId = getUserId(user);
       const { startDate, endDate } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
 
       if (!startDate || !endDate) {
         return res.status(400).json({ message: "Start and end dates are required" });
       }
 
       const { quickBooksService } = await import("./quickbooksService");
-      const result = await quickBooksService.syncTransactions(user.id, startDate, endDate);
+      const result = await quickBooksService.syncTransactions(userId, startDate, endDate);
       res.json(result);
     } catch (error: any) {
       console.error("QuickBooks sync error:", error);
@@ -1843,9 +1854,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/quickbooks/accounts", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
       const { quickBooksService } = await import("./quickbooksService");
-      const accounts = await quickBooksService.getAccounts(user.id);
+      const accounts = await quickBooksService.getAccounts(userId);
       res.json({ accounts });
     } catch (error: any) {
       console.error("QuickBooks accounts error:", error);
@@ -1855,15 +1872,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/quickbooks/profit-loss", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
+      const user = req.user as any;
+      const userId = getUserId(user);
       const { startDate, endDate } = req.query;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
 
       if (!startDate || !endDate) {
         return res.status(400).json({ message: "Start and end dates are required" });
       }
 
       const { quickBooksService } = await import("./quickbooksService");
-      const report = await quickBooksService.getProfitAndLoss(user.id, startDate as string, endDate as string);
+      const report = await quickBooksService.getProfitAndLoss(userId, startDate as string, endDate as string);
       res.json(report);
     } catch (error: any) {
       console.error("QuickBooks P&L error:", error);
@@ -1873,15 +1895,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/quickbooks/balance-sheet", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
+      const user = req.user as any;
+      const userId = getUserId(user);
       const { asOfDate } = req.query;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
 
       if (!asOfDate) {
         return res.status(400).json({ message: "As of date is required" });
       }
 
       const { quickBooksService } = await import("./quickbooksService");
-      const report = await quickBooksService.getBalanceSheet(user.id, asOfDate as string);
+      const report = await quickBooksService.getBalanceSheet(userId, asOfDate as string);
       res.json(report);
     } catch (error: any) {
       console.error("QuickBooks balance sheet error:", error);
@@ -1891,15 +1918,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/quickbooks/cash-flow", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
+      const user = req.user as any;
+      const userId = getUserId(user);
       const { startDate, endDate } = req.query;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
 
       if (!startDate || !endDate) {
         return res.status(400).json({ message: "Start and end dates are required" });
       }
 
       const { quickBooksService } = await import("./quickbooksService");
-      const report = await quickBooksService.getCashFlow(user.id, startDate as string, endDate as string);
+      const report = await quickBooksService.getCashFlow(userId, startDate as string, endDate as string);
       res.json(report);
     } catch (error: any) {
       console.error("QuickBooks cash flow error:", error);
@@ -1909,9 +1941,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quickbooks/disconnect", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
       const { quickBooksService } = await import("./quickbooksService");
-      await quickBooksService.disconnect(user.id);
+      await quickBooksService.disconnect(userId);
       res.json({ success: true });
     } catch (error: any) {
       console.error("QuickBooks disconnect error:", error);

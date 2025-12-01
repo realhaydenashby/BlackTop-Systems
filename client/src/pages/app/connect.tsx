@@ -134,7 +134,19 @@ export default function Connect() {
       return res.json();
     },
     onSuccess: (data) => {
-      window.location.href = data.authUrl;
+      // QuickBooks OAuth pages block iframe embedding (X-Frame-Options: DENY)
+      // Must open in new tab or break out of iframe context
+      if (window.self !== window.top) {
+        // Running inside iframe (Replit preview) - open in new tab
+        window.open(data.authUrl, "_blank", "noopener");
+        toast({
+          title: "QuickBooks Authorization",
+          description: "A new tab opened for QuickBooks login. Complete authorization there and return here.",
+        });
+      } else {
+        // Running in top-level window - redirect normally
+        window.location.href = data.authUrl;
+      }
     },
     onError: (error: Error) => {
       toast({
