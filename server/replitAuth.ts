@@ -45,10 +45,18 @@ function updateUserSession(
   user: any,
   tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
 ) {
-  user.claims = tokens.claims();
+  const claims = tokens.claims();
+  user.claims = claims;
   user.access_token = tokens.access_token;
   user.refresh_token = tokens.refresh_token;
-  user.expires_at = user.claims?.exp;
+  user.expires_at = claims?.exp;
+  
+  // Add user profile fields for easy access in routes
+  user.id = claims?.sub;
+  user.email = claims?.email;
+  user.firstName = claims?.first_name;
+  user.lastName = claims?.last_name;
+  user.profileImageUrl = claims?.profile_image_url;
 }
 
 async function upsertUser(
