@@ -29,13 +29,22 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
+interface Category {
+  id: string;
+  organizationId: string;
+  name: string;
+  type?: string;
+  createdAt?: string;
+}
+
 interface Transaction {
   id: string;
   date: string;
   description: string;
   vendorOriginal: string;
   vendorNormalized?: string;
-  category?: string;
+  category?: Category | null;
+  categoryId?: string | null;
   amount: number;
   type: "debit" | "credit";
   isRecurring: boolean;
@@ -70,6 +79,13 @@ export default function AppTransactions() {
     enabled: !!user,
   });
 
+  // Helper to get category name from category object or string
+  const getCategoryName = (category: Category | string | null | undefined): string | null => {
+    if (!category) return null;
+    if (typeof category === "string") return category;
+    return category.name || null;
+  };
+
   const mockTransactions: Transaction[] = [
     {
       id: "1",
@@ -77,7 +93,7 @@ export default function AppTransactions() {
       description: "AMZN WEB SERVICES",
       vendorOriginal: "AMZN WEB SERVICES",
       vendorNormalized: "AWS",
-      category: "Infrastructure",
+      category: { id: "cat1", organizationId: "org1", name: "Infrastructure" },
       amount: 5964,
       type: "debit",
       isRecurring: true,
@@ -90,7 +106,7 @@ export default function AppTransactions() {
       description: "GUSTO PAYROLL",
       vendorOriginal: "GUSTO PAYROLL 45000",
       vendorNormalized: "Gusto",
-      category: "Payroll",
+      category: { id: "cat2", organizationId: "org1", name: "Payroll" },
       amount: 45000,
       type: "debit",
       isRecurring: true,
@@ -103,7 +119,7 @@ export default function AppTransactions() {
       description: "Stripe Transfer",
       vendorOriginal: "STRIPE TRANSFER",
       vendorNormalized: "Stripe",
-      category: "Revenue",
+      category: { id: "cat3", organizationId: "org1", name: "Revenue" },
       amount: 12500,
       type: "credit",
       isRecurring: false,
@@ -116,7 +132,7 @@ export default function AppTransactions() {
       description: "SLACK TECHNOLOGIES",
       vendorOriginal: "SLACK TECHNOLOGIES",
       vendorNormalized: "Slack",
-      category: "Software",
+      category: { id: "cat4", organizationId: "org1", name: "Software" },
       amount: 850,
       type: "debit",
       isRecurring: true,
@@ -129,7 +145,7 @@ export default function AppTransactions() {
       description: "FIGMA INC",
       vendorOriginal: "FIGMA INC",
       vendorNormalized: "Figma",
-      category: "Software",
+      category: { id: "cat4", organizationId: "org1", name: "Software" },
       amount: 450,
       type: "debit",
       isRecurring: true,
@@ -142,7 +158,7 @@ export default function AppTransactions() {
       description: "GOOGLE CLOUD",
       vendorOriginal: "GOOGLE *CLOUD",
       vendorNormalized: "Google Cloud",
-      category: "Infrastructure",
+      category: { id: "cat1", organizationId: "org1", name: "Infrastructure" },
       amount: 2340,
       type: "debit",
       isRecurring: true,
@@ -155,7 +171,7 @@ export default function AppTransactions() {
       description: "Customer Payment",
       vendorOriginal: "ACH DEPOSIT - ACME CORP",
       vendorNormalized: "Acme Corp",
-      category: "Revenue",
+      category: { id: "cat3", organizationId: "org1", name: "Revenue" },
       amount: 8500,
       type: "credit",
       isRecurring: false,
@@ -173,8 +189,9 @@ export default function AppTransactions() {
       txn.vendorNormalized?.toLowerCase().includes(search.toLowerCase()) ||
       txn.vendorOriginal.toLowerCase().includes(search.toLowerCase());
 
+    const categoryName = getCategoryName(txn.category);
     const matchesCategory =
-      categoryFilter === "all" || txn.category === categoryFilter;
+      categoryFilter === "all" || categoryName === categoryFilter;
 
     const matchesType = typeFilter === "all" || txn.type === typeFilter;
 
@@ -182,8 +199,8 @@ export default function AppTransactions() {
   });
 
   const categories = Array.from(
-    new Set(displayTransactions.map((t) => t.category).filter(Boolean))
-  );
+    new Set(displayTransactions.map((t) => getCategoryName(t.category)).filter(Boolean))
+  ) as string[];
 
   const totalInflows = filteredTransactions
     .filter((t) => t.type === "credit")
@@ -349,8 +366,8 @@ export default function AppTransactions() {
                         {txn.vendorOriginal}
                       </TableCell>
                       <TableCell>
-                        {txn.category ? (
-                          <Badge variant="secondary">{txn.category}</Badge>
+                        {getCategoryName(txn.category) ? (
+                          <Badge variant="secondary">{getCategoryName(txn.category)}</Badge>
                         ) : (
                           <Badge variant="outline" className="text-muted-foreground">
                             Uncategorized

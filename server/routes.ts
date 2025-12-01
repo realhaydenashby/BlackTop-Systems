@@ -2414,8 +2414,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Run auto-model pipeline manually
   app.post("/api/live/auto-model/run", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
-      const orgMember = await storage.getOrganizationMember(user.id);
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
       
       if (!orgMember) {
         return res.status(400).json({ message: "No organization found. Connect bank accounts first." });
@@ -2434,8 +2440,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get Live Mode transactions for user
   app.get("/api/live/transactions", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
-      const orgMember = await storage.getOrganizationMember(user.id);
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
       
       if (!orgMember) {
         return res.json([]);
@@ -2464,8 +2476,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get Live Mode dashboard analytics
   app.get("/api/live/analytics/dashboard", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
-      const orgMember = await storage.getOrganizationMember(user.id);
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
       
       if (!orgMember) {
         return res.json({
@@ -2519,7 +2537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       // Calculate current cash from bank accounts
-      const bankAccounts = await storage.getUserBankAccounts(user.id);
+      const bankAccounts = await storage.getUserBankAccounts(userId);
       const currentCash = bankAccounts.reduce((sum: number, acc: any) => {
         return sum + (parseFloat(acc.currentBalance) || 0);
       }, 0);
@@ -2737,8 +2755,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
    */
   app.get("/api/live/company-state", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
-      const orgMember = await storage.getOrganizationMember(user.id);
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
       
       if (!orgMember) {
         return res.status(404).json({ message: "No organization found" });
@@ -2755,7 +2779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { calculateRunway } = await import("./analytics/runway");
 
       // Get bank accounts for current cash
-      const bankAccounts = await storage.getUserBankAccounts(user.id);
+      const bankAccounts = await storage.getUserBankAccounts(userId);
       const cashBalance = bankAccounts.reduce((sum: number, acc: any) => {
         return sum + (parseFloat(acc.currentBalance) || 0);
       }, 0);
@@ -2833,7 +2857,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get planned hires
-      const plannedHires = await storage.getUserPlannedHires(user.id);
+      const plannedHires = await storage.getUserPlannedHires(userId);
       
       // Build headcount array
       const headcount = plannedHires.map((hire: any) => ({
