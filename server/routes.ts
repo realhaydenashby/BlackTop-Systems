@@ -14,6 +14,12 @@ import { generateMockDashboardStats, generateMockAnalytics, generateMockInsights
 
 const objectStorageService = new ObjectStorageService();
 
+// Helper to get user ID from session (handles old sessions without user.id)
+function getUserId(user: any): string {
+  // Try user.id first (new sessions), fall back to claims.sub (old sessions)
+  return user?.id || user?.claims?.sub;
+}
+
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -1766,9 +1772,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // QuickBooks Integration endpoints
   app.get("/api/quickbooks/auth-url", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
       const { quickBooksService } = await import("./quickbooksService");
-      const authUrl = quickBooksService.getAuthUrl(user.id);
+      const authUrl = quickBooksService.getAuthUrl(userId);
       res.json({ authUrl });
     } catch (error: any) {
       console.error("QuickBooks auth URL error:", error);
@@ -2211,14 +2223,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create Plaid Link token
   app.post("/api/live/plaid/link-token", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
       const { plaidService } = await import("./plaidService");
       
       if (!plaidService.isConfigured()) {
         return res.status(503).json({ message: "Plaid is not configured. Please add PLAID_CLIENT_ID and PLAID_SECRET." });
       }
 
-      const linkToken = await plaidService.createLinkToken(user.id);
+      const linkToken = await plaidService.createLinkToken(userId);
       res.json({ linkToken });
     } catch (error: any) {
       console.error("Plaid link token error:", error);
@@ -2229,18 +2247,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Exchange Plaid public token for access token
   app.post("/api/live/plaid/exchange-token", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
+      const user = req.user as any;
+      const userId = getUserId(user);
       const { publicToken } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
 
       if (!publicToken) {
         return res.status(400).json({ message: "Public token is required" });
       }
 
       const { plaidService } = await import("./plaidService");
-      const result = await plaidService.exchangePublicToken(user.id, publicToken);
+      const result = await plaidService.exchangePublicToken(userId, publicToken);
 
       // Create organization if doesn't exist
-      let orgMember = await storage.getOrganizationMember(user.id);
+      let orgMember = await storage.getOrganizationMember(userId);
       let organizationId: string;
       
       if (!orgMember) {
@@ -2253,7 +2276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         organizationId = org.id;
         await storage.addOrganizationMember({
           organizationId: org.id,
-          userId: user.id,
+          userId: userId,
           role: "founder",
         });
       } else {
@@ -2261,7 +2284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update all bank accounts with organization ID
-      const accounts = await plaidService.getAccounts(user.id);
+      const accounts = await plaidService.getAccounts(userId);
       for (const account of accounts) {
         if (!account.organizationId) {
           await storage.updateBankAccount(account.id, { organizationId });
@@ -2278,14 +2301,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sync Plaid transactions
   app.post("/api/live/plaid/sync", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
       const { plaidService } = await import("./plaidService");
 
-      const synced = await plaidService.syncTransactions(user.id);
+      const synced = await plaidService.syncTransactions(userId);
 
       // Trigger auto-model pipeline if transactions were synced
       if (synced > 0) {
-        const orgMember = await storage.getOrganizationMember(user.id);
+        const orgMember = await storage.getOrganizationMember(userId);
         if (orgMember) {
           const { autoModelPipeline } = await import("./autoModelPipeline");
           autoModelPipeline.runFullPipeline(orgMember.organizationId).then(result => {
@@ -2295,9 +2324,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
 
           const { checkThresholds, sendThresholdAlerts } = await import("./notifs/thresholdAlerts");
-          checkThresholds(orgMember.organizationId, user.id).then(async (alerts) => {
+          checkThresholds(orgMember.organizationId, userId).then(async (alerts) => {
             if (alerts.length > 0) {
-              const result = await sendThresholdAlerts(user.id, alerts);
+              const result = await sendThresholdAlerts(userId, alerts);
               console.log("[ThresholdAlerts] Sent:", result.sent);
             }
           }).catch(err => {
@@ -2316,9 +2345,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get Plaid accounts
   app.get("/api/live/plaid/accounts", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as User;
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
       const { plaidService } = await import("./plaidService");
-      const accounts = await plaidService.getAccounts(user.id);
+      const accounts = await plaidService.getAccounts(userId);
       res.json(accounts);
     } catch (error: any) {
       console.error("Plaid accounts error:", error);
