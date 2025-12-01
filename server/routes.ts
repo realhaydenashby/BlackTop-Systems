@@ -2049,14 +2049,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/live/bank-accounts/:id", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as User;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
       const account = await storage.getBankAccount(req.params.id);
       
-      if (!account || account.userId !== user.id) {
+      if (!account || account.userId !== userId) {
         return res.status(404).json({ message: "Bank account not found" });
       }
 
+      // Get user's org membership to find associated transactions
+      const orgMember = await storage.getOrganizationMember(userId);
+      if (orgMember) {
+        // Delete all transactions associated with this bank account
+        await db.delete(transactions)
+          .where(and(
+            eq(transactions.organizationId, orgMember.organizationId),
+            eq(transactions.bankAccountId, req.params.id)
+          ));
+        
+        console.log(`[Delete Account] Cleaned up transactions for bank account ${req.params.id}`);
+      }
+
+      // Delete the bank account
       await storage.deleteBankAccount(req.params.id);
-      res.json({ success: true });
+      
+      // Check if user has any remaining bank accounts
+      const remainingAccounts = await storage.getUserBankAccounts(userId);
+      
+      console.log(`[Delete Account] Bank account ${req.params.id} deleted. Remaining accounts: ${remainingAccounts.length}`);
+      
+      res.json({ 
+        success: true, 
+        remainingAccounts: remainingAccounts.length,
+        dashboardReset: remainingAccounts.length === 0
+      });
     } catch (error: any) {
       console.error("Delete bank account error:", error);
       res.status(500).json({ message: error.message || "Failed to delete bank account" });

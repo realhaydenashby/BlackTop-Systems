@@ -3,6 +3,7 @@ import { transactions, categories, budgets, budgetLines, forecasts, organization
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 import { normalizationService } from "./normalizationService";
 import { callAI } from "./aiService";
+import { transformPlaidTransaction, getCategoryColor as getTransformCategoryColor } from "./plaidTransformService";
 
 interface AutoModelResult {
   categorized: number;
@@ -74,7 +75,7 @@ export class AutoModelPipeline {
         eq(transactions.organizationId, organizationId),
         sql`${transactions.categoryId} IS NULL OR ${transactions.classificationConfidence} < 0.5`
       ),
-      limit: 100,
+      limit: 200,
     });
 
     if (uncategorizedTxns.length === 0) {
@@ -82,7 +83,7 @@ export class AutoModelPipeline {
       return 0;
     }
 
-    console.log(`[AutoModel] Categorizing ${uncategorizedTxns.length} transactions`);
+    console.log(`[AutoModel] Categorizing ${uncategorizedTxns.length} transactions using Plaid transform service`);
 
     const allCategories = await db.query.categories.findMany({
       where: eq(categories.organizationId, organizationId),
@@ -90,14 +91,17 @@ export class AutoModelPipeline {
 
     const categoryMap = new Map(allCategories.map(c => [c.name, c.id]));
 
+    // Startup-focused default categories (matching transformation service)
     const defaultCategories = [
+      "Payroll",
+      "Payroll Taxes",
+      "Infrastructure",
       "Software & SaaS",
-      "Marketing & Advertising", 
-      "Payroll & Benefits",
-      "Office & Equipment",
+      "Office & Operations",
+      "Marketing",
       "Professional Services",
-      "Travel & Meals",
-      "Operations & Misc",
+      "Bank & Fees",
+      "Travel & Entertainment",
       "Revenue",
     ];
 
@@ -106,7 +110,8 @@ export class AutoModelPipeline {
         const [newCat] = await db.insert(categories).values({
           organizationId,
           name: catName,
-          color: this.getCategoryColor(catName),
+          type: catName === "Revenue" ? "income" : "expense",
+          color: getTransformCategoryColor(catName),
         }).returning();
         categoryMap.set(catName, newCat.id);
       }
@@ -117,33 +122,54 @@ export class AutoModelPipeline {
     for (const txn of uncategorizedTxns) {
       try {
         const amount = parseFloat(txn.amount);
+        const metadata = txn.metadata as { category?: string[]; pending?: boolean } | null;
+        const plaidCategories = metadata?.category || null;
         
-        if (amount > 0) {
-          const revenueId = categoryMap.get("Revenue");
-          if (revenueId) {
-            await db.update(transactions)
-              .set({ 
-                categoryId: revenueId,
-                classificationConfidence: "0.9",
-              })
-              .where(eq(transactions.id, txn.id));
-            categorized++;
-          }
-          continue;
-        }
-
-        const classification = await normalizationService.classifyCategory(
-          txn.vendorNormalized || txn.vendorOriginal || "",
+        // Use the Plaid transformation service for smart categorization
+        const result = transformPlaidTransaction(
+          txn.vendorOriginal || null,
           txn.description || "",
-          amount
+          amount,
+          plaidCategories
         );
-
-        const categoryId = categoryMap.get(classification.category);
+        
+        // Get or create the category
+        let categoryId = categoryMap.get(result.categoryName);
+        if (!categoryId) {
+          const [newCat] = await db.insert(categories).values({
+            organizationId,
+            name: result.categoryName,
+            type: result.categoryName === "Revenue" ? "income" : "expense",
+            color: getTransformCategoryColor(result.categoryName),
+          }).onConflictDoNothing().returning();
+          
+          if (newCat) {
+            categoryId = newCat.id;
+            categoryMap.set(result.categoryName, categoryId);
+          } else {
+            // Category might exist, fetch it
+            const existing = await db.query.categories.findFirst({
+              where: and(
+                eq(categories.organizationId, organizationId),
+                eq(categories.name, result.categoryName)
+              ),
+            });
+            if (existing) {
+              categoryId = existing.id;
+              categoryMap.set(result.categoryName, categoryId);
+            }
+          }
+        }
+        
         if (categoryId) {
           await db.update(transactions)
             .set({
+              vendorNormalized: result.vendorNormalized,
               categoryId,
-              classificationConfidence: classification.confidence.toString(),
+              isRecurring: result.isRecurring,
+              isPayroll: result.isPayroll,
+              classificationConfidence: result.confidence.toString(),
+              updatedAt: new Date(),
             })
             .where(eq(transactions.id, txn.id));
           categorized++;

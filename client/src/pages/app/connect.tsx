@@ -262,10 +262,15 @@ export default function Connect() {
       await apiRequest("DELETE", `/api/live/bank-accounts/${accountId}`);
     },
     onSuccess: () => {
+      // Invalidate all relevant queries to reset dashboard state
       queryClient.invalidateQueries({ queryKey: ["/api/live/bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/analytics/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/company-state"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/weekly-changes"] });
       toast({
         title: "Account Removed",
-        description: "Bank account has been disconnected.",
+        description: "Bank account has been disconnected. Dashboard has been reset.",
       });
     },
   });

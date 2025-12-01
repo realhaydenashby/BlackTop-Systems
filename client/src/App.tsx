@@ -10,6 +10,7 @@ import { TopBar } from "@/components/top-bar";
 import { MarketingLayout } from "@/layouts/MarketingLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { AppModeProvider } from "@/contexts/AppModeContext";
+import { FloatingCopilot } from "@/components/floating-copilot";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Features from "@/pages/features";
@@ -96,6 +97,7 @@ function LiveAppLayout({ children }: { children: React.ReactNode }) {
             {children}
           </main>
         </div>
+        <FloatingCopilot />
       </div>
     </SidebarProvider>
   );
