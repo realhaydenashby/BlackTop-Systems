@@ -162,13 +162,14 @@ export class AutoModelPipeline {
         }
         
         if (categoryId) {
+          const confidenceRounded = Math.round(result.confidence * 100) / 100;
           await db.update(transactions)
             .set({
               vendorNormalized: result.vendorNormalized,
               categoryId,
               isRecurring: result.isRecurring,
               isPayroll: result.isPayroll,
-              classificationConfidence: result.confidence.toString(),
+              classificationConfidence: confidenceRounded.toString(),
               updatedAt: new Date(),
             })
             .where(eq(transactions.id, txn.id));

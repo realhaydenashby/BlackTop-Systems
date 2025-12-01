@@ -181,15 +181,16 @@ export function FloatingCopilot() {
       <div className="fixed bottom-6 right-6 z-50">
         <Button
           size="lg"
-          className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+          className="rounded-full shadow-lg"
           onClick={() => setIsOpen(true)}
           data-testid="button-copilot-open"
         >
-          <Sparkles className="h-6 w-6" />
+          <Sparkles className="h-5 w-5 mr-2" />
+          Ask AI
         </Button>
-        <span className="absolute -top-1 -right-1 flex h-4 w-4">
+        <span className="absolute -top-1 -right-1 flex h-3 w-3">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-4 w-4 bg-primary border-2 border-background"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-primary border-2 border-background"></span>
         </span>
       </div>
     );
@@ -209,7 +210,6 @@ export function FloatingCopilot() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
                 onClick={() => setIsMinimized(false)}
                 data-testid="button-copilot-maximize"
               >
@@ -218,7 +218,6 @@ export function FloatingCopilot() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
                 onClick={() => setIsOpen(false)}
                 data-testid="button-copilot-close-min"
               >
@@ -241,7 +240,7 @@ export function FloatingCopilot() {
               <Sparkles className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <span className="font-medium text-sm">Financial Copilot</span>
+              <span className="font-medium text-sm" data-testid="text-copilot-title">Financial Copilot</span>
               <p className="text-xs text-muted-foreground">Ask anything about your finances</p>
             </div>
           </div>
@@ -249,7 +248,6 @@ export function FloatingCopilot() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
               onClick={() => setIsMinimized(true)}
               data-testid="button-copilot-minimize"
             >
@@ -258,7 +256,6 @@ export function FloatingCopilot() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
               onClick={() => setIsOpen(false)}
               data-testid="button-copilot-close"
             >
@@ -296,7 +293,6 @@ export function FloatingCopilot() {
                   key={i}
                   variant="outline"
                   size="sm"
-                  className="text-xs h-7"
                   onClick={() => handleQuickPrompt(prompt.text)}
                   data-testid={`button-quick-prompt-${i}`}
                 >
@@ -335,7 +331,7 @@ export function FloatingCopilot() {
           </div>
           <div className="flex justify-center mt-2">
             <Link href="/app/copilot">
-              <Button variant="link" size="sm" className="text-xs h-auto p-0 text-muted-foreground">
+              <Button variant="link" size="sm" className="text-muted-foreground" data-testid="link-copilot-full-view">
                 <MessageCircle className="h-3 w-3 mr-1" />
                 Open full view
               </Button>
