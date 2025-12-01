@@ -2516,8 +2516,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orgMember = await storage.getOrganizationMember(userId);
       
       if (!orgMember) {
+        // Check bank accounts even without org membership for consistency
+        const bankAccounts = await storage.getUserBankAccounts(userId);
         return res.json({
           hasData: false,
+          hasBankAccounts: bankAccounts.length > 0,
           spend: { total: 0, trend: [], byCategory: [] },
           revenue: { total: 0, trend: [] },
           burn: { gross: 0, net: 0, payroll: 0, nonPayroll: 0 },
@@ -2528,6 +2531,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Check if user has connected bank accounts
+      const bankAccounts = await storage.getUserBankAccounts(userId);
+      const hasBankAccounts = bankAccounts.length > 0;
+      
       // Import analytics functions
       const { calculateBurnRate, calculateBurnTrend } = await import("./analytics/burn");
       const { calculateRunway } = await import("./analytics/runway");
@@ -2545,6 +2552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (rawTransactions.length === 0) {
         return res.json({
           hasData: false,
+          hasBankAccounts,
           spend: { total: 0, trend: [], byCategory: [] },
           revenue: { total: 0, trend: [] },
           burn: { gross: 0, net: 0, payroll: 0, nonPayroll: 0 },
@@ -2566,8 +2574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isPayroll: txn.isPayroll || false,
       }));
 
-      // Calculate current cash from bank accounts
-      const bankAccounts = await storage.getUserBankAccounts(userId);
+      // Calculate current cash from bank accounts (bankAccounts already fetched above)
       const currentCash = bankAccounts.reduce((sum: number, acc: any) => {
         return sum + (parseFloat(acc.currentBalance) || 0);
       }, 0);
@@ -2729,6 +2736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         hasData: true,
+        hasBankAccounts,
         spend: {
           total: burnMetrics.grossBurn,
           trend: burnTrend.map((b) => ({

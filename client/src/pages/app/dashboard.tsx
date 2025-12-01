@@ -18,6 +18,7 @@ import {
   Target,
   Users,
   AlertTriangle,
+  AlertCircle,
   ArrowUpRight,
   ArrowDownRight,
   Plus,
@@ -71,6 +72,7 @@ interface WeeklyChangesData {
 
 interface DashboardAnalytics {
   hasData: boolean;
+  hasBankAccounts: boolean;
   spend: {
     total: number;
     trend: Array<{ month: string; amount: number }>;
@@ -955,9 +957,15 @@ export default function AppDashboard() {
     );
   }
 
+  if (!data?.hasData && !data?.hasBankAccounts) {
+    return <EmptyState />;
+  }
+
   if (!data?.hasData) {
     return <EmptyState />;
   }
+
+  const showNoBankWarning = !data.hasBankAccounts;
 
   const payrollPercent = data.burn.gross > 0 
     ? Math.round((data.burn.payroll / data.burn.gross) * 100) 
@@ -978,6 +986,29 @@ export default function AppDashboard() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
+      {showNoBankWarning && (
+        <Card className="border-yellow-500/50 bg-yellow-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-yellow-600 dark:text-yellow-400">
+                  No bank account connected
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Connect your bank account to get real-time financial insights.
+                </p>
+              </div>
+              <Link href="/app/connect">
+                <Button variant="outline" size="sm" data-testid="button-connect-bank-warning">
+                  Connect Bank
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" data-testid="heading-dashboard">
