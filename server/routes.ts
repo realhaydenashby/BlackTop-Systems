@@ -6,7 +6,7 @@ import { isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
 import { User, insertOrganizationSchema, insertDocumentSchema, insertTransactionSchema, organizationMembers, transactions } from "@shared/schema";
-import { eq, and, gte } from "drizzle-orm";
+import { eq, and, gte, lt } from "drizzle-orm";
 import * as pdfParse from "pdf-parse";
 import Papa from "papaparse";
 import { subDays, startOfMonth, endOfMonth, addMonths } from "date-fns";
@@ -3229,17 +3229,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user as User;
       
-      const userOrg = await db.query.userOrganizations.findFirst({
-        where: eq(userOrganizations.userId, user.id),
-      });
+      const orgMember = await storage.getOrganizationMember(user.id);
       
-      if (!userOrg) {
+      if (!orgMember) {
         return res.json({ 
           changes: [],
           period: { start: null, end: null },
           message: "No organization connected"
         });
       }
+      
+      const organizationId = orgMember.organizationId;
 
       // Get transactions from this week and last week
       const now = new Date();
@@ -3250,7 +3250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const thisWeekTxns = await db.query.transactions.findMany({
         where: and(
-          eq(transactions.organizationId, userOrg.organizationId),
+          eq(transactions.organizationId, organizationId),
           gte(transactions.date, weekAgo)
         ),
         with: { category: true }
@@ -3258,7 +3258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const lastWeekTxns = await db.query.transactions.findMany({
         where: and(
-          eq(transactions.organizationId, userOrg.organizationId),
+          eq(transactions.organizationId, organizationId),
           gte(transactions.date, twoWeeksAgo),
           lt(transactions.date, weekAgo)
         ),
