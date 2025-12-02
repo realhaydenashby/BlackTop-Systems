@@ -308,7 +308,7 @@ class PlaidService {
   }
 
   async disconnectAndResetAll(userId: string, organizationId: string): Promise<{ itemsDeleted: number; accountsDeleted: number; transactionsDeleted: number }> {
-    console.log(`[Plaid] Disconnecting all items for user ${userId}, org ${organizationId}`);
+    console.log(`[Plaid] Disconnecting all items for user ${userId}, org ${organizationId || 'none'}`);
     
     // Get all Plaid items for this user
     const items = await db.select().from(plaidItems).where(eq(plaidItems.userId, userId));
@@ -323,9 +323,12 @@ class PlaidService {
       }
     }
 
-    // Delete all transactions for this organization
-    const transactionResult = await db.delete(transactions).where(eq(transactions.organizationId, organizationId)).returning();
-    const transactionsDeleted = transactionResult.length;
+    // Delete all transactions for this organization (only if org exists)
+    let transactionsDeleted = 0;
+    if (organizationId) {
+      const transactionResult = await db.delete(transactions).where(eq(transactions.organizationId, organizationId)).returning();
+      transactionsDeleted = transactionResult.length;
+    }
 
     // Delete all bank accounts for this user
     const accountResult = await db.delete(bankAccounts).where(eq(bankAccounts.userId, userId)).returning();

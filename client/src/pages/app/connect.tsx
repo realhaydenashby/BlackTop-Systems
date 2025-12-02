@@ -289,6 +289,8 @@ export default function Connect() {
       queryClient.invalidateQueries({ queryKey: ["/api/live/company-state"] });
       queryClient.invalidateQueries({ queryKey: ["/api/live/weekly-changes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/live/plaid/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/plaid/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/connections/status"] });
       toast({
         title: "All Connections Reset",
         description: data.message || "All bank connections and data have been cleared.",

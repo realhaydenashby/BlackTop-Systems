@@ -2449,13 +2449,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
       }
 
+      // Get organization first - required for proper cleanup
       const orgMember = await storage.getOrganizationMember(userId);
       
-      if (!orgMember) {
-        return res.json({ success: true, message: "No data to disconnect" });
+      // Check if user has any Plaid items before proceeding
+      const { plaidService } = await import("./plaidService");
+      const accounts = await plaidService.getAccounts(userId);
+      
+      if (accounts.length === 0) {
+        return res.json({ 
+          success: true, 
+          itemsDeleted: 0, 
+          accountsDeleted: 0, 
+          transactionsDeleted: 0,
+          message: "No bank connections to disconnect" 
+        });
       }
 
-      const { plaidService } = await import("./plaidService");
+      // Must have an organization to properly disconnect (transactions are linked to org)
+      if (!orgMember) {
+        // If no org but has accounts, still clean up the accounts at user level
+        const result = await plaidService.disconnectAndResetAll(userId, "");
+        return res.json({ 
+          success: true, 
+          ...result,
+          message: `Disconnected ${result.itemsDeleted} bank connection(s)`
+        });
+      }
+
       const result = await plaidService.disconnectAndResetAll(userId, orgMember.organizationId);
 
       // Also clear any analytics/insights for a fresh start
