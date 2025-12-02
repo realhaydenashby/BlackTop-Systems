@@ -2588,7 +2588,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transactions = transactions.filter((t: any) => t.source === source);
       }
 
-      res.json(transactions);
+      // Transform transactions to include type field (credit/debit) based on amount
+      const transformedTransactions = transactions.map((txn: any) => ({
+        ...txn,
+        type: parseFloat(txn.amount) >= 0 ? "credit" : "debit",
+      }));
+
+      res.json(transformedTransactions);
     } catch (error: any) {
       console.error("Get live transactions error:", error);
       res.status(500).json({ message: error.message || "Failed to fetch transactions" });
