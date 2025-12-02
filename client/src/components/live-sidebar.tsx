@@ -67,7 +67,6 @@ const analyticsItems = [
   { title: "Spend", url: "/app/analytics" },
   { title: "Revenue", url: "/app/analytics/revenue" },
   { title: "Profitability", url: "/app/analytics/profitability" },
-  { title: "Forecasting", url: "/app/analytics/forecasting" },
 ];
 
 const fundraisingItems = [
