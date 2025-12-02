@@ -106,9 +106,13 @@ Routes: `/app`, `/app/transactions`, `/app/upload`, `/app/settings`, `/app/conne
 - AppModeContext: Syncs mode from URL on load and popstate events
 
 ### Data Services
-- `client/src/services/demoDataService.ts`: Centralized mock data (transactions, spend, burn, runway, vendors)
-- `client/src/services/liveDataService.ts`: Placeholder functions for real API calls
+- `client/src/services/demoDataService.ts`: Comprehensive mock data for all demo pages:
+  - **Analytics**: spendTrend, categoryDistribution, topVendors, revenue (MRR/ARR), profitability (margins), forecasting (historical + projections)
+  - **Fundraising**: burn ($85K/mo), runway (18 months), raise ($2.2M recommended), hiring (12 headcount + 5 planned)
+  - All action plans with severity levels and recommendations
+- `client/src/services/liveDataService.ts`: Real API calls for authenticated Live Mode
 - `client/src/services/notificationsService.ts`: Stub for Slack/SMS alerts (console logging)
+- `server/mockData.ts`: Server-side mock data generator used when no real data exists
 
 ## Key Features
 

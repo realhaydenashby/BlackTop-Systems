@@ -3,10 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { CHART_COLORS, chartStyles, lineStyles, barStyles, areaStyles } from "@/lib/chartTheme";
-import { TrendingDown, TrendingUp, AlertTriangle, Users } from "lucide-react";
+import { TrendingDown, TrendingUp, Users } from "lucide-react";
+import { demoDataService } from "@/services/demoDataService";
 
 export default function Fundraising() {
   const [, params] = useRoute("/fundraising/:section");
@@ -14,7 +14,8 @@ export default function Fundraising() {
   const section = params?.section || "burn";
 
   const { data: analytics, isLoading, error } = useQuery<any>({
-    queryKey: ["/api/analytics"],
+    queryKey: ["demo-analytics"],
+    queryFn: () => demoDataService.getAnalytics(),
   });
 
   if (isLoading) {
