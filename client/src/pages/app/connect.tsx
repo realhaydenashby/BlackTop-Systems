@@ -357,10 +357,13 @@ export default function Connect() {
       return res.json();
     },
     onSuccess: (data) => {
+      // Invalidate connection queries immediately
       queryClient.invalidateQueries({ queryKey: ["/api/live/bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/connections/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/plaid/accounts"] });
       toast({
         title: "Bank Connected",
-        description: `${data.accountCount} account(s) connected successfully.`,
+        description: `${data.accountCount} account(s) connected successfully. Syncing transactions...`,
       });
       // Sync transactions immediately
       syncPlaidMutation.mutate();
@@ -381,10 +384,19 @@ export default function Connect() {
       return res.json();
     },
     onSuccess: (data) => {
+      // Invalidate all relevant queries so dashboard/analytics auto-update
+      queryClient.invalidateQueries({ queryKey: ["/api/live/bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/analytics/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/company-state"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/weekly-changes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/connections/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/plaid/accounts"] });
+      
       if (data.synced > 0) {
         toast({
           title: "Transactions Synced",
-          description: `${data.synced} transaction(s) imported.`,
+          description: `${data.synced} transaction(s) imported. Dashboard updating...`,
         });
       }
       // Redirect to dashboard after successful sync
