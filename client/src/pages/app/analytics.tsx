@@ -128,6 +128,7 @@ export default function LiveAnalytics() {
   const getSectionTitle = () => {
     switch (section) {
       case "revenue": return "Revenue Analytics";
+      case "profitability": return "Profitability Analytics";
       case "burn": return "Burn Rate Analytics";
       case "runway": return "Runway Analytics";
       default: return "Spend Analytics";
@@ -137,6 +138,7 @@ export default function LiveAnalytics() {
   const getSectionDescription = () => {
     switch (section) {
       case "revenue": return "Track your revenue streams and growth metrics";
+      case "profitability": return "Analyze your margins and profit trends";
       case "burn": return "Understand your burn rate breakdown";
       case "runway": return "Monitor your financial runway";
       default: return "Deep insights into your spending patterns";
@@ -193,8 +195,7 @@ export default function LiveAnalytics() {
         <TabsList>
           <TabsTrigger value="spend" data-testid="tab-spend">Spend</TabsTrigger>
           <TabsTrigger value="revenue" data-testid="tab-revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="burn" data-testid="tab-burn">Burn</TabsTrigger>
-          <TabsTrigger value="runway" data-testid="tab-runway">Runway</TabsTrigger>
+          <TabsTrigger value="profitability" data-testid="tab-profitability">Profitability</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -402,6 +403,194 @@ export default function LiveAnalytics() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </>
+      )}
+
+      {section === "profitability" && (
+        <>
+          {/* Profitability Metrics */}
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold flex items-center gap-2 text-green-600" data-testid="text-profit-revenue">
+                  <TrendingUp className="h-5 w-5" />
+                  {formatCurrency(analytics.revenue.total)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Last 3 months</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold flex items-center gap-2 text-destructive" data-testid="text-profit-expenses">
+                  <TrendingDown className="h-5 w-5" />
+                  {formatCurrency(analytics.spend.total)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Last 3 months</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Net Profit/Loss</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold flex items-center gap-2 ${analytics.revenue.total - analytics.spend.total >= 0 ? "text-green-600" : "text-destructive"}`} data-testid="text-net-profit">
+                  <DollarSign className="h-5 w-5" />
+                  {formatCurrency(Math.abs(analytics.revenue.total - analytics.spend.total))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {analytics.revenue.total - analytics.spend.total >= 0 ? "Profit" : "Loss"} (Last 3 months)
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Profit Margin</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${analytics.revenue.total > 0 && ((analytics.revenue.total - analytics.spend.total) / analytics.revenue.total) > 0 ? "text-green-600" : "text-destructive"}`} data-testid="text-profit-margin">
+                  {analytics.revenue.total > 0 
+                    ? `${(((analytics.revenue.total - analytics.spend.total) / analytics.revenue.total) * 100).toFixed(1)}%`
+                    : "N/A"}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Net margin</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Revenue vs Expenses Comparison */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue vs Expenses Trend</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={(() => {
+                  const combinedData = analytics.revenue.trend.map((revItem, idx) => {
+                    const spendItem = analytics.spend.trend[idx];
+                    return {
+                      month: formatMonth(revItem.month),
+                      revenue: revItem.amount,
+                      expenses: spendItem?.amount || 0,
+                      profit: revItem.amount - (spendItem?.amount || 0),
+                    };
+                  });
+                  return combinedData;
+                })()}>
+                  <CartesianGrid {...chartStyles.cartesianGrid} />
+                  <XAxis dataKey="month" {...chartStyles.xAxis} />
+                  <YAxis {...chartStyles.yAxis} tickFormatter={(v) => formatCurrency(v)} />
+                  <Tooltip {...chartStyles.tooltip} formatter={(value: number) => formatCurrency(value)} />
+                  <Legend {...chartStyles.legend} />
+                  <Bar dataKey="revenue" fill={CHART_COLORS[2]} name="Revenue" {...barStyles} />
+                  <Bar dataKey="expenses" fill={CHART_COLORS[4]} name="Expenses" {...barStyles} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Profit/Loss Trend */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Profit/Loss Trend</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={(() => {
+                  return analytics.revenue.trend.map((revItem, idx) => {
+                    const spendItem = analytics.spend.trend[idx];
+                    return {
+                      month: formatMonth(revItem.month),
+                      profit: revItem.amount - (spendItem?.amount || 0),
+                    };
+                  });
+                })()}>
+                  <CartesianGrid {...chartStyles.cartesianGrid} />
+                  <XAxis dataKey="month" {...chartStyles.xAxis} />
+                  <YAxis {...chartStyles.yAxis} tickFormatter={(v) => formatCurrency(v)} />
+                  <Tooltip {...chartStyles.tooltip} formatter={(value: number) => formatCurrency(value)} />
+                  <Area 
+                    type="monotone" 
+                    dataKey="profit" 
+                    stroke={CHART_COLORS[0]} 
+                    fill={CHART_COLORS[0]} 
+                    name="Net Profit/Loss" 
+                    {...areaStyles}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Expense Categories Breakdown */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Expense Categories</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={categoryData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={100}
+                      dataKey="value"
+                    >
+                      {categoryData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip {...chartStyles.tooltip} formatter={(value: number) => formatCurrency(value)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Margin Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Operating Expenses</span>
+                    <span className="font-medium">{formatCurrency(analytics.burn.nonPayroll)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Payroll</span>
+                    <span className="font-medium">{formatCurrency(analytics.burn.payroll)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Recurring Expenses</span>
+                    <span className="font-medium">{formatCurrency(analytics.burn.recurring)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm border-t pt-2">
+                    <span className="font-medium">Total Expenses</span>
+                    <span className="font-medium">{formatCurrency(analytics.spend.total)}</span>
+                  </div>
+                </div>
+                <div className="pt-4 border-t">
+                  <div className="flex justify-between">
+                    <span className="font-semibold">Net Margin</span>
+                    <span className={`font-bold ${analytics.revenue.total > 0 && ((analytics.revenue.total - analytics.spend.total) / analytics.revenue.total) > 0 ? "text-green-600" : "text-destructive"}`}>
+                      {analytics.revenue.total > 0 
+                        ? `${(((analytics.revenue.total - analytics.spend.total) / analytics.revenue.total) * 100).toFixed(1)}%`
+                        : "N/A"}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </>
       )}
 
