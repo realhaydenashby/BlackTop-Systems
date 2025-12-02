@@ -48,6 +48,7 @@ export default function Landing() {
         </div>
       </motion.nav>
 
+      {/* Hero Section - Dark */}
       <section className="px-6 py-32">
         <div className="max-w-5xl mx-auto text-center">
           <motion.h1 
@@ -83,7 +84,8 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="px-6 py-24 bg-muted/30">
+      {/* About Section - Transitions into Blue */}
+      <section className="px-6 py-24 transition-into-blue">
         <div className="max-w-6xl mx-auto">
           <motion.div
             className="text-center mb-20"
@@ -102,10 +104,11 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="px-6 py-24">
-        <div className="max-w-6xl mx-auto">
+      {/* Analytics Features Section - BLUE */}
+      <section className="px-6 py-24 section-blue">
+        <div className="max-w-6xl mx-auto relative z-10">
           <motion.h2 
-            className="text-4xl font-bold text-center mb-4"
+            className="text-4xl font-bold text-center mb-4 section-blue-text"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -114,7 +117,7 @@ export default function Landing() {
             Analytics that actually matter
           </motion.h2>
           <motion.p
-            className="text-center text-muted-foreground mb-16 max-w-2xl mx-auto"
+            className="text-center section-blue-text-muted mb-16 max-w-2xl mx-auto"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -185,13 +188,13 @@ export default function Landing() {
                 key={feature.title}
                 variants={fadeInUp}
               >
-                <Card className="h-full hover-elevate transition-all">
+                <Card className="h-full card-on-blue transition-all duration-300">
                   <CardHeader>
-                    <feature.icon className="w-10 h-10 text-primary mb-3" />
-                    <CardTitle>{feature.title}</CardTitle>
+                    <feature.icon className="w-10 h-10 icon-on-blue mb-3" />
+                    <CardTitle className="section-blue-text">{feature.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="text-base">
+                    <CardDescription className="text-base section-blue-text-muted">
                       {feature.description}
                     </CardDescription>
                   </CardContent>
@@ -202,8 +205,9 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="px-6 py-24 bg-muted/30">
-        <div className="max-w-6xl mx-auto">
+      {/* Resources Section - Transitions out of Blue */}
+      <section className="px-6 py-24 transition-out-of-blue">
+        <div className="max-w-6xl mx-auto relative z-10 pt-16">
           <motion.h2 
             className="text-4xl font-bold text-center mb-4"
             initial={{ opacity: 0, y: 20 }}
@@ -258,10 +262,10 @@ export default function Landing() {
                   data-testid={`card-resource-${resource.title.toLowerCase().replace(/\s+/g, '-')}`}
                 >
                   <CardHeader>
-                    <div className="flex items-start justify-between mb-3">
-                      <resource.icon className="w-10 h-10 text-accent" />
+                    <div className="flex items-start justify-between mb-3 gap-2">
+                      <resource.icon className="w-10 h-10 text-accent flex-shrink-0" />
                       <span 
-                        className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md"
+                        className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md whitespace-nowrap"
                         data-testid={`badge-read-time-${resource.title.toLowerCase().replace(/\s+/g, '-')}`}
                       >
                         {resource.tag}
@@ -283,6 +287,7 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* CTA Section - Dark */}
       <section className="px-6 py-24">
         <motion.div 
           className="max-w-4xl mx-auto text-center"

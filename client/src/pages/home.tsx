@@ -1,9 +1,23 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, BarChart3, Shield, Zap, AlertCircle, Clock, FileQuestion, TrendingDown, FlaskConical } from "lucide-react";
+import { ArrowRight, BarChart3, Shield, Zap, AlertCircle, Clock, FileQuestion, TrendingDown, FlaskConical, Target, Users, LineChart, AlertTriangle, Info } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAppMode } from "@/contexts/AppModeContext";
+
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.6, ease: "easeOut" }
+};
+
+const staggerContainer = {
+  animate: {
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
 
 export default function Home() {
   const { setMode } = useAppMode();
@@ -16,6 +30,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Hero Section - Dark */}
       <section className="px-6 py-32">
         <div className="max-w-5xl mx-auto text-center">
           <motion.h1 
@@ -59,7 +74,8 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="px-6 py-24 bg-muted/30">
+      {/* Why BlackTop - Transitions into Blue */}
+      <section className="px-6 py-24 transition-into-blue">
         <div className="max-w-6xl mx-auto">
           <motion.div
             className="text-center mb-16"
@@ -99,7 +115,7 @@ export default function Home() {
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: index * 0.1 }}
               >
-                <Card>
+                <Card className="hover-elevate">
                   <CardHeader>
                     <benefit.icon className="w-12 h-12 text-primary mb-4" />
                     <CardTitle className="text-xl">{benefit.title}</CardTitle>
@@ -116,8 +132,90 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="px-6 py-24">
-        <div className="max-w-6xl mx-auto">
+      {/* Analytics Features - BLUE SECTION */}
+      <section className="px-6 py-24 section-blue">
+        <div className="max-w-6xl mx-auto relative z-10">
+          <motion.h2 
+            className="text-4xl font-bold text-center mb-4 section-blue-text"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            Analytics that actually matter
+          </motion.h2>
+          <motion.p
+            className="text-center section-blue-text-muted mb-16 max-w-2xl mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          >
+            Stop guessing. Start knowing. Our AI diagnoses your spend and shows you what changed and why.
+          </motion.p>
+          <motion.div 
+            className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+            variants={staggerContainer}
+            initial="initial"
+            whileInView="animate"
+            viewport={{ once: true }}
+          >
+            {[
+              {
+                icon: BarChart3,
+                title: "Category Spend",
+                description: "Track spending across software, marketing, operations, and more."
+              },
+              {
+                icon: Users,
+                title: "Department Spend",
+                description: "See which teams are spending what—and where to optimize."
+              },
+              {
+                icon: Clock,
+                title: "Recurring Vendor Burn",
+                description: "Identify monthly commitments draining your runway."
+              },
+              {
+                icon: Target,
+                title: "Subscription Creep",
+                description: "Catch forgotten SaaS tools costing you thousands."
+              },
+              {
+                icon: AlertTriangle,
+                title: "Vendor Overbilling",
+                description: "AI flags suspicious charges and duplicate invoices."
+              },
+              {
+                icon: LineChart,
+                title: "Trend Anomalies",
+                description: "Detect unusual spending patterns before they become problems."
+              }
+            ].map((feature) => (
+              <motion.div
+                key={feature.title}
+                variants={fadeInUp}
+              >
+                <Card className="h-full card-on-blue transition-all duration-300">
+                  <CardHeader>
+                    <feature.icon className="w-10 h-10 icon-on-blue mb-3" />
+                    <CardTitle className="section-blue-text">{feature.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="text-base section-blue-text-muted">
+                      {feature.description}
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Pain Points - Transitions out of Blue */}
+      <section className="px-6 py-24 transition-out-of-blue">
+        <div className="max-w-6xl mx-auto relative z-10 pt-16">
           <motion.div
             className="text-center mb-16"
             initial={{ opacity: 0, y: 20 }}
@@ -161,7 +259,7 @@ export default function Home() {
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: index * 0.1 }}
               >
-                <Card>
+                <Card className="hover-elevate">
                   <CardHeader>
                     <painPoint.icon className="w-12 h-12 text-destructive mb-4" />
                     <CardTitle className="text-xl">{painPoint.title}</CardTitle>
@@ -178,7 +276,8 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="px-6 py-24 bg-muted/30">
+      {/* CTA Section - Dark */}
+      <section className="px-6 py-24">
         <motion.div 
           className="max-w-4xl mx-auto text-center"
           initial={{ opacity: 0, y: 20 }}

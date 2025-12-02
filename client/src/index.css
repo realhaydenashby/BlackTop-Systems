@@ -486,3 +486,133 @@
     background: hsl(var(--muted) / 0.7);
   }
 }
+
+/* ====================================
+   BLUE SECTION - Liquid Glass Styling
+   ==================================== */
+
+/* Blue section background with liquid glass feel */
+.section-blue {
+  --section-bg: 217 91% 42%;
+  --section-bg-deep: 217 91% 32%;
+  --section-bg-light: 217 91% 50%;
+  background: linear-gradient(
+    180deg,
+    hsl(var(--section-bg-deep)) 0%,
+    hsl(var(--section-bg)) 50%,
+    hsl(var(--section-bg-deep)) 100%
+  );
+  position: relative;
+}
+
+/* Frosted glass overlay for depth */
+.section-blue::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    hsl(var(--section-bg-light) / 0.3) 0%,
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+/* Text styling for blue sections */
+.section-blue-text {
+  color: hsl(0 0% 100%);
+}
+
+.section-blue-text-muted {
+  color: hsl(210 30% 85%);
+}
+
+/* Cards on blue background - frosted glass effect */
+.card-on-blue {
+  background: hsl(0 0% 100% / 0.12) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid hsl(0 0% 100% / 0.2) !important;
+  box-shadow: 
+    0 8px 32px hsl(217 91% 20% / 0.3),
+    inset 0 1px 0 hsl(0 0% 100% / 0.15);
+}
+
+.card-on-blue:hover {
+  background: hsl(0 0% 100% / 0.18) !important;
+  border-color: hsl(0 0% 100% / 0.3) !important;
+}
+
+/* Icon styling on blue */
+.icon-on-blue {
+  color: hsl(195 100% 75%);
+  filter: drop-shadow(0 0 8px hsl(195 100% 70% / 0.5));
+}
+
+/* Gradient transitions between sections */
+.gradient-dark-to-blue {
+  background: linear-gradient(
+    180deg,
+    hsl(222 47% 5%) 0%,
+    hsl(222 47% 5%) 20%,
+    hsl(217 60% 15%) 50%,
+    hsl(217 80% 25%) 75%,
+    hsl(217 91% 35%) 100%
+  );
+}
+
+.gradient-blue-to-dark {
+  background: linear-gradient(
+    180deg,
+    hsl(217 91% 35%) 0%,
+    hsl(217 80% 25%) 25%,
+    hsl(217 60% 15%) 50%,
+    hsl(222 47% 5%) 80%,
+    hsl(222 47% 5%) 100%
+  );
+}
+
+/* Smooth transition band - enters blue */
+.transition-into-blue {
+  position: relative;
+}
+
+.transition-into-blue::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 150px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    hsl(217 60% 12% / 0.5) 30%,
+    hsl(217 80% 22% / 0.8) 60%,
+    hsl(217 91% 35%) 100%
+  );
+  pointer-events: none;
+}
+
+/* Smooth transition band - exits blue */
+.transition-out-of-blue {
+  position: relative;
+}
+
+.transition-out-of-blue::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 150px;
+  background: linear-gradient(
+    180deg,
+    hsl(217 91% 35%) 0%,
+    hsl(217 80% 22% / 0.8) 40%,
+    hsl(217 60% 12% / 0.5) 70%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
