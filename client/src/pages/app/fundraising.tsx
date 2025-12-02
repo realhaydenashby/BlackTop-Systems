@@ -2,9 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { useRoute, useLocation } from "wouter";
 import { CHART_COLORS, chartStyles, lineStyles, barStyles, areaStyles } from "@/lib/chartTheme";
-import { TrendingDown, TrendingUp, DollarSign, Timer, Building2, Users } from "lucide-react";
+import { TrendingDown, TrendingUp, DollarSign, Timer, Building2, Users, UserPlus, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 
@@ -42,6 +43,33 @@ interface LiveAnalytics {
   };
   insights: { type: string; message: string; severity: string }[];
   vendors: { name: string; amount: number }[];
+}
+
+interface HiringData {
+  hasData: boolean;
+  summary: {
+    currentHeadcount: number;
+    plannedHeadcount: number;
+    totalHeadcount: number;
+    currentMonthlyPayroll: number;
+    plannedMonthlyPayroll: number;
+    totalMonthlyPayroll: number;
+    totalAnnualPayroll: number;
+  };
+  hires: {
+    id: string;
+    role: string;
+    department: string;
+    monthlyCost: number;
+    annualCost: number;
+    startDate: string;
+    status: "active" | "planned";
+  }[];
+  byDepartment: {
+    name: string;
+    count: number;
+    monthlyCost: number;
+  }[];
 }
 
 function EmptyState() {
@@ -86,6 +114,11 @@ export default function LiveFundraising() {
     queryKey: ["/api/live/analytics/dashboard"],
   });
 
+  const { data: hiringData } = useQuery<HiringData>({
+    queryKey: ["/api/live/hiring"],
+    enabled: section === "hiring",
+  });
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
@@ -126,7 +159,7 @@ export default function LiveFundraising() {
     switch (section) {
       case "runway": return "Runway Estimator";
       case "raise": return "How Much Should You Raise?";
-      case "cash": return "Cash Position";
+      case "hiring": return "Hiring Plan";
       default: return "Burn Rate Analyzer";
     }
   };
@@ -165,7 +198,7 @@ export default function LiveFundraising() {
           <TabsTrigger value="burn" data-testid="tab-burn">Burn</TabsTrigger>
           <TabsTrigger value="runway" data-testid="tab-runway">Runway</TabsTrigger>
           <TabsTrigger value="raise" data-testid="tab-raise">Raise</TabsTrigger>
-          <TabsTrigger value="cash" data-testid="tab-cash">Cash</TabsTrigger>
+          <TabsTrigger value="hiring" data-testid="tab-hiring">Hiring</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -605,6 +638,208 @@ export default function LiveFundraising() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </>
+      )}
+
+      {section === "hiring" && (
+        <>
+          {hiringData?.hasData ? (
+            <>
+              {/* Summary Metrics */}
+              <div className="grid gap-4 md:grid-cols-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Current Headcount</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold flex items-center gap-2" data-testid="text-current-headcount">
+                      <Users className="h-5 w-5 text-primary" />
+                      {hiringData.summary.currentHeadcount}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Active employees</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Planned Hires</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold flex items-center gap-2" data-testid="text-planned-hires">
+                      <UserPlus className="h-5 w-5 text-green-500" />
+                      {hiringData.summary.plannedHeadcount}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Future hires</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Monthly Payroll</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold" data-testid="text-monthly-payroll">
+                      {formatCurrency(hiringData.summary.totalMonthlyPayroll)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Current + planned</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Annual Payroll</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold" data-testid="text-annual-payroll">
+                      {formatCurrency(hiringData.summary.totalAnnualPayroll)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Projected yearly cost</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Department Breakdown Chart */}
+              {hiringData.byDepartment.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Headcount by Department</CardTitle>
+                    <CardDescription>Distribution of employees across departments</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={hiringData.byDepartment}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, count }) => `${name}: ${count}`}
+                          outerRadius={100}
+                          dataKey="count"
+                        >
+                          {hiringData.byDepartment.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip {...chartStyles.tooltip} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Payroll by Department */}
+              {hiringData.byDepartment.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Monthly Payroll by Department</CardTitle>
+                    <CardDescription>Cost distribution across departments</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={hiringData.byDepartment} layout="vertical">
+                        <CartesianGrid {...chartStyles.cartesianGrid} />
+                        <XAxis type="number" {...chartStyles.xAxis} tickFormatter={(v) => formatCurrency(v)} />
+                        <YAxis dataKey="name" type="category" width={120} {...chartStyles.yAxis} />
+                        <Tooltip {...chartStyles.tooltip} formatter={(value: number) => formatCurrency(value)} />
+                        <Bar dataKey="monthlyCost" fill={CHART_COLORS[0]} name="Monthly Cost" {...barStyles} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Hire List */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Team Members</CardTitle>
+                  <CardDescription>All current and planned hires</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {hiringData.hires.map((hire) => (
+                      <div
+                        key={hire.id}
+                        className="flex items-center justify-between p-4 rounded-lg border"
+                        data-testid={`hire-row-${hire.id}`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="rounded-full bg-primary/10 p-2">
+                            <Briefcase className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{hire.role}</p>
+                            <p className="text-sm text-muted-foreground">{hire.department}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="font-medium">{formatCurrency(hire.annualCost)}/yr</p>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(hire.startDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                            </p>
+                          </div>
+                          <Badge variant={hire.status === "active" ? "default" : "secondary"}>
+                            {hire.status === "active" ? "Active" : "Planned"}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Impact on Burn/Runway */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Hiring Impact Summary</CardTitle>
+                  <CardDescription>How hiring affects your financial metrics</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Current Payroll</span>
+                        <span className="font-medium">{formatCurrency(hiringData.summary.currentMonthlyPayroll)}/mo</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Planned Payroll Increase</span>
+                        <span className="font-medium text-destructive">+{formatCurrency(hiringData.summary.plannedMonthlyPayroll)}/mo</span>
+                      </div>
+                      <div className="flex justify-between text-sm border-t pt-2">
+                        <span className="font-medium">Total After Hires</span>
+                        <span className="font-medium">{formatCurrency(hiringData.summary.totalMonthlyPayroll)}/mo</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Annual Current Payroll</span>
+                        <span className="font-medium">{formatCurrency(hiringData.summary.currentMonthlyPayroll * 12)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Annual Planned Increase</span>
+                        <span className="font-medium text-destructive">+{formatCurrency(hiringData.summary.plannedMonthlyPayroll * 12)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm border-t pt-2">
+                        <span className="font-medium">Total Annual Payroll</span>
+                        <span className="font-medium">{formatCurrency(hiringData.summary.totalAnnualPayroll)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-16 flex flex-col items-center text-center">
+                <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Hiring Data</h3>
+                <p className="text-muted-foreground max-w-md mb-6">
+                  Use the AI Copilot to model hiring scenarios. Try asking "What if I hire a $90k engineer?" to see how it impacts your runway.
+                </p>
+                <Button asChild data-testid="button-open-copilot">
+                  <Link href="/app/copilot">Open Copilot</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

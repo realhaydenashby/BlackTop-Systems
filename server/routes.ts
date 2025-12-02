@@ -2903,6 +2903,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // HIRING DATA API
+  // ============================================
+  
+  /**
+   * Get hiring/headcount data for the Hiring page
+   */
+  app.get("/api/live/hiring", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+
+      // Get planned hires
+      const plannedHires = await storage.getUserPlannedHires(userId);
+      
+      // Transform and categorize hires
+      const now = new Date();
+      const hires = plannedHires.map((hire: any) => {
+        const startDate = new Date(hire.startDate);
+        const monthlyCost = parseFloat(hire.monthlyCost) || 0;
+        return {
+          id: hire.id,
+          role: hire.role,
+          department: hire.department || "General",
+          monthlyCost,
+          annualCost: monthlyCost * 12,
+          startDate: startDate.toISOString(),
+          status: startDate <= now ? "active" : "planned",
+          isActive: hire.isActive,
+        };
+      });
+
+      // Calculate summary metrics
+      const activeHires = hires.filter((h: any) => h.status === "active" && h.isActive);
+      const plannedFutureHires = hires.filter((h: any) => h.status === "planned" && h.isActive);
+      
+      const currentHeadcount = activeHires.length;
+      const plannedHeadcount = plannedFutureHires.length;
+      const totalHeadcount = currentHeadcount + plannedHeadcount;
+      
+      const currentPayroll = activeHires.reduce((sum: number, h: any) => sum + h.monthlyCost, 0);
+      const plannedPayroll = plannedFutureHires.reduce((sum: number, h: any) => sum + h.monthlyCost, 0);
+      const totalMonthlyPayroll = currentPayroll + plannedPayroll;
+      
+      // Group by department
+      const byDepartment: Record<string, { count: number; monthlyCost: number }> = {};
+      hires.filter((h: any) => h.isActive).forEach((hire: any) => {
+        const dept = hire.department;
+        if (!byDepartment[dept]) {
+          byDepartment[dept] = { count: 0, monthlyCost: 0 };
+        }
+        byDepartment[dept].count++;
+        byDepartment[dept].monthlyCost += hire.monthlyCost;
+      });
+
+      res.json({
+        hasData: hires.length > 0,
+        summary: {
+          currentHeadcount,
+          plannedHeadcount,
+          totalHeadcount,
+          currentMonthlyPayroll: currentPayroll,
+          plannedMonthlyPayroll: plannedPayroll,
+          totalMonthlyPayroll,
+          totalAnnualPayroll: totalMonthlyPayroll * 12,
+        },
+        hires: hires.filter((h: any) => h.isActive),
+        byDepartment: Object.entries(byDepartment).map(([name, data]) => ({
+          name,
+          count: data.count,
+          monthlyCost: data.monthlyCost,
+        })),
+      });
+    } catch (error: any) {
+      console.error("Get hiring data error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch hiring data" });
+    }
+  });
+
+  // ============================================
   // COMPANY STATE API - AI Copilot Data Layer
   // ============================================
   
