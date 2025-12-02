@@ -2439,6 +2439,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Disconnect all Plaid connections and reset data
+  app.post("/api/live/plaid/disconnect-all", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.json({ success: true, message: "No data to disconnect" });
+      }
+
+      const { plaidService } = await import("./plaidService");
+      const result = await plaidService.disconnectAndResetAll(userId, orgMember.organizationId);
+
+      // Also clear any analytics/insights for a fresh start
+      await storage.deleteOrganizationInsights(orgMember.organizationId);
+
+      res.json({ 
+        success: true, 
+        ...result,
+        message: `Disconnected ${result.itemsDeleted} bank connection(s) and cleared ${result.transactionsDeleted} transactions`
+      });
+    } catch (error: any) {
+      console.error("Plaid disconnect error:", error);
+      res.status(500).json({ message: error.message || "Failed to disconnect bank accounts" });
+    }
+  });
+
   // ========== END PLAID ROUTES ==========
 
   // ========== CONNECTION STATUS ==========

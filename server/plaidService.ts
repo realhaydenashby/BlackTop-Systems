@@ -307,6 +307,39 @@ class PlaidService {
     await db.delete(plaidItems).where(eq(plaidItems.id, itemId));
   }
 
+  async disconnectAndResetAll(userId: string, organizationId: string): Promise<{ itemsDeleted: number; accountsDeleted: number; transactionsDeleted: number }> {
+    console.log(`[Plaid] Disconnecting all items for user ${userId}, org ${organizationId}`);
+    
+    // Get all Plaid items for this user
+    const items = await db.select().from(plaidItems).where(eq(plaidItems.userId, userId));
+    
+    // Remove each item from Plaid API
+    for (const item of items) {
+      try {
+        const client = this.getClient();
+        await client.itemRemove({ access_token: item.accessToken });
+      } catch (e) {
+        console.warn("Could not remove item from Plaid (may already be removed):", e);
+      }
+    }
+
+    // Delete all transactions for this organization
+    const transactionResult = await db.delete(transactions).where(eq(transactions.organizationId, organizationId)).returning();
+    const transactionsDeleted = transactionResult.length;
+
+    // Delete all bank accounts for this user
+    const accountResult = await db.delete(bankAccounts).where(eq(bankAccounts.userId, userId)).returning();
+    const accountsDeleted = accountResult.length;
+
+    // Delete all Plaid items for this user
+    const itemResult = await db.delete(plaidItems).where(eq(plaidItems.userId, userId)).returning();
+    const itemsDeleted = itemResult.length;
+
+    console.log(`[Plaid] Disconnected: ${itemsDeleted} items, ${accountsDeleted} accounts, ${transactionsDeleted} transactions`);
+    
+    return { itemsDeleted, accountsDeleted, transactionsDeleted };
+  }
+
   private mapAccountType(plaidType: string): "checking" | "savings" | "credit_card" | "investment" | "loan" | "other" {
     switch (plaidType.toLowerCase()) {
       case "depository":
