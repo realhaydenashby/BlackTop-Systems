@@ -176,25 +176,31 @@ export default function Copilot() {
       </ScrollArea>
 
       <div className="border-t bg-background">
-        <div className="max-w-2xl mx-auto px-4 py-4">
-          <div className="relative">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask anything about your finances..."
-              rows={1}
-              className="w-full resize-none rounded-xl border bg-muted/50 px-4 py-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 placeholder:text-muted-foreground"
-              disabled={chatMutation.isPending}
-              data-testid="input-chat-message"
-              style={{ minHeight: '48px', maxHeight: '120px' }}
-            />
+        <div className="max-w-2xl mx-auto px-4 py-3">
+          <div className="flex items-end gap-2">
+            <div className="flex-1 relative">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  e.target.style.height = '36px';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Message"
+                rows={1}
+                className="w-full resize-none rounded-full border bg-muted/50 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 placeholder:text-muted-foreground"
+                disabled={chatMutation.isPending}
+                data-testid="input-chat-message"
+                style={{ height: '36px', maxHeight: '100px' }}
+              />
+            </div>
             <Button
               onClick={handleSend}
               disabled={!input.trim() || chatMutation.isPending}
               size="icon"
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg"
+              className="h-9 w-9 rounded-full bg-primary shrink-0"
               data-testid="button-send-message"
             >
               {chatMutation.isPending ? (
