@@ -90,15 +90,23 @@ Routes: `/dashboard`, `/transactions`, `/upload`, `/analytics`, `/fundraising`, 
 - Full-featured demo for evaluation before connecting real accounts
 
 ### Live Mode (/app/* - Auth Required)
-Routes: `/app`, `/app/transactions`, `/app/upload`, `/app/settings`, `/app/connect`, `/app/forecasting/workbook`
+Routes: `/app`, `/app/transactions`, `/app/upload`, `/app/settings`, `/app/connect`, `/app/analytics`, `/app/fundraising`, `/app/forecasting/workbook`
 - Protected routes requiring Replit Auth (uses ProtectedRoute)
 - Uses real API calls via `liveDataService.ts`
 - TopBar shows "Live workspace" badge
 - **Dashboard**: Single page with collapsible sections (Spend, Revenue, Burn, Runway, Forecast, Raise, Hiring)
 - **Transactions**: Spreadsheet-style view with search, filter, categorization
 - **Connect**: Bank account connection via Plaid (primary) or Yodlee FastLink (fallback)
+- **Analytics**: Connection-aware analytics (Spend, Revenue, Profitability, Forecasting tabs) - only shown in sidebar when user has active connections
+- **Fundraising**: Connection-aware fundraising prep (Burn, Runway, Raise, Hiring tabs) - only shown in sidebar when user has active connections
 - **Forecasting Workbook**: Spreadsheet-style scenario modeling with 12-month projections
 - **Settings**: Notifications, company info, integrations
+
+### Connection-Aware Navigation
+The LiveSidebar uses `useConnectionStatus` hook to check for active financial connections:
+- **Endpoint**: `GET /api/live/connections/status` - Returns `{ hasActiveConnection: boolean, connections: [...] }`
+- **Checks**: Plaid items, Yodlee bank accounts, QuickBooks connections
+- **Behavior**: Analytics and Fundraising Prep menu sections only appear when user has at least one active financial data source
 
 ### Mode Switching
 - Landing page: "Explore Demo" → `/dashboard`, "Log in" → auth flow → `/app`

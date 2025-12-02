@@ -2441,6 +2441,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ========== END PLAID ROUTES ==========
 
+  // ========== CONNECTION STATUS ==========
+  // Check if user has any active financial data connections (Plaid, Yodlee, QuickBooks)
+  app.get("/api/live/connections/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+
+      const connections: { provider: string; status: string; accountCount: number }[] = [];
+      let hasActiveConnection = false;
+
+      // Check Plaid connections
+      try {
+        const { plaidService } = await import("./plaidService");
+        const plaidAccounts = await plaidService.getAccounts(userId);
+        if (plaidAccounts.length > 0) {
+          connections.push({ provider: "plaid", status: "active", accountCount: plaidAccounts.length });
+          hasActiveConnection = true;
+        }
+      } catch (e) {
+        // Plaid not configured or no accounts
+      }
+
+      // Check Yodlee connections
+      try {
+        const bankAccounts = await storage.getUserBankAccounts(userId);
+        const yodleeAccounts = bankAccounts.filter((acc: any) => acc.yodleeAccountId);
+        if (yodleeAccounts.length > 0) {
+          connections.push({ provider: "yodlee", status: "active", accountCount: yodleeAccounts.length });
+          hasActiveConnection = true;
+        }
+      } catch (e) {
+        // No Yodlee accounts
+      }
+
+      // Check QuickBooks connection
+      try {
+        const { quickBooksService } = await import("./quickbooksService");
+        const qbStatus = await quickBooksService.getConnectionStatus(userId);
+        if (qbStatus.connected) {
+          connections.push({ provider: "quickbooks", status: "active", accountCount: 1 });
+          hasActiveConnection = true;
+        }
+      } catch (e) {
+        // QuickBooks not connected
+      }
+
+      res.json({ hasActiveConnection, connections });
+    } catch (error: any) {
+      console.error("Connection status error:", error);
+      res.status(500).json({ message: error.message || "Failed to check connection status" });
+    }
+  });
+
+  // ========== END CONNECTION STATUS ==========
+
   // Run auto-model pipeline manually
   app.post("/api/live/auto-model/run", isAuthenticated, async (req, res) => {
     try {

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -7,8 +8,12 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Link, useLocation } from "wouter";
 import {
   Building2,
@@ -19,10 +24,13 @@ import {
   Calculator,
   TrendingUp,
   Sparkles,
+  ChevronRight,
+  Rocket,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
+import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 
 const mainMenuItems = [
   {
@@ -55,6 +63,20 @@ const forecastingItems = [
   },
 ];
 
+const analyticsItems = [
+  { title: "Spend", url: "/app/analytics" },
+  { title: "Revenue", url: "/app/analytics/revenue" },
+  { title: "Profitability", url: "/app/analytics/profitability" },
+  { title: "Forecasting", url: "/app/analytics/forecasting" },
+];
+
+const fundraisingItems = [
+  { title: "Burn", url: "/app/fundraising" },
+  { title: "Runway", url: "/app/fundraising/runway" },
+  { title: "Raise", url: "/app/fundraising/raise" },
+  { title: "Hiring", url: "/app/fundraising/hiring" },
+];
+
 const utilityItems = [
   {
     title: "Settings",
@@ -66,6 +88,9 @@ const utilityItems = [
 export function LiveSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
+  const { hasActiveConnection } = useConnectionStatus();
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [fundraisingOpen, setFundraisingOpen] = useState(false);
 
   const userInitials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`
@@ -113,6 +138,75 @@ export function LiveSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {hasActiveConnection && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground">
+              Insights
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton data-testid="nav-analytics">
+                        <TrendingUp className="w-4 h-4" />
+                        <span>Analytics</span>
+                        <ChevronRight className={`ml-auto w-4 h-4 transition-transform ${analyticsOpen ? 'rotate-90' : ''}`} />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {analyticsItems.map((item) => (
+                          <SidebarMenuSubItem key={item.title}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location === item.url}
+                              data-testid={`nav-analytics-${item.title.toLowerCase()}`}
+                            >
+                              <Link href={item.url}>
+                                <span>{item.title}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+
+                <Collapsible open={fundraisingOpen} onOpenChange={setFundraisingOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton data-testid="nav-fundraising-prep">
+                        <Rocket className="w-4 h-4" />
+                        <span>Fundraising Prep</span>
+                        <ChevronRight className={`ml-auto w-4 h-4 transition-transform ${fundraisingOpen ? 'rotate-90' : ''}`} />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {fundraisingItems.map((item) => (
+                          <SidebarMenuSubItem key={item.title}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location === item.url}
+                              data-testid={`nav-fundraising-${item.title.toLowerCase()}`}
+                            >
+                              <Link href={item.url}>
+                                <span>{item.title}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground">
