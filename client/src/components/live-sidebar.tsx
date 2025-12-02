@@ -107,9 +107,9 @@ export function LiveSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <div className="flex items-center justify-between gap-2 pl-0 pr-2 py-6 border-b border-sidebar-border">
-            <div className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2 hover-elevate rounded-lg p-1" data-testid="link-home-logo">
               <span className="font-bold text-lg">BlackTop</span>
-            </div>
+            </Link>
             <Badge variant="default" className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
               Live
             </Badge>

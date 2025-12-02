@@ -116,11 +116,13 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <div className="flex items-center gap-2 pl-0 pr-2 py-6 border-b border-sidebar-border">
-            <img 
-              src="/logo.png" 
-              alt="BlackTop Systems" 
-              className="h-6 object-contain" 
-            />
+            <Link href="/" className="hover-elevate rounded-lg p-1" data-testid="link-home-logo">
+              <img 
+                src="/logo.png" 
+                alt="BlackTop Systems" 
+                className="h-6 object-contain" 
+              />
+            </Link>
           </div>
           <SidebarGroupContent className="pt-2">
             <SidebarMenu>
