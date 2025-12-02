@@ -1,112 +1,37 @@
 import { useState, useRef, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { 
   Send, 
   Loader2, 
   Sparkles, 
-  User,
   TrendingUp,
   DollarSign,
   Users,
   Calendar,
-  RefreshCw,
-  MessageSquare
+  ArrowUp
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
-import { format } from "date-fns";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-  actions?: Array<{
-    type: string;
-    description: string;
-    data?: Record<string, unknown>;
-  }>;
 }
 
 const SUGGESTED_PROMPTS = [
-  {
-    icon: TrendingUp,
-    text: "How's my runway looking?",
-    description: "Get current runway analysis",
-  },
-  {
-    icon: DollarSign,
-    text: "What are my biggest expenses?",
-    description: "Review top spending categories",
-  },
-  {
-    icon: Users,
-    text: "Can I afford to hire someone?",
-    description: "Hiring impact analysis",
-  },
-  {
-    icon: Calendar,
-    text: "What changed this week?",
-    description: "Weekly financial summary",
-  },
+  { icon: TrendingUp, text: "How's my runway?" },
+  { icon: DollarSign, text: "Top expenses this month" },
+  { icon: Users, text: "Can I afford a new hire?" },
+  { icon: Calendar, text: "What changed this week?" },
 ];
-
-function MessageBubble({ message }: { message: Message }) {
-  const isUser = message.role === "user";
-
-  return (
-    <div
-      className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}
-      data-testid={`message-${message.id}`}
-    >
-      <Avatar className="h-8 w-8 flex-shrink-0">
-        <AvatarFallback className={isUser ? "bg-primary text-primary-foreground" : "bg-muted"}>
-          {isUser ? <User className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-        </AvatarFallback>
-      </Avatar>
-      <div className={`flex flex-col gap-1 max-w-[80%] ${isUser ? "items-end" : ""}`}>
-        <div
-          className={`px-4 py-3 rounded-2xl ${
-            isUser
-              ? "bg-primary text-primary-foreground rounded-tr-sm"
-              : "bg-muted rounded-tl-sm"
-          }`}
-        >
-          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-        </div>
-        <span className="text-xs text-muted-foreground">
-          {format(message.timestamp, "h:mm a")}
-        </span>
-        {message.actions && message.actions.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {message.actions.map((action, i) => (
-              <Badge key={i} variant="outline" className="text-xs">
-                {action.description}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 export default function Copilot() {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: "Hi! I'm your financial copilot. Ask me anything about your company's finances, runway, spending, or hiring plans. I can analyze your data and help you make better decisions.",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -123,23 +48,20 @@ export default function Copilot() {
       return res.json();
     },
     onSuccess: (data) => {
-      const assistantMessage: Message = {
+      setMessages((prev) => [...prev, {
         id: `assistant-${Date.now()}`,
         role: "assistant",
         content: data.response,
         timestamp: new Date(),
-        actions: data.actions,
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      }]);
     },
     onError: (error: Error) => {
-      const errorMessage: Message = {
+      setMessages((prev) => [...prev, {
         id: `error-${Date.now()}`,
         role: "assistant",
-        content: `I'm sorry, I encountered an error: ${error.message}. Please try again.`,
+        content: `Something went wrong. Please try again.`,
         timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      }]);
     },
   });
 
@@ -147,14 +69,12 @@ export default function Copilot() {
     const trimmedInput = input.trim();
     if (!trimmedInput || chatMutation.isPending) return;
 
-    const userMessage: Message = {
+    setMessages((prev) => [...prev, {
       id: `user-${Date.now()}`,
       role: "user",
       content: trimmedInput,
       timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
+    }]);
     setInput("");
     chatMutation.mutate(trimmedInput);
   };
@@ -177,99 +97,112 @@ export default function Copilot() {
     }
   }, [messages]);
 
+  const showWelcome = messages.length === 0;
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      <div className="p-6 border-b">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Sparkles className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold" data-testid="heading-copilot">Financial Copilot</h1>
-              <p className="text-sm text-muted-foreground">
-                Ask questions about your finances in plain English
+      <ScrollArea className="flex-1" ref={scrollRef}>
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          {showWelcome ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <Sparkles className="h-6 w-6 text-primary" />
+              </div>
+              <h1 className="text-2xl font-semibold mb-2" data-testid="heading-copilot">
+                Financial Copilot
+              </h1>
+              <p className="text-muted-foreground mb-8 max-w-md">
+                Ask questions about your runway, spending, hiring plans, or anything else about your finances.
               </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-hidden">
-        <div className="max-w-4xl mx-auto h-full flex flex-col">
-          <ScrollArea className="flex-1 p-6" ref={scrollRef}>
-            <div className="space-y-6">
-              {messages.map((message) => (
-                <MessageBubble key={message.id} message={message} />
-              ))}
-              {chatMutation.isPending && (
-                <div className="flex gap-3">
-                  <Avatar className="h-8 w-8 flex-shrink-0">
-                    <AvatarFallback className="bg-muted">
-                      <Sparkles className="h-4 w-4" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-muted rounded-tl-sm">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Analyzing your data...</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-
-          {messages.length <= 1 && (
-            <div className="px-6 pb-4">
-              <p className="text-sm text-muted-foreground mb-3">Try asking:</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-wrap justify-center gap-2">
                 {SUGGESTED_PROMPTS.map((prompt, i) => (
                   <Button
                     key={i}
                     variant="outline"
-                    className="h-auto py-3 px-4 justify-start text-left hover-elevate"
+                    size="sm"
+                    className="gap-2"
                     onClick={() => handleSuggestedPrompt(prompt.text)}
                     data-testid={`suggested-prompt-${i}`}
                   >
-                    <prompt.icon className="h-4 w-4 mr-3 flex-shrink-0 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium text-sm">{prompt.text}</p>
-                      <p className="text-xs text-muted-foreground">{prompt.description}</p>
-                    </div>
+                    <prompt.icon className="h-3.5 w-3.5" />
+                    {prompt.text}
                   </Button>
                 ))}
               </div>
             </div>
-          )}
-
-          <div className="p-6 border-t">
-            <div className="flex gap-3">
-              <Textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask about your runway, expenses, hiring plans..."
-                className="min-h-[52px] max-h-32 resize-none"
-                disabled={chatMutation.isPending}
-                data-testid="input-chat-message"
-              />
-              <Button
-                onClick={handleSend}
-                disabled={!input.trim() || chatMutation.isPending}
-                size="icon"
-                className="h-[52px] w-[52px]"
-                data-testid="button-send-message"
-              >
-                {chatMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
+          ) : (
+            <div className="space-y-6">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  data-testid={`message-${message.id}`}
+                >
+                  {message.role === "assistant" && (
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center mr-3 mt-1 flex-shrink-0">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[85%] px-4 py-2.5 rounded-2xl ${
+                      message.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {message.content}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {chatMutation.isPending && (
+                <div className="flex justify-start">
+                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center mr-3 mt-1 flex-shrink-0">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div className="bg-muted px-4 py-2.5 rounded-2xl">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse [animation-delay:150ms]" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse [animation-delay:300ms]" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground mt-2 text-center">
-              Copilot uses your financial data to provide personalized insights
-            </p>
+          )}
+        </div>
+      </ScrollArea>
+
+      <div className="border-t bg-background">
+        <div className="max-w-2xl mx-auto px-4 py-4">
+          <div className="relative">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask anything about your finances..."
+              rows={1}
+              className="w-full resize-none rounded-xl border bg-muted/50 px-4 py-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 placeholder:text-muted-foreground"
+              disabled={chatMutation.isPending}
+              data-testid="input-chat-message"
+              style={{ minHeight: '48px', maxHeight: '120px' }}
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || chatMutation.isPending}
+              size="icon"
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg"
+              data-testid="button-send-message"
+            >
+              {chatMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ArrowUp className="h-4 w-4" />
+              )}
+            </Button>
           </div>
         </div>
       </div>
