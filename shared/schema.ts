@@ -110,13 +110,13 @@ export const vendors = pgTable("vendors", {
 });
 
 // Categories
-export const categoryTypeEnum = pgEnum("category_type", ["fixed", "variable"]);
+export const categoryTypeEnum = pgEnum("category_type", ["income", "expense"]);
 
 export const categories = pgTable("categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 100 }).notNull(),
-  type: categoryTypeEnum("type").default("variable"),
+  type: categoryTypeEnum("type").default("expense"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
