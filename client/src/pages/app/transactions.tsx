@@ -204,11 +204,11 @@ export default function AppTransactions() {
 
   const totalInflows = filteredTransactions
     .filter((t) => t.type === "credit")
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + (typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount), 0);
 
   const totalOutflows = filteredTransactions
     .filter((t) => t.type === "debit")
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + Math.abs(typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount), 0);
 
   if (isLoading) {
     return (
