@@ -417,10 +417,10 @@ export default function Connect() {
           <h2 className="text-lg font-medium">Accounting Software</h2>
         </div>
 
-        <Card data-testid="card-quickbooks">
+        <Card data-testid="card-quickbooks" className="hover:shadow-glow transition-all duration-base">
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
             <div className="flex items-center gap-4">
-              <div className="rounded-lg bg-[#2CA01C]/10 p-3">
+              <div className="rounded-xl bg-[#2CA01C]/10 border border-[#2CA01C]/20 p-3">
                 <SiQuickbooks className="h-6 w-6 text-[#2CA01C]" />
               </div>
               <div>
@@ -530,8 +530,8 @@ export default function Connect() {
         {!bankLoading && bankAccounts.length === 0 && (
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="rounded-full bg-muted p-4 mb-4">
-                <Building2 className="h-8 w-8 text-muted-foreground" />
+              <div className="rounded-2xl bg-muted border border-border p-5 mb-6">
+                <Building2 className="h-8 w-8 text-primary" />
               </div>
               <h3 className="text-lg font-semibold mb-2">No Bank Accounts Connected</h3>
               <p className="text-muted-foreground text-center max-w-md mb-6">
@@ -540,6 +540,7 @@ export default function Connect() {
               <Button
                 onClick={handleConnectBank}
                 disabled={isConnectingBank || !plaidReady}
+                className="shadow-glow"
                 data-testid="button-connect-first-bank"
               >
                 {isConnectingBank ? (
@@ -557,10 +558,10 @@ export default function Connect() {
         {!bankLoading && bankAccounts.length > 0 && (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {bankAccounts.map((account) => (
-              <Card key={account.id} data-testid={`card-account-${account.id}`}>
+              <Card key={account.id} data-testid={`card-account-${account.id}`} className="hover:shadow-glow transition-all duration-base">
                 <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-2">
                   <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-primary/10 p-2">
+                    <div className="rounded-xl bg-primary/10 border border-primary/20 p-2.5">
                       {getAccountIcon(account.accountType)}
                     </div>
                     <div>

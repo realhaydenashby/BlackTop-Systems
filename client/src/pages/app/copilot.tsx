@@ -105,8 +105,8 @@ export default function Copilot() {
         <div className="max-w-2xl mx-auto px-4 py-8">
           {showWelcome ? (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <Sparkles className="h-6 w-6 text-primary" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/10 border border-primary/20 flex items-center justify-center mb-6">
+                <Sparkles className="h-7 w-7 text-primary" />
               </div>
               <h1 className="text-2xl font-semibold mb-2" data-testid="heading-copilot">
                 Financial Copilot
@@ -118,7 +118,7 @@ export default function Copilot() {
                 {SUGGESTED_PROMPTS.map((prompt, i) => (
                   <Button
                     key={i}
-                    variant="outline"
+                    variant="glass"
                     size="sm"
                     className="gap-2"
                     onClick={() => handleSuggestedPrompt(prompt.text)}
@@ -139,15 +139,15 @@ export default function Copilot() {
                   data-testid={`message-${message.id}`}
                 >
                   {message.role === "assistant" && (
-                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center mr-3 mt-1 flex-shrink-0">
-                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 border border-primary/20 flex items-center justify-center mr-3 mt-1 flex-shrink-0">
+                      <Sparkles className="h-4 w-4 text-primary" />
                     </div>
                   )}
                   <div
-                    className={`max-w-[85%] px-4 py-2.5 rounded-2xl ${
+                    className={`max-w-[85%] px-4 py-3 rounded-2xl ${
                       message.role === "user"
                         ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
+                        : "bg-muted border border-border"
                     }`}
                   >
                     <p className="text-sm whitespace-pre-wrap leading-relaxed">
@@ -158,14 +158,14 @@ export default function Copilot() {
               ))}
               {chatMutation.isPending && (
                 <div className="flex justify-start">
-                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center mr-3 mt-1 flex-shrink-0">
-                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 border border-primary/20 flex items-center justify-center mr-3 mt-1 flex-shrink-0">
+                    <Sparkles className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="bg-muted px-4 py-2.5 rounded-2xl">
+                  <div className="bg-muted border border-border px-4 py-3 rounded-2xl">
                     <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse" />
-                      <div className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse [animation-delay:150ms]" />
-                      <div className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse [animation-delay:300ms]" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-pulse" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-pulse [animation-delay:150ms]" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-pulse [animation-delay:300ms]" />
                     </div>
                   </div>
                 </div>
@@ -190,7 +190,7 @@ export default function Copilot() {
                 onKeyDown={handleKeyDown}
                 placeholder="Message"
                 rows={1}
-                className="w-full resize-none rounded-full border bg-muted/50 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 placeholder:text-muted-foreground"
+                className="w-full resize-none rounded-full border border-input bg-muted/50 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 placeholder:text-muted-foreground"
                 disabled={chatMutation.isPending}
                 data-testid="input-chat-message"
                 style={{ height: '36px', maxHeight: '100px' }}
@@ -200,7 +200,7 @@ export default function Copilot() {
               onClick={handleSend}
               disabled={!input.trim() || chatMutation.isPending}
               size="icon"
-              className="h-9 w-9 rounded-full bg-primary shrink-0"
+              className="h-9 w-9 rounded-full shrink-0"
               data-testid="button-send-message"
             >
               {chatMutation.isPending ? (

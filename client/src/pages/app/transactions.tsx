@@ -247,7 +247,7 @@ export default function AppTransactions() {
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <Card>
+        <Card className="hover:shadow-glow transition-all duration-base">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Inflows</p>
             <p className="text-xl font-bold text-green-500">
@@ -255,7 +255,7 @@ export default function AppTransactions() {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-glow transition-all duration-base">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Outflows</p>
             <p className="text-xl font-bold text-red-500">
@@ -263,7 +263,7 @@ export default function AppTransactions() {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-glow transition-all duration-base">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Net Flow</p>
             <p

@@ -508,7 +508,10 @@ function MetricCard({
   }
 
   return (
-    <Card data-testid={`card-metric-${title.toLowerCase().replace(/\s/g, "-")}`}>
+    <Card 
+      data-testid={`card-metric-${title.toLowerCase().replace(/\s/g, "-")}`}
+      className="group hover:shadow-glow transition-all duration-base"
+    >
       <CardContent className="pt-6">
         <div className="flex items-center justify-between">
           <div>
@@ -540,8 +543,8 @@ function MetricCard({
               </div>
             )}
           </div>
-          <div className="p-3 rounded-full bg-muted">
-            <Icon className="h-5 w-5 text-muted-foreground" />
+          <div className="p-3 rounded-2xl bg-primary/10 group-hover:bg-primary/20 transition-colors duration-base">
+            <Icon className="h-5 w-5 text-primary" />
           </div>
         </div>
       </CardContent>
@@ -997,12 +1000,13 @@ export default function AppDashboard() {
         </Badge>
       </div>
 
-      <Card className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
+      <Card className="relative overflow-hidden border-glass-border/20 shadow-glass">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/5" />
+        <div className="absolute top-0 left-1/4 right-1/4 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
         <CardContent className="pt-8 pb-8 relative">
           <div className="text-center space-y-4">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted">
-              <Clock className="h-4 w-4" />
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted border border-border">
+              <Clock className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">Current Runway</span>
             </div>
             

@@ -53,10 +53,12 @@ export default function AppSettings() {
         </p>
       </div>
 
-      <Card>
+      <Card className="hover:shadow-glow transition-all duration-base">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
+            <div className="p-2 rounded-xl bg-primary/10">
+              <User className="h-4 w-4 text-primary" />
+            </div>
             Profile
           </CardTitle>
           <CardDescription>Your personal account information</CardDescription>
@@ -94,10 +96,12 @@ export default function AppSettings() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hover:shadow-glow transition-all duration-base">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Building className="h-5 w-5" />
+            <div className="p-2 rounded-xl bg-primary/10">
+              <Building className="h-4 w-4 text-primary" />
+            </div>
             Company
           </CardTitle>
           <CardDescription>Your company settings and details</CardDescription>
@@ -140,10 +144,12 @@ export default function AppSettings() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hover:shadow-glow transition-all duration-base">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5" />
+            <div className="p-2 rounded-xl bg-primary/10">
+              <Bell className="h-4 w-4 text-primary" />
+            </div>
             Notifications
           </CardTitle>
           <CardDescription>Configure how you receive alerts</CardDescription>
@@ -249,18 +255,20 @@ export default function AppSettings() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hover:shadow-glow transition-all duration-base">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Link2 className="h-5 w-5" />
+            <div className="p-2 rounded-xl bg-primary/10">
+              <Link2 className="h-4 w-4 text-primary" />
+            </div>
             Connected Accounts
           </CardTitle>
           <CardDescription>Manage your financial data sources</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 border rounded-lg">
+          <div className="flex items-center justify-between p-4 border border-glass-border/30 rounded-xl bg-glass/20">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-muted rounded">
+              <div className="p-2 bg-muted rounded-lg">
                 <Building className="h-5 w-5" />
               </div>
               <div>
@@ -272,9 +280,9 @@ export default function AppSettings() {
             </div>
             <Badge variant="outline">Not Connected</Badge>
           </div>
-          <div className="flex items-center justify-between p-4 border rounded-lg">
+          <div className="flex items-center justify-between p-4 border border-glass-border/30 rounded-xl bg-glass/20">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-muted rounded">
+              <div className="p-2 bg-muted rounded-lg">
                 <CreditCard className="h-5 w-5" />
               </div>
               <div>
@@ -282,11 +290,11 @@ export default function AppSettings() {
                 <p className="text-sm text-muted-foreground">Revenue data</p>
               </div>
             </div>
-            <Badge variant="outline">Not Connected</Badge>
+            <Badge variant="glass">Not Connected</Badge>
           </div>
-          <div className="flex items-center justify-between p-4 border rounded-lg">
+          <div className="flex items-center justify-between p-4 border border-glass-border/30 rounded-xl bg-glass/20">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-muted rounded">
+              <div className="p-2 bg-muted rounded-lg">
                 <Building className="h-5 w-5" />
               </div>
               <div>
@@ -294,7 +302,7 @@ export default function AppSettings() {
                 <p className="text-sm text-muted-foreground">Accounting data</p>
               </div>
             </div>
-            <Badge variant="outline">Not Connected</Badge>
+            <Badge variant="glass">Not Connected</Badge>
           </div>
           <Button
             className="w-full"
@@ -307,16 +315,18 @@ export default function AppSettings() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hover:shadow-glow transition-all duration-base">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
+            <div className="p-2 rounded-xl bg-primary/10">
+              <CreditCard className="h-4 w-4 text-primary" />
+            </div>
             Subscription
           </CardTitle>
           <CardDescription>Your plan and billing details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-glass/30 border border-glass-border/30 rounded-xl">
             <div>
               <p className="font-medium">Current Plan</p>
               <p className="text-sm text-muted-foreground">Free Trial</p>

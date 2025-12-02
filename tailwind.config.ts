@@ -6,16 +6,26 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        lg: "var(--radius-lg)",
+        md: "var(--radius)",
+        sm: "var(--radius-sm)",
+        xl: "var(--radius-xl)",
+        "2xl": "1.5rem",
+        "3xl": "2rem",
       },
       colors: {
-        // Flat / base colors (regular buttons)
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
         border: "hsl(var(--border) / <alpha-value>)",
         input: "hsl(var(--input) / <alpha-value>)",
+        ring: "hsl(var(--ring) / <alpha-value>)",
+        
+        glass: {
+          DEFAULT: "hsl(var(--glass) / <alpha-value>)",
+          foreground: "hsl(var(--glass-foreground) / <alpha-value>)",
+          border: "hsl(var(--glass-border) / <alpha-value>)",
+        },
+        
         card: {
           DEFAULT: "hsl(var(--card) / <alpha-value>)",
           foreground: "hsl(var(--card-foreground) / <alpha-value>)",
@@ -51,7 +61,6 @@ export default {
           foreground: "hsl(var(--destructive-foreground) / <alpha-value>)",
           border: "var(--destructive-border)",
         },
-        ring: "hsl(var(--ring) / <alpha-value>)",
         chart: {
           "1": "hsl(var(--chart-1) / <alpha-value>)",
           "2": "hsl(var(--chart-2) / <alpha-value>)",
@@ -87,6 +96,28 @@ export default {
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
       },
+      backdropBlur: {
+        xs: "4px",
+        glass: "var(--glass-blur)",
+        heavy: "var(--glass-blur-heavy)",
+      },
+      boxShadow: {
+        glass: "var(--shadow-glass)",
+        glow: "var(--shadow-glow)",
+        float: "var(--shadow-float)",
+        subtle: "var(--shadow-subtle)",
+        "glow-primary": "0 0 20px var(--primary-glow), 0 0 40px var(--primary-glow)",
+        "glow-accent": "0 0 20px var(--accent-glow), 0 0 40px var(--accent-glow)",
+      },
+      transitionTimingFunction: {
+        glass: "cubic-bezier(0.4, 0, 0.2, 1)",
+        bounce: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      },
+      transitionDuration: {
+        fast: "150ms",
+        base: "250ms",
+        slow: "400ms",
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
@@ -96,10 +127,25 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "glow-pulse": {
+          "0%, 100%": { opacity: "0.4" },
+          "50%": { opacity: "0.8" },
+        },
+        "float": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-4px)" },
+        },
+        "shimmer": {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
+        "float": "float 3s ease-in-out infinite",
+        "shimmer": "shimmer 2s linear infinite",
       },
     },
   },

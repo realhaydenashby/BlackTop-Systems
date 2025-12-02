@@ -2,167 +2,284 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE */
+/* iOS 26 LIQUID GLASS DESIGN SYSTEM */
+
 :root {
-  --button-outline: rgba(0,0,0, .10);
-  --badge-outline: rgba(0,0,0, .05);
-  --opaque-button-border-intensity: -8;
-  --elevate-1: rgba(0,0,0, .03);
-  --elevate-2: rgba(0,0,0, .08);
+  /* Base palette - Dark mode by default */
   --background: 222 47% 5%;
   --foreground: 210 20% 98%;
-  --border: 217 19% 12%;
-  --card: 220 30% 6%;
+  --border: 217 19% 18%;
+  
+  /* Glass surface tokens */
+  --glass: 220 30% 12%;
+  --glass-foreground: 210 20% 95%;
+  --glass-border: 217 30% 25%;
+  --glass-highlight: 210 100% 98%;
+  --glass-blur: 20px;
+  --glass-blur-heavy: 40px;
+  --glass-opacity: 0.6;
+  --glass-opacity-light: 0.4;
+  
+  /* Translucent surfaces - HSL format for Tailwind */
+  --surface-translucent: 222 30% 12%;
+  --surface-translucent-hover: 222 25% 18%;
+  --surface-frosted: 0 0% 100%;
+  --surface-glow: 210 80% 70%;
+  
+  /* Card with glass effect */
+  --card: 220 30% 8%;
   --card-foreground: 210 20% 95%;
-  --card-border: 217 19% 10%;
-  --sidebar: 222 40% 7%;
+  --card-border: 217 25% 20%;
+  --card-glow: 210 80% 70%;
+  
+  /* Sidebar glass */
+  --sidebar: 222 40% 6%;
   --sidebar-foreground: 210 15% 90%;
-  --sidebar-border: 217 19% 14%;
-  --sidebar-primary: 217 91% 55%;
-  --sidebar-primary-foreground: 0 0% 98%;
-  --sidebar-accent: 217 19% 13%;
+  --sidebar-border: 217 19% 16%;
+  --sidebar-primary: 217 91% 42%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 217 25% 16%;
   --sidebar-accent-foreground: 210 15% 92%;
-  --sidebar-ring: 193 82% 50%;
-  --popover: 220 25% 8%;
+  --sidebar-ring: 210 100% 50%;
+  
+  /* Popover glass */
+  --popover: 220 30% 10%;
   --popover-foreground: 210 15% 90%;
-  --popover-border: 217 19% 15%;
-  --primary: 217 91% 55%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 217 19% 15%;
+  --popover-border: 217 25% 22%;
+  
+  /* Primary - accessible blue with glow (darkened for 4.5:1 contrast with white) */
+  --primary: 217 91% 42%;
+  --primary-foreground: 0 0% 100%;
+  --primary-glow: 217 91% 50%;
+  
+  /* Secondary - subtle glass */
+  --secondary: 217 25% 18%;
   --secondary-foreground: 210 15% 90%;
-  --muted: 217 19% 14%;
-  --muted-foreground: 215 15% 62%;
-  --accent: 193 82% 50%;
+  
+  /* Muted - softer */
+  --muted: 217 20% 16%;
+  --muted-foreground: 215 15% 55%;
+  
+  /* Accent - cyan glow */
+  --accent: 195 90% 55%;
   --accent-foreground: 222 47% 5%;
-  --destructive: 0 72% 50%;
+  --accent-glow: 195 90% 55%;
+  
+  /* Destructive */
+  --destructive: 0 72% 55%;
   --destructive-foreground: 0 0% 98%;
-  --input: 217 19% 25%;
-  --ring: 193 82% 50%;
-  --chart-1: 220 45% 48%;
-  --chart-2: 190 35% 52%;
-  --chart-3: 220 10% 55%;
-  --chart-4: 240 25% 50%;
-  --chart-5: 185 28% 58%;
-  --font-sans: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --destructive-glow: 0 72% 55%;
+  
+  /* Form inputs */
+  --input: 217 20% 20%;
+  --ring: 217 91% 50%;
+  
+  /* Charts - vibrant but glassy */
+  --chart-1: 217 80% 55%;
+  --chart-2: 195 75% 50%;
+  --chart-3: 260 60% 55%;
+  --chart-4: 330 70% 55%;
+  --chart-5: 160 60% 45%;
+  
+  /* Typography */
+  --font-sans: 'SF Pro Display', 'Inter', system-ui, -apple-system, sans-serif;
   --font-serif: Georgia, serif;
-  --font-mono: Menlo, monospace;
-  --radius: .5rem;
-  --shadow-2xs: 0px 2px 0px 0px hsl(220 15% 15% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(220 15% 15% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(220 15% 15% / 0.00), 0px 1px 2px -1px hsl(220 15% 15% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(220 15% 15% / 0.00), 0px 1px 2px -1px hsl(220 15% 15% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(220 15% 15% / 0.00), 0px 2px 4px -1px hsl(220 15% 15% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(220 15% 15% / 0.00), 0px 4px 6px -1px hsl(220 15% 15% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(220 15% 15% / 0.00), 0px 8px 10px -1px hsl(220 15% 15% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(220 15% 15% / 0.00);
-  --tracking-normal: 0em;
+  --font-mono: 'SF Mono', Menlo, monospace;
+  
+  /* Radius - more rounded for glass */
+  --radius: 1rem;
+  --radius-sm: 0.625rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+  
+  /* Shadow color tokens in HSL for Tailwind */
+  --shadow-color: 210 80% 70%;
+  --shadow-black: 0 0% 0%;
+  --shadow-white: 0 0% 100%;
+  
+  /* Animation timing */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  
+  /* Elevation system in HSL */
+  --button-outline: 0 0% 100%;
+  --badge-outline: 0 0% 100%;
+  --opaque-button-border-intensity: 10;
+  --elevate-1: 0 0% 100%;
+  --elevate-2: 0 0% 100%;
+  
   --spacing: 0.25rem;
+  --tracking-normal: 0em;
 
-/* Fallback for older browsers */
-  --sidebar-primary-border: hsl(var(--sidebar-primary));
-  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --sidebar-accent-border: hsl(var(--sidebar-accent));
-  --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --primary-border: hsl(var(--primary));
-  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --secondary-border: hsl(var(--secondary));
-  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --muted-border: hsl(var(--muted));
-  --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --accent-border: hsl(var(--accent));
-  --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --destructive-border: hsl(var(--destructive));
-  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  /* Border colors derived from base - HSL format */
+  --sidebar-primary-border: 217 91% 42%;
+  --sidebar-accent-border: 217 25% 16%;
+  --primary-border: 217 91% 42%;
+  --secondary-border: 217 25% 18%;
+  --muted-border: 217 20% 16%;
+  --accent-border: 195 90% 55%;
+  --destructive-border: 0 72% 55%;
 }
 
+/* Light mode - bright frosted glass */
+.light {
+  --background: 220 20% 96%;
+  --foreground: 222 47% 8%;
+  --border: 220 15% 85%;
+  
+  --glass: 0 0% 100%;
+  --glass-foreground: 222 47% 10%;
+  --glass-border: 220 20% 90%;
+  --glass-highlight: 0 0% 100%;
+  --glass-opacity: 0.7;
+  --glass-opacity-light: 0.5;
+  
+  --surface-translucent: 0 0% 100%;
+  --surface-translucent-hover: 0 0% 98%;
+  --surface-frosted: 0 0% 100%;
+  --surface-glow: 210 80% 60%;
+  
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 10%;
+  --card-border: 220 15% 88%;
+  --card-glow: 210 80% 60%;
+  
+  --sidebar: 220 20% 98%;
+  --sidebar-foreground: 222 40% 15%;
+  --sidebar-border: 220 15% 90%;
+  --sidebar-primary: 217 91% 40%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 15% 94%;
+  --sidebar-accent-foreground: 222 40% 20%;
+  --sidebar-ring: 217 91% 40%;
+  
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 40% 15%;
+  --popover-border: 220 15% 88%;
+  
+  --primary: 217 91% 40%;
+  --primary-foreground: 0 0% 100%;
+  --primary-glow: 217 91% 45%;
+  
+  --secondary: 220 15% 92%;
+  --secondary-foreground: 222 40% 20%;
+  
+  --muted: 220 15% 94%;
+  --muted-foreground: 220 10% 45%;
+  
+  --accent: 195 90% 45%;
+  --accent-foreground: 0 0% 100%;
+  --accent-glow: 195 90% 45%;
+  
+  --destructive: 0 72% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --destructive-glow: 0 72% 50%;
+  
+  --input: 220 15% 92%;
+  --ring: 217 91% 50%;
+  
+  /* Shadow color tokens for light mode */
+  --shadow-color: 210 80% 60%;
+  --shadow-black: 0 0% 0%;
+  --shadow-white: 0 0% 100%;
+  
+  /* Elevation system for light mode */
+  --button-outline: 0 0% 0%;
+  --badge-outline: 0 0% 0%;
+  --opaque-button-border-intensity: -8;
+  --elevate-1: 0 0% 0%;
+  --elevate-2: 0 0% 0%;
+  
+  /* Border colors derived from base - light mode HSL */
+  --sidebar-primary-border: 217 91% 40%;
+  --sidebar-accent-border: 220 15% 94%;
+  --primary-border: 217 91% 40%;
+  --secondary-border: 220 15% 92%;
+  --muted-border: 220 15% 94%;
+  --accent-border: 195 90% 45%;
+  --destructive-border: 0 72% 50%;
+}
+
+/* Dark mode - deep glass */
 .dark {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
-  --opaque-button-border-intensity: 9;
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
   --background: 222 47% 5%;
   --foreground: 210 20% 98%;
-  --border: 217 19% 12%;
-  --card: 220 30% 6%;
+  --border: 217 19% 18%;
+  
+  --glass: 220 30% 12%;
+  --glass-foreground: 210 20% 95%;
+  --glass-border: 217 30% 25%;
+  --glass-highlight: 210 100% 98%;
+  --glass-opacity: 0.6;
+  --glass-opacity-light: 0.4;
+  
+  --surface-translucent: 222 30% 12%;
+  --surface-translucent-hover: 222 25% 18%;
+  --surface-frosted: 0 0% 100%;
+  --surface-glow: 210 80% 70%;
+  
+  --card: 220 30% 8%;
   --card-foreground: 210 20% 95%;
-  --card-border: 217 19% 10%;
-  --sidebar: 222 40% 7%;
+  --card-border: 217 25% 20%;
+  --card-glow: 210 80% 70%;
+  
+  --sidebar: 222 40% 6%;
   --sidebar-foreground: 210 15% 90%;
-  --sidebar-border: 217 19% 14%;
-  --sidebar-primary: 217 91% 55%;
-  --sidebar-primary-foreground: 0 0% 98%;
-  --sidebar-accent: 217 19% 13%;
+  --sidebar-border: 217 19% 16%;
+  --sidebar-primary: 217 91% 42%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 217 25% 16%;
   --sidebar-accent-foreground: 210 15% 92%;
-  --sidebar-ring: 193 82% 50%;
-  --popover: 220 25% 8%;
+  --sidebar-ring: 210 100% 50%;
+  
+  --popover: 220 30% 10%;
   --popover-foreground: 210 15% 90%;
-  --popover-border: 217 19% 15%;
-  --primary: 217 91% 55%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 217 19% 15%;
+  --popover-border: 217 25% 22%;
+  
+  --primary: 217 91% 42%;
+  --primary-foreground: 0 0% 100%;
+  --primary-glow: 217 91% 50%;
+  
+  --secondary: 217 25% 18%;
   --secondary-foreground: 210 15% 90%;
-  --muted: 217 19% 14%;
-  --muted-foreground: 215 15% 62%;
-  --accent: 193 82% 50%;
+  
+  --muted: 217 20% 16%;
+  --muted-foreground: 215 15% 55%;
+  
+  --accent: 195 90% 55%;
   --accent-foreground: 222 47% 5%;
-  --destructive: 0 72% 50%;
+  --accent-glow: 195 90% 55%;
+  
+  --destructive: 0 72% 55%;
   --destructive-foreground: 0 0% 98%;
-  --input: 217 19% 25%;
-  --ring: 193 82% 50%;
-  --chart-1: 220 45% 48%;
-  --chart-2: 190 35% 52%;
-  --chart-3: 220 10% 55%;
-  --chart-4: 240 25% 50%;
-  --chart-5: 185 28% 58%;
-  --shadow-2xs: 0px 2px 0px 0px hsl(222 47% 5% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(222 47% 5% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(222 47% 5% / 0.00), 0px 1px 2px -1px hsl(222 47% 5% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(222 47% 5% / 0.00), 0px 1px 2px -1px hsl(222 47% 5% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(222 47% 5% / 0.00), 0px 2px 4px -1px hsl(222 47% 5% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(222 47% 5% / 0.00), 0px 4px 6px -1px hsl(222 47% 5% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(222 47% 5% / 0.00), 0px 8px 10px -1px hsl(222 47% 5% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(222 47% 5% / 0.00);
+  --destructive-glow: 0 72% 55%;
+  
+  --input: 217 20% 20%;
+  --ring: 217 91% 50%;
+  
+  /* Shadow color tokens for dark mode */
+  --shadow-color: 210 80% 70%;
+  --shadow-black: 0 0% 0%;
+  --shadow-white: 0 0% 100%;
+  
+  /* Elevation system for dark mode */
+  --button-outline: 0 0% 100%;
+  --badge-outline: 0 0% 100%;
+  --opaque-button-border-intensity: 10;
+  --elevate-1: 0 0% 100%;
+  --elevate-2: 0 0% 100%;
 
-/* Fallback for older browsers */
-  --sidebar-primary-border: hsl(var(--sidebar-primary));
-  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --sidebar-accent-border: hsl(var(--sidebar-accent));
-  --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --primary-border: hsl(var(--primary));
-  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --secondary-border: hsl(var(--secondary));
-  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --muted-border: hsl(var(--muted));
-  --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --accent-border: hsl(var(--accent));
-  --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-
-  /* Fallback for older browsers */
-  --destructive-border: hsl(var(--destructive));
-  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  /* Border colors derived from base */
+  --sidebar-primary-border: 217 91% 42%;
+  --sidebar-accent-border: 217 25% 16%;
+  --primary-border: 217 91% 42%;
+  --secondary-border: 217 25% 18%;
+  --muted-border: 217 20% 16%;
+  --accent-border: 195 90% 55%;
+  --destructive-border: 0 72% 55%;
 }
 
 @layer base {
@@ -175,29 +292,106 @@
   }
 }
 
-/**
- * Using the elevate system.
- * Automatic contrast adjustment.
- *
- * <element className="hover-elevate" />
- * <element className="active-elevate-2" />
- *
- * // Using the tailwind utility when a data attribute is "on"
- * <element className="toggle-elevate data-[state=on]:toggle-elevated" />
- * // Or manually controlling the toggle state
- * <element className="toggle-elevate toggle-elevated" />
- *
- * Elevation systems have to handle many states.
- * - not-hovered, vs. hovered vs. active  (three mutually exclusive states)
- * - toggled or not
- * - focused or not (this is not handled with these utilities)
- *
- * Even without handling focused or not, this is six possible combinations that
- * need to be distinguished from eachother visually.
- */
+/* GLASS COMPONENT UTILITIES */
 @layer utilities {
+  /* Core glass effect */
+  .glass {
+    background: hsl(var(--surface-translucent));
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid hsl(var(--glass-border) / 0.3);
+    box-shadow: 0 8px 32px hsl(var(--shadow-black) / 0.2), inset 0 1px 0 hsl(var(--shadow-white) / 0.05);
+  }
+  
+  .glass-subtle {
+    background: hsl(var(--surface-frosted) / 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--glass-border) / 0.2);
+  }
+  
+  .glass-heavy {
+    background: hsl(var(--surface-translucent));
+    backdrop-filter: blur(var(--glass-blur-heavy));
+    -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+    border: 1px solid hsl(var(--glass-border) / 0.4);
+    box-shadow: 0 8px 32px hsl(var(--shadow-black) / 0.25), 0 0 30px hsl(var(--shadow-color) / 0.1);
+  }
+  
+  /* Glow effects */
+  .glow-primary {
+    box-shadow: 0 0 20px hsl(var(--primary-glow) / 0.4), 0 0 40px hsl(var(--primary-glow) / 0.2);
+  }
+  
+  .glow-accent {
+    box-shadow: 0 0 20px hsl(var(--accent-glow) / 0.4), 0 0 40px hsl(var(--accent-glow) / 0.2);
+  }
+  
+  .glow-soft {
+    box-shadow: 0 0 30px hsl(var(--shadow-color) / 0.1);
+  }
+  
+  /* Highlight edge (top border glow) */
+  .glass-highlight {
+    position: relative;
+  }
+  
+  .glass-highlight::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--glass-highlight) / 0.3), transparent);
+    pointer-events: none;
+  }
+  
+  /* Fluid transitions */
+  .transition-glass {
+    transition: all var(--transition-base);
+  }
+  
+  .transition-bounce {
+    transition: all var(--transition-bounce);
+  }
+  
+  /* Glass card variant */
+  .card-glass {
+    background: hsl(var(--surface-translucent));
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid hsl(var(--card-border) / 0.5);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px hsl(var(--shadow-black) / 0.2);
+  }
+  
+  .card-glass:hover {
+    background: hsl(var(--surface-translucent-hover));
+    box-shadow: 0 8px 32px hsl(var(--shadow-black) / 0.25), 0 0 30px hsl(var(--shadow-color) / 0.1);
+  }
+  
+  /* Glass button base */
+  .btn-glass {
+    background: hsl(var(--surface-translucent));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--glass-border) / 0.3);
+    transition: all var(--transition-fast);
+  }
+  
+  .btn-glass:hover {
+    background: hsl(var(--surface-translucent-hover));
+    border-color: hsl(var(--glass-border) / 0.5);
+    box-shadow: 0 0 30px hsl(var(--shadow-color) / 0.1);
+  }
+  
+  /* Floating element */
+  .float-glass {
+    box-shadow: 0 20px 40px hsl(var(--shadow-black) / 0.3);
+  }
 
-  /* Hide ugly search cancel button in Chrome until we can style it properly */
+  /* Hide ugly search cancel button in Chrome */
   input[type="search"]::-webkit-search-cancel-button {
     @apply hidden;
   }
@@ -209,42 +403,30 @@
     pointer-events: none;
   }
 
-  /* .no-default-hover-elevate/no-default-active-elevate is an escape hatch so consumers of
-   * buttons/badges can remove the automatic brightness adjustment on interactions
-   * and program their own. */
+  /* Elevation escape hatches */
   .no-default-hover-elevate {}
-
   .no-default-active-elevate {}
 
-
-  /**
-   * Toggleable backgrounds go behind the content. Hoverable/active goes on top.
-   * This way they can stack/compound. Both will overlap the parent's borders!
-   * So borders will be automatically adjusted both on toggle, and hover/active,
-   * and they will be compounded.
-   */
+  /* Toggle elevation system */
   .toggle-elevate::before,
   .toggle-elevate-2::before {
     content: "";
     pointer-events: none;
     position: absolute;
     inset: 0px;
-    /*border-radius: inherit;   match rounded corners */
     border-radius: inherit;
     z-index: -1;
-    /* sits behind content but above backdrop */
   }
 
   .toggle-elevate.toggle-elevated::before {
-    background-color: var(--elevate-2);
+    background-color: hsl(var(--elevate-2) / 0.1);
   }
 
-  /* If there's a 1px border, adjust the inset so that it covers that parent's border */
   .border.toggle-elevate::before {
     inset: -1px;
   }
 
-  /* Does not work on elements with overflow:hidden! */
+  /* Hover/active elevation */
   .hover-elevate:not(.no-default-hover-elevate),
   .active-elevate:not(.no-default-active-elevate),
   .hover-elevate-2:not(.no-default-hover-elevate),
@@ -261,28 +443,46 @@
     pointer-events: none;
     position: absolute;
     inset: 0px;
-    /*border-radius: inherit;   match rounded corners */
     border-radius: inherit;
     z-index: 999;
-    /* sits in front of content */
+    transition: background-color var(--transition-fast);
   }
 
   .hover-elevate:hover:not(.no-default-hover-elevate)::after,
   .active-elevate:active:not(.no-default-active-elevate)::after {
-    background-color: var(--elevate-1);
+    background-color: hsl(var(--elevate-1) / 0.05);
   }
 
   .hover-elevate-2:hover:not(.no-default-hover-elevate)::after,
   .active-elevate-2:active:not(.no-default-active-elevate)::after {
-    background-color: var(--elevate-2);
+    background-color: hsl(var(--elevate-2) / 0.1);
   }
 
-  /* If there's a 1px border, adjust the inset so that it covers that parent's border */
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after,
   .border.active-elevate:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate-2:not(.no-hover-interaction-elevate)::after,
-  .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
-  .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
+  .border.active-elevate-2:not(.no-active-interaction-elevate)::after {
     inset: -1px;
+  }
+}
+
+/* Smooth scrollbar for glass aesthetic */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted) / 0.5);
+    border-radius: var(--radius-full);
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted) / 0.7);
   }
 }
