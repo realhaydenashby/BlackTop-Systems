@@ -132,8 +132,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Analytics Features - BLUE SECTION */}
-      <section className="px-6 py-24 section-blue">
+      {/* Analytics Features - BLUE SECTION with geometric gradient */}
+      <section className="px-6 py-24 section-blue-cta">
         <div className="max-w-6xl mx-auto relative z-10">
           <motion.h2 
             className="text-4xl font-bold text-center mb-4 section-blue-text"
@@ -213,8 +213,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Pain Points - Transitions out of Blue */}
-      <section className="px-6 py-24 transition-out-of-blue">
+      {/* Pain Points - Between two blue sections */}
+      <section className="px-6 py-24 transition-between-blue">
         <div className="max-w-6xl mx-auto relative z-10 pt-16">
           <motion.div
             className="text-center mb-16"
@@ -276,8 +276,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA Section - Blue with geometric gradient */}
-      <section className="px-6 py-24 section-blue-cta">
+      {/* CTA Section - Blue with geometric gradient and fade-out */}
+      <section className="px-6 py-24 section-blue-cta-fade-out">
         <motion.div 
           className="max-w-4xl mx-auto text-center relative z-10"
           initial={{ opacity: 0, y: 20 }}

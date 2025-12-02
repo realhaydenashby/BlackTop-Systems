@@ -688,3 +688,100 @@
   background: hsl(0 0% 100% / 0.1) !important;
   border-color: hsl(0 0% 100% / 0.7) !important;
 }
+
+/* Section between two blue sections - exits blue at top, enters blue at bottom */
+.transition-between-blue {
+  position: relative;
+}
+
+.transition-between-blue::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 150px;
+  background: linear-gradient(
+    180deg,
+    hsl(217 91% 35%) 0%,
+    hsl(217 80% 22% / 0.8) 40%,
+    hsl(217 60% 12% / 0.5) 70%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.transition-between-blue::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 150px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    hsl(217 60% 12% / 0.5) 30%,
+    hsl(217 80% 22% / 0.8) 60%,
+    hsl(217 91% 35%) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* CTA section fade out at bottom */
+.section-blue-cta-fade-out {
+  --section-bg: 217 91% 42%;
+  --section-bg-deep: 217 91% 38%;
+  background: linear-gradient(
+    180deg,
+    hsl(var(--section-bg)) 0%,
+    hsl(var(--section-bg)) 60%,
+    hsl(217 60% 25%) 80%,
+    hsl(222 47% 11%) 95%,
+    hsl(222 47% 5%) 100%
+  );
+  position: relative;
+  overflow: hidden;
+}
+
+/* Geometric overlays for section with fade-out */
+.section-blue-cta-fade-out::before {
+  content: "";
+  position: absolute;
+  bottom: 20%;
+  right: -10%;
+  width: 70%;
+  height: 100%;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    transparent 45%,
+    hsl(217 91% 35% / 0.6) 45%,
+    hsl(217 91% 32% / 0.8) 55%,
+    hsl(217 91% 28% / 0.9) 65%,
+    hsl(217 91% 25%) 100%
+  );
+  transform: skewX(-15deg);
+  pointer-events: none;
+}
+
+.section-blue-cta-fade-out::after {
+  content: "";
+  position: absolute;
+  bottom: 10%;
+  right: -20%;
+  width: 60%;
+  height: 120%;
+  background: linear-gradient(
+    140deg,
+    transparent 0%,
+    transparent 50%,
+    hsl(217 91% 30% / 0.4) 50%,
+    hsl(217 91% 25% / 0.6) 70%,
+    hsl(217 91% 20% / 0.8) 100%
+  );
+  transform: skewX(-20deg);
+  pointer-events: none;
+}
