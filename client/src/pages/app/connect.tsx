@@ -275,6 +275,34 @@ export default function Connect() {
     },
   });
 
+  // Disconnect all Plaid connections and reset data
+  const disconnectAllMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/live/plaid/disconnect-all");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      // Invalidate all relevant queries to reset dashboard state
+      queryClient.invalidateQueries({ queryKey: ["/api/live/bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/analytics/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/company-state"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/weekly-changes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/plaid/accounts"] });
+      toast({
+        title: "All Connections Reset",
+        description: data.message || "All bank connections and data have been cleared.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Reset Failed",
+        description: error.message || "Unable to reset connections.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Check Plaid configuration status
   const { data: plaidStatus } = useQuery<{ configured: boolean }>({
     queryKey: ["/api/live/plaid/status"],
@@ -628,6 +656,46 @@ export default function Connect() {
               </Card>
             ))}
           </div>
+        )}
+
+        {/* Disconnect & Reset Card - Only show when there are connections */}
+        {!bankLoading && bankAccounts.length > 0 && (
+          <Card className="border-destructive/20 bg-destructive/5">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-2.5">
+                  <Unlink className="h-5 w-5 text-destructive" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Reset All Connections</CardTitle>
+                  <CardDescription className="text-xs">
+                    Disconnect all banks and clear all imported data
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  This removes all bank connections, transactions, and analytics. Use this to start fresh.
+                </p>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => disconnectAllMutation.mutate()}
+                  disabled={disconnectAllMutation.isPending}
+                  data-testid="button-disconnect-all"
+                >
+                  {disconnectAllMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Unlink className="h-4 w-4 mr-2" />
+                  )}
+                  Disconnect All
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
 
