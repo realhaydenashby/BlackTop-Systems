@@ -276,22 +276,22 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA Section - Dark */}
-      <section className="px-6 py-24">
+      {/* CTA Section - Blue with geometric gradient */}
+      <section className="px-6 py-24 section-blue-cta">
         <motion.div 
-          className="max-w-4xl mx-auto text-center"
+          className="max-w-4xl mx-auto text-center relative z-10"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <h2 className="text-4xl font-bold mb-6">Start today</h2>
-          <p className="text-lg text-muted-foreground mb-10">
+          <h2 className="text-4xl font-bold mb-6 section-blue-text">Start today</h2>
+          <p className="text-lg section-blue-text-muted mb-10">
             Join founders who've stopped guessing and started knowing.
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
             <a href="/api/login">
-              <Button size="lg" className="group" data-testid="button-cta-login">
+              <Button size="lg" className="group btn-on-blue" data-testid="button-cta-login">
                 Log in to your account
                 <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
@@ -300,6 +300,7 @@ export default function Home() {
               size="lg" 
               variant="outline" 
               onClick={handleExploreDemo}
+              className="btn-outline-on-blue"
               data-testid="button-cta-demo"
             >
               <FlaskConical className="mr-2 w-4 h-4" />
