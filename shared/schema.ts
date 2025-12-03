@@ -34,11 +34,37 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   isLiveMode: boolean("is_live_mode").default(false), // Live mode = real bank connection, Demo mode = existing features
+  isApproved: boolean("is_approved").default(false), // Waitlist: user approved to access live workspace
+  isAdmin: boolean("is_admin").default(false), // Admin access for waitlist management
   yodleeUserSession: varchar("yodlee_user_session"), // Cached Yodlee user session
   currentCash: numeric("current_cash", { precision: 15, scale: 2 }), // User's current cash on hand for runway calc
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Waitlist role enum
+export const waitlistRoleEnum = pgEnum("waitlist_role", ["founder", "cfo", "ops", "investor", "other"]);
+
+// Waitlist status enum
+export const waitlistStatusEnum = pgEnum("waitlist_status", ["pending", "approved", "rejected"]);
+
+// Waitlist - Pre-launch signups
+export const waitlist = pgTable("waitlist", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  role: waitlistRoleEnum("role").default("founder"),
+  company: varchar("company", { length: 255 }),
+  painPoint: text("pain_point"), // "What's your biggest financial blindspot?"
+  status: waitlistStatusEnum("status").default("pending"),
+  approvedAt: timestamp("approved_at"),
+  approvedBy: varchar("approved_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_waitlist_email").on(table.email),
+  index("idx_waitlist_status").on(table.status),
+  index("idx_waitlist_created_at").on(table.createdAt),
+]);
 
 export const userRoleEnum = pgEnum("user_role", ["founder", "ops", "accountant", "cfo"]);
 
@@ -643,6 +669,7 @@ export const insertPlannedHireSchema = createInsertSchema(plannedHires).omit({ i
 export const insertBurnMetricSchema = createInsertSchema(burnMetrics).omit({ id: true, createdAt: true });
 export const insertRaiseRecommendationSchema = createInsertSchema(raiseRecommendations).omit({ id: true, createdAt: true });
 export const insertQuickbooksTokenSchema = createInsertSchema(quickbooksTokens).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertWaitlistSchema = createInsertSchema(waitlist).omit({ id: true, createdAt: true, approvedAt: true, approvedBy: true });
 
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
@@ -691,6 +718,10 @@ export type RaiseRecommendation = typeof raiseRecommendations.$inferSelect;
 export type InsertRaiseRecommendation = z.infer<typeof insertRaiseRecommendationSchema>;
 export type QuickbooksToken = typeof quickbooksTokens.$inferSelect;
 export type InsertQuickbooksToken = z.infer<typeof insertQuickbooksTokenSchema>;
+
+// Waitlist types
+export type WaitlistEntry = typeof waitlist.$inferSelect;
+export type InsertWaitlistEntry = z.infer<typeof insertWaitlistSchema>;
 
 // Extended types with relations
 export type TransactionWithRelations = Transaction & {

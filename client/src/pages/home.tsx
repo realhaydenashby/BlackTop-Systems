@@ -55,12 +55,12 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
           >
-            <a href="/api/login">
-              <Button size="lg" className="group" data-testid="button-login">
-                Log in to your account
+            <Link href="/waitlist">
+              <Button size="lg" className="group" data-testid="button-request-access">
+                Request Early Access
                 <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
-            </a>
+            </Link>
             <Button 
               size="lg" 
               variant="outline" 
@@ -71,6 +71,17 @@ export default function Home() {
               Explore Demo
             </Button>
           </motion.div>
+          <motion.p
+            className="text-sm text-muted-foreground mt-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+          >
+            Already have access?{" "}
+            <a href="/api/login" className="text-primary hover:underline" data-testid="link-login">
+              Log in here
+            </a>
+          </motion.p>
         </div>
       </section>
 
@@ -290,12 +301,12 @@ export default function Home() {
             Join founders who've stopped guessing and started knowing.
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
-            <a href="/api/login">
-              <Button size="lg" className="group btn-on-blue" data-testid="button-cta-login">
-                Log in to your account
+            <Link href="/waitlist">
+              <Button size="lg" className="group btn-on-blue" data-testid="button-cta-access">
+                Request Early Access
                 <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
-            </a>
+            </Link>
             <Button 
               size="lg" 
               variant="outline" 

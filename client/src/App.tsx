@@ -1,6 +1,6 @@
 import { Switch, Route, Redirect, Router as WouterRouter, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -40,9 +40,27 @@ import Workbook from "@/pages/app/forecasting/workbook";
 import Copilot from "@/pages/app/copilot";
 import LiveAnalytics from "@/pages/app/analytics";
 import LiveFundraising from "@/pages/app/fundraising";
+// Waitlist Pages
+import Waitlist from "@/pages/waitlist";
+import WaitlistSuccess from "@/pages/waitlist-success";
+import WaitlistPending from "@/pages/waitlist-pending";
+import AdminWaitlist from "@/pages/admin/waitlist";
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+interface ApprovalStatus {
+  isApproved: boolean;
+  isAdmin: boolean;
+  email: string;
+}
+
+function ProtectedRoute({ component: Component, requireApproval = true }: { component: React.ComponentType; requireApproval?: boolean }) {
   const { user, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+
+  const { data: approvalStatus, isLoading: isCheckingApproval } = useQuery<ApprovalStatus>({
+    queryKey: ["/api/auth/approval-status"],
+    enabled: !!user && requireApproval,
+    staleTime: 60000,
+  });
 
   if (isLoading) {
     return (
@@ -55,13 +73,72 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   }
 
   if (!user) {
-    // Use full page navigation for server-side login endpoint
     window.location.href = "/api/login";
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
           <p className="mt-4 text-muted-foreground">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (requireApproval && isCheckingApproval) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
+          <p className="mt-4 text-muted-foreground">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (requireApproval && approvalStatus && !approvalStatus.isApproved && !approvalStatus.isAdmin) {
+    return <WaitlistPending />;
+  }
+
+  return <Component />;
+}
+
+function AdminRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+
+  const { data: approvalStatus, isLoading: isCheckingApproval } = useQuery<ApprovalStatus>({
+    queryKey: ["/api/auth/approval-status"],
+    enabled: !!user,
+    staleTime: 60000,
+  });
+
+  if (isLoading || isCheckingApproval) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    window.location.href = "/api/login";
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
+          <p className="mt-4 text-muted-foreground">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!approvalStatus?.isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">Access Denied</h1>
+          <p className="mt-2 text-muted-foreground">You don't have permission to access this page.</p>
         </div>
       </div>
     );
@@ -186,6 +263,26 @@ function LiveModeRouter() {
   );
 }
 
+function WaitlistRouter() {
+  return (
+    <Switch>
+      <Route path="/waitlist" component={Waitlist} />
+      <Route path="/waitlist/success" component={WaitlistSuccess} />
+      <Route path="/waitlist/pending" component={WaitlistPending} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function AdminRouter() {
+  return (
+    <Switch>
+      <Route path="/admin/waitlist" component={() => <AdminRoute component={AdminWaitlist} />} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
 function RouterInner() {
   const { isLoading } = useAuth();
   const [location] = useLocation();
@@ -216,6 +313,12 @@ function RouterInner() {
     "/integrations"
   ];
 
+  const waitlistRoutes = [
+    "/waitlist",
+    "/waitlist/success",
+    "/waitlist/pending"
+  ];
+
   const isMarketingRoute = marketingRoutes.some(route => 
     cleanLocation === route || cleanLocation.startsWith(route + "/")
   );
@@ -224,11 +327,17 @@ function RouterInner() {
     cleanLocation === route || cleanLocation.startsWith(route + "/")
   );
 
+  const isWaitlistRoute = waitlistRoutes.some(route =>
+    cleanLocation === route
+  );
+
+  const isAdminRoute = cleanLocation === "/admin" || cleanLocation.startsWith("/admin/");
+
   const isLiveModeRoute = cleanLocation === "/app" || cleanLocation.startsWith("/app/");
 
   const isProtectedRoute = cleanLocation === "/onboarding";
 
-  if (isLoading && (isLiveModeRoute || isProtectedRoute)) {
+  if (isLoading && (isLiveModeRoute || isProtectedRoute || isAdminRoute)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -236,6 +345,14 @@ function RouterInner() {
         </div>
       </div>
     );
+  }
+
+  if (isWaitlistRoute) {
+    return <WaitlistRouter />;
+  }
+
+  if (isAdminRoute) {
+    return <AdminRouter />;
   }
 
   if (isMarketingRoute) {

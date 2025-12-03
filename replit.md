@@ -109,9 +109,41 @@ The LiveSidebar uses `useConnectionStatus` hook to check for active financial co
 - **Behavior**: Analytics and Fundraising Prep menu sections only appear when user has at least one active financial data source
 
 ### Mode Switching
-- Landing page: "Explore Demo" → `/dashboard`, "Log in" → auth flow → `/app`
+- Landing page: "Request Early Access" → `/waitlist`, "Explore Demo" → `/dashboard`
 - TopBar: Mode switcher dropdown navigates between equivalent demo/live routes
 - AppModeContext: Syncs mode from URL on load and popstate events
+
+## Waitlist & Access Control
+
+### Launch Strategy
+BlackTop uses a controlled waitlist approach to manage early access:
+- Users request access via `/waitlist` signup form
+- Admins review and approve/reject signups via `/admin/waitlist`
+- Approved users can access Live Mode; unapproved users see pending page
+
+### Waitlist Routes
+- `/waitlist` - Public signup form (name, email, role, company, pain point)
+- `/waitlist/success` - Thank you page after signup
+- `/waitlist/pending` - Shown to authenticated but unapproved users
+- `/admin/waitlist` - Admin panel for managing signups (requires isAdmin)
+
+### Access Control Flow
+1. User signs up via Replit Auth → redirected to `/app`
+2. ProtectedRoute checks `/api/auth/approval-status`
+3. If `isApproved` or `isAdmin` → show Live Mode
+4. If not approved → show WaitlistPending page
+
+### Database Schema
+- `waitlist` table: email, name, role, company, painPoint, status (pending/approved/rejected)
+- `users` table: `isApproved` (boolean), `isAdmin` (boolean) fields added
+
+### API Endpoints
+- `POST /api/waitlist` - Public signup (no auth)
+- `GET /api/auth/approval-status` - Check user approval status
+- `GET /api/admin/waitlist` - List all waitlist entries (admin only)
+- `POST /api/admin/waitlist/:id/approve` - Approve user (admin only)
+- `POST /api/admin/waitlist/:id/reject` - Reject user (admin only)
+- `GET /api/admin/waitlist/export` - Export CSV (admin only)
 
 ### Data Services
 - `client/src/services/demoDataService.ts`: Comprehensive mock data for all demo pages:

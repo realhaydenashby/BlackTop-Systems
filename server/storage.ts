@@ -43,6 +43,8 @@ import type {
   InsertShareableReport,
   AuditLog,
   InsertAuditLog,
+  WaitlistEntry,
+  InsertWaitlistEntry,
 } from "@shared/schema";
 import {
   users,
@@ -67,6 +69,7 @@ import {
   notificationPreferences,
   shareableReports,
   auditLogs,
+  waitlist,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -212,6 +215,16 @@ export interface IStorage {
     }
   ): Promise<AuditLog[]>;
   getRecentAuditLogs(organizationId: string, limit?: number): Promise<AuditLog[]>;
+
+  // Waitlist
+  createWaitlistEntry(entry: InsertWaitlistEntry): Promise<WaitlistEntry>;
+  getWaitlistEntry(id: string): Promise<WaitlistEntry | undefined>;
+  getWaitlistEntryByEmail(email: string): Promise<WaitlistEntry | undefined>;
+  getAllWaitlistEntries(status?: string): Promise<WaitlistEntry[]>;
+  updateWaitlistEntry(id: string, data: Partial<WaitlistEntry>): Promise<WaitlistEntry | undefined>;
+  approveWaitlistEntry(id: string, approvedBy: string): Promise<WaitlistEntry | undefined>;
+  rejectWaitlistEntry(id: string): Promise<WaitlistEntry | undefined>;
+  getWaitlistStats(): Promise<{ total: number; pending: number; approved: number; rejected: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -917,6 +930,77 @@ export class DatabaseStorage implements IStorage {
       orderBy: [desc(auditLogs.createdAt)],
       limit,
     });
+  }
+
+  // Waitlist
+  async createWaitlistEntry(entryData: InsertWaitlistEntry): Promise<WaitlistEntry> {
+    const [entry] = await db.insert(waitlist).values(entryData).returning();
+    return entry;
+  }
+
+  async getWaitlistEntry(id: string): Promise<WaitlistEntry | undefined> {
+    return await db.query.waitlist.findFirst({
+      where: eq(waitlist.id, id),
+    });
+  }
+
+  async getWaitlistEntryByEmail(email: string): Promise<WaitlistEntry | undefined> {
+    return await db.query.waitlist.findFirst({
+      where: eq(waitlist.email, email.toLowerCase()),
+    });
+  }
+
+  async getAllWaitlistEntries(status?: string): Promise<WaitlistEntry[]> {
+    if (status) {
+      return await db.query.waitlist.findMany({
+        where: eq(waitlist.status, status as any),
+        orderBy: [desc(waitlist.createdAt)],
+      });
+    }
+    return await db.query.waitlist.findMany({
+      orderBy: [desc(waitlist.createdAt)],
+    });
+  }
+
+  async updateWaitlistEntry(id: string, data: Partial<WaitlistEntry>): Promise<WaitlistEntry | undefined> {
+    const [updated] = await db
+      .update(waitlist)
+      .set(data)
+      .where(eq(waitlist.id, id))
+      .returning();
+    return updated;
+  }
+
+  async approveWaitlistEntry(id: string, approvedBy: string): Promise<WaitlistEntry | undefined> {
+    const [updated] = await db
+      .update(waitlist)
+      .set({ 
+        status: "approved", 
+        approvedAt: new Date(), 
+        approvedBy 
+      })
+      .where(eq(waitlist.id, id))
+      .returning();
+    return updated;
+  }
+
+  async rejectWaitlistEntry(id: string): Promise<WaitlistEntry | undefined> {
+    const [updated] = await db
+      .update(waitlist)
+      .set({ status: "rejected" })
+      .where(eq(waitlist.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getWaitlistStats(): Promise<{ total: number; pending: number; approved: number; rejected: number }> {
+    const all = await db.query.waitlist.findMany();
+    return {
+      total: all.length,
+      pending: all.filter(e => e.status === "pending").length,
+      approved: all.filter(e => e.status === "approved").length,
+      rejected: all.filter(e => e.status === "rejected").length,
+    };
   }
 }
 

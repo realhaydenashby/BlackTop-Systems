@@ -4361,6 +4361,208 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
+  // ============================================
+  // WAITLIST ENDPOINTS
+  // ============================================
+
+  // Public endpoint - Submit waitlist signup (no auth required)
+  app.post("/api/waitlist", async (req, res) => {
+    try {
+      const { email, name, role, company, painPoint } = req.body;
+
+      // Validate required fields
+      if (!email || !name) {
+        return res.status(400).json({ message: "Email and name are required" });
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: "Please enter a valid email address" });
+      }
+
+      // Check if email already exists
+      const existing = await storage.getWaitlistEntryByEmail(email.toLowerCase());
+      if (existing) {
+        return res.status(409).json({ message: "This email is already on the waitlist" });
+      }
+
+      // Create waitlist entry
+      const entry = await storage.createWaitlistEntry({
+        email: email.toLowerCase().trim(),
+        name: name.trim(),
+        role: role || "founder",
+        company: company?.trim() || null,
+        painPoint: painPoint?.trim() || null,
+        status: "pending",
+      });
+
+      console.log(`[WAITLIST] New signup: ${email} (${role})`);
+
+      res.status(201).json({ 
+        success: true,
+        message: "Successfully joined the waitlist",
+        id: entry.id
+      });
+    } catch (error: any) {
+      console.error("Waitlist signup error:", error);
+      res.status(500).json({ message: "Failed to join waitlist. Please try again." });
+    }
+  });
+
+  // Admin middleware - Check if user is admin
+  const isAdmin = async (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated || !req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = req.user as User;
+    if (!user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    // Check if user is admin
+    const dbUser = await storage.getUser(user.id);
+    if (!dbUser?.isAdmin) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    next();
+  };
+
+  // Admin endpoint - Get all waitlist entries
+  app.get("/api/admin/waitlist", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const entries = await storage.getAllWaitlistEntries(status);
+      const stats = await storage.getWaitlistStats();
+
+      res.json({ entries, stats });
+    } catch (error: any) {
+      console.error("Admin waitlist list error:", error);
+      res.status(500).json({ message: "Failed to fetch waitlist" });
+    }
+  });
+
+  // Admin endpoint - Get waitlist stats
+  app.get("/api/admin/waitlist/stats", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getWaitlistStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Admin waitlist stats error:", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  // Admin endpoint - Approve a waitlist entry
+  app.post("/api/admin/waitlist/:id/approve", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = req.user as User;
+
+      const entry = await storage.getWaitlistEntry(id);
+      if (!entry) {
+        return res.status(404).json({ message: "Waitlist entry not found" });
+      }
+
+      const updated = await storage.approveWaitlistEntry(id, user.id);
+      
+      // Also update the user if they exist
+      const existingUser = await storage.getUserByEmail(entry.email);
+      if (existingUser) {
+        await storage.updateUser(existingUser.id, { isApproved: true });
+      }
+
+      console.log(`[WAITLIST] Approved: ${entry.email} by ${user.email}`);
+
+      res.json({ success: true, entry: updated });
+    } catch (error: any) {
+      console.error("Admin waitlist approve error:", error);
+      res.status(500).json({ message: "Failed to approve entry" });
+    }
+  });
+
+  // Admin endpoint - Reject a waitlist entry
+  app.post("/api/admin/waitlist/:id/reject", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = req.user as User;
+
+      const entry = await storage.getWaitlistEntry(id);
+      if (!entry) {
+        return res.status(404).json({ message: "Waitlist entry not found" });
+      }
+
+      const updated = await storage.rejectWaitlistEntry(id);
+      
+      console.log(`[WAITLIST] Rejected: ${entry.email} by ${user.email}`);
+
+      res.json({ success: true, entry: updated });
+    } catch (error: any) {
+      console.error("Admin waitlist reject error:", error);
+      res.status(500).json({ message: "Failed to reject entry" });
+    }
+  });
+
+  // Admin endpoint - Export waitlist as CSV
+  app.get("/api/admin/waitlist/export", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const entries = await storage.getAllWaitlistEntries();
+      
+      // Generate CSV
+      const headers = ["ID", "Email", "Name", "Role", "Company", "Pain Point", "Status", "Created At", "Approved At"];
+      const rows = entries.map(e => [
+        e.id,
+        e.email,
+        e.name,
+        e.role,
+        e.company || "",
+        (e.painPoint || "").replace(/"/g, '""'),
+        e.status,
+        e.createdAt ? new Date(e.createdAt).toISOString() : "",
+        e.approvedAt ? new Date(e.approvedAt).toISOString() : ""
+      ]);
+
+      const csv = [
+        headers.join(","),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+      ].join("\n");
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename=waitlist-${new Date().toISOString().split("T")[0]}.csv`);
+      res.send(csv);
+    } catch (error: any) {
+      console.error("Admin waitlist export error:", error);
+      res.status(500).json({ message: "Failed to export waitlist" });
+    }
+  });
+
+  // Check if current user is approved (for access gate)
+  app.get("/api/auth/approval-status", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const dbUser = await storage.getUser(user.id);
+
+      if (!dbUser) {
+        return res.json({ isApproved: false, isAdmin: false });
+      }
+
+      // Check if user is on approved waitlist
+      const waitlistEntry = await storage.getWaitlistEntryByEmail(dbUser.email || "");
+      const isOnApprovedWaitlist = waitlistEntry?.status === "approved";
+
+      res.json({ 
+        isApproved: dbUser.isApproved || isOnApprovedWaitlist,
+        isAdmin: dbUser.isAdmin || false,
+        email: dbUser.email
+      });
+    } catch (error: any) {
+      console.error("Approval status error:", error);
+      res.status(500).json({ message: "Failed to check approval status" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
