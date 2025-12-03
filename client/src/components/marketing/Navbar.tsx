@@ -4,10 +4,11 @@ import {
   NavigationMenu,
   NavigationMenuContent,
   NavigationMenuItem,
+  NavigationMenuLink,
   NavigationMenuList,
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
-import { motion } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 
 export function Navbar() {
   const [location] = useLocation();
@@ -18,106 +19,114 @@ export function Navbar() {
     return false;
   };
 
-  const navItems = [
-    { path: "/features", label: "Product" },
-    { path: "/pricing", label: "Pricing" },
-    { path: "/resources", label: "Resources" },
-  ];
-
   return (
-    <motion.nav 
-      className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl"
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-    >
-      <div className="flex items-center justify-between w-full px-6 h-16">
-        <Link href="/">
-          <motion.div 
-            className="flex items-center gap-2 cursor-pointer"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-          >
-            <img 
-              src="/logo.png" 
-              alt="BlackTop Systems" 
-              className="h-6 object-contain" 
-            />
-          </motion.div>
+    <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex items-center justify-between w-full px-4 h-16">
+        <Link href="/" className="flex items-center gap-2 hover-elevate rounded-lg py-1 px-2">
+          <img 
+            src="/logo.png" 
+            alt="BlackTop Systems" 
+            className="h-6 object-contain" 
+          />
         </Link>
 
-        <div className="flex items-center gap-8">
-          <div className="hidden md:flex items-center gap-6">
-            {navItems.map((item) => (
-              <Link key={item.path} href={item.path}>
-                <motion.span
-                  className={`text-sm font-medium transition-colors cursor-pointer relative ${
-                    isActive(item.path) ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+        <div className="flex items-center gap-6">
+          <Link href="/features">
+            <span
+              className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer ${
+                isActive("/features") ? "text-primary" : "text-muted-foreground"
+              }`}
+              data-testid="nav-features"
+            >
+              Product
+            </span>
+          </Link>
+
+          <Link href="/pricing">
+            <span
+              className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer ${
+                isActive("/pricing") ? "text-primary" : "text-muted-foreground"
+              }`}
+              data-testid="nav-pricing"
+            >
+              Pricing
+            </span>
+          </Link>
+
+          <Link href="/resources">
+            <span
+              className={`text-sm font-medium transition-colors hover:text-primary cursor-pointer ${
+                isActive("/resources") ? "text-primary" : "text-muted-foreground"
+              }`}
+              data-testid="nav-resources"
+            >
+              Resources
+            </span>
+          </Link>
+
+          <NavigationMenu>
+            <NavigationMenuList>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger 
+                  className={`text-sm font-medium ${
+                    isActive("/company") ? "text-primary" : "text-muted-foreground"
                   }`}
-                  data-testid={`nav-${item.label.toLowerCase()}`}
-                  whileHover={{ y: -1 }}
-                  transition={{ duration: 0.2 }}
+                  data-testid="nav-company"
                 >
-                  {item.label}
-                  {isActive(item.path) && (
-                    <motion.div 
-                      className="absolute -bottom-1 left-0 right-0 h-px bg-foreground"
-                      layoutId="navbar-indicator"
-                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                    />
-                  )}
-                </motion.span>
-              </Link>
-            ))}
+                  Company
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-48 gap-1 p-2">
+                    <li>
+                      <Link href="/company/about">
+                        <div
+                          className="block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer"
+                          data-testid="nav-company-about"
+                        >
+                          <div className="text-sm font-medium leading-none">About</div>
+                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground mt-1">
+                            Our mission and story
+                          </p>
+                        </div>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/company/security">
+                        <div
+                          className="block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer"
+                          data-testid="nav-company-security"
+                        >
+                          <div className="text-sm font-medium leading-none">Security & Privacy</div>
+                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground mt-1">
+                            How we protect your data
+                          </p>
+                        </div>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/company/contact">
+                        <div
+                          className="block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer"
+                          data-testid="nav-company-contact"
+                        >
+                          <div className="text-sm font-medium leading-none">Contact</div>
+                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground mt-1">
+                            Get in touch with us
+                          </p>
+                        </div>
+                      </Link>
+                    </li>
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </NavigationMenu>
 
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger 
-                    className={`text-sm font-medium bg-transparent hover:bg-transparent ${
-                      isActive("/company") ? "text-foreground" : "text-muted-foreground"
-                    }`}
-                    data-testid="nav-company"
-                  >
-                    Company
-                  </NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <motion.ul 
-                      className="grid w-52 gap-1 p-2"
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      {[
-                        { path: "/company/about", label: "About", desc: "Our mission and story" },
-                        { path: "/company/security", label: "Security", desc: "How we protect your data" },
-                        { path: "/company/contact", label: "Contact", desc: "Get in touch" },
-                      ].map((item) => (
-                        <li key={item.path}>
-                          <Link href={item.path}>
-                            <div
-                              className="block select-none rounded-lg p-3 leading-none no-underline outline-none transition-colors hover:bg-muted cursor-pointer"
-                              data-testid={`nav-${item.label.toLowerCase()}`}
-                            >
-                              <div className="text-sm font-medium">{item.label}</div>
-                              <p className="text-xs text-muted-foreground mt-1">{item.desc}</p>
-                            </div>
-                          </Link>
-                        </li>
-                      ))}
-                    </motion.ul>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          </div>
-
-          <Button asChild size="sm" className="h-9 px-4" data-testid="button-login">
+          <Button asChild data-testid="button-login">
             <a href="/api/login">Log In</a>
           </Button>
         </div>
       </div>
-    </motion.nav>
+    </nav>
   );
 }
