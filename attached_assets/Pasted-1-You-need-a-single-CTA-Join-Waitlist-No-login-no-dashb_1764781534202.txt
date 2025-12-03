@@ -1,0 +1,119 @@
+1. You need a single CTA: “Join Waitlist”
+
+No login, no dashboard, no fake “demo.”
+Just one CTA everywhere so people can’t wander into an empty house.
+
+This button goes to either:
+
+Option A: an embedded form
+Option B: a hosted waitlist page (cleaner, less jank)
+
+Both are fine, but Option B scales better.
+
+⸻
+
+2. Use a service that does NOT expose waitlist counts
+
+Do NOT build this from scratch unless you love pain.
+
+Use one of these:
+
+The good choices
+	•	Tally.so (best UX, invisible backend, easy embed)
+	•	Typedream Waitlist (cleanest for startups, no count)
+	•	Webflow form → Zapier → Airtable (more effort, more control)
+	•	HubSpot Form free tier (actually good, tracks leads, zero exposure)
+
+Avoid
+	•	Product Hunt Ship (public counts, cringe)
+	•	Notion forms with public pages (rookie mistake)
+
+All your submissions should feed a private backend:
+	•	Airtable
+	•	Google Sheets
+	•	HubSpot CRM
+	•	or your own Postgres
+
+Nobody sees anything except you.
+
+⸻
+
+3. What it actually collects
+
+Keep it brutally simple or your conversion rate tanks.
+
+Collect:
+	•	Name
+	•	Email
+	•	Role (dropdown)
+	•	Company (optional)
+	•	“What problem are you facing right now?” (optional)
+
+That last one becomes gold for your outbound.
+
+⸻
+
+4. The UX flow on your site
+
+HERO SECTION
+• Big headline
+• Sub-headline
+• One CTA button: “Get On the Waitlist”
+
+Button → /waitlist page.
+
+⸻
+
+WAITLIST PAGE
+
+Clean, barebones, no extra navigation.
+	•	1–2 lines about the product
+	•	A tiny value promise
+	•	The form
+	•	A line saying:
+“No spam. You’ll only hear from us when something real is ready.”
+
+Absolutely zero reference to:
+	•	Who’s on the list
+	•	How many are on the list
+	•	Any testimonials (because you don’t have them yet)
+
+⸻
+
+5. How to structure the backend so nobody sees anything
+
+If you use Tally or Webflow
+	•	The backend is automatically private.
+	•	Export to Airtable or Sheets.
+	•	You control 100 percent visibility.
+
+If you want a simple developer-controlled solution
+
+Use:
+	•	A /api/waitlist endpoint on Vercel
+	•	POST request dumps entries into a private database
+	•	Done
+Nobody but you can query it.
+
+This is overkill unless you need custom logic.
+
+⸻
+
+6. What you post on LinkedIn
+	•	A polished banner
+	•	A clean CTA linking to terra-yield.com/waitlist
+	•	Nothing else
+Do NOT brag about waitlist numbers.
+Do NOT show any names (GDPR + professionalism).
+
+Just funnel traffic.
+
+⸻
+
+7. How you use the waitlist later
+	•	Sort by role (farmer, banker, co-op, etc.)
+	•	Reach out for interviews, pilots, and demos
+	•	When you launch:
+segment → personalize → convert
+
+It’s not complicated. Just needs discipline.
