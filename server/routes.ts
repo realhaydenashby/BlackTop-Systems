@@ -4570,11 +4570,17 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
       const dbUser = await storage.getUser(user.id);
 
       if (!dbUser?.email) {
-        return res.json({ isOnWaitlist: false });
+        return res.json({ isOnWaitlist: false, waitlistStatus: null, isApproved: false });
       }
 
       const waitlistEntry = await storage.getWaitlistEntryByEmail(dbUser.email);
-      res.json({ isOnWaitlist: !!waitlistEntry });
+      const isOnApprovedWaitlist = waitlistEntry?.status === "approved";
+      
+      res.json({ 
+        isOnWaitlist: !!waitlistEntry,
+        waitlistStatus: waitlistEntry?.status || null,
+        isApproved: dbUser.isApproved || isOnApprovedWaitlist
+      });
     } catch (error: any) {
       console.error("Waitlist status error:", error);
       res.status(500).json({ message: "Failed to check waitlist status" });

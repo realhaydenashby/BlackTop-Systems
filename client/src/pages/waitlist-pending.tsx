@@ -1,14 +1,27 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, ArrowRight, LogOut, UserPlus, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
+interface WaitlistStatusResponse {
+  isOnWaitlist: boolean;
+  waitlistStatus: "pending" | "approved" | "rejected" | null;
+  isApproved: boolean;
+}
+
 export default function WaitlistPending() {
-  const { data: waitlistStatus, isLoading } = useQuery<{ isOnWaitlist: boolean }>({
+  const [, setLocation] = useLocation();
+  const { data: waitlistStatus, isLoading } = useQuery<WaitlistStatusResponse>({
     queryKey: ["/api/auth/waitlist-status"],
   });
+  
+  // If user is approved, redirect to app
+  if (waitlistStatus?.isApproved) {
+    setLocation("/app");
+    return null;
+  }
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
