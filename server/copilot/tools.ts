@@ -6,6 +6,8 @@ const openaiClient = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
 });
 
+const AI_MODEL = "gpt-4o";
+
 export interface ToolResult {
   success: boolean;
   message: string;
@@ -151,6 +153,47 @@ export const copilotTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_financial_summary",
+      description: "Get a complete financial summary of the company including cash, burn, runway, revenue, and key metrics. Use when user asks general questions about their finances or company health.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_recent_changes",
+      description: "Get recent changes in spending patterns, new vendors, and unusual transactions. Use when user asks what's changed or what's new.",
+      parameters: {
+        type: "object",
+        properties: {
+          days: {
+            type: "number",
+            description: "Number of days to look back (default: 30)",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_recurring_expenses",
+      description: "Get a list of all recurring/subscription expenses. Use when user asks about subscriptions, recurring costs, or fixed expenses.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
 ];
 
 export async function executeToolCall(
@@ -173,6 +216,12 @@ export async function executeToolCall(
         return await getCategoryBreakdown(organizationId, args);
       case "fundraising_calculator":
         return await fundraisingCalculator(userId, organizationId, args);
+      case "get_financial_summary":
+        return await getFinancialSummary(userId, organizationId);
+      case "get_recent_changes":
+        return await getRecentChanges(organizationId, args);
+      case "get_recurring_expenses":
+        return await getRecurringExpenses(organizationId);
       default:
         return { success: false, message: `Unknown tool: ${toolName}` };
     }
@@ -617,6 +666,277 @@ async function fundraisingCalculator(
   };
 }
 
+async function getFinancialSummary(
+  userId: string,
+  organizationId: string
+): Promise<ToolResult> {
+  const bankAccounts = await storage.getUserBankAccounts(userId);
+  const currentCash = bankAccounts.reduce((sum: number, acc: any) => {
+    return sum + (parseFloat(acc.currentBalance) || 0);
+  }, 0);
+
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const transactions = await storage.getOrganizationTransactions(organizationId, {
+    startDate: sixMonthsAgo,
+    endDate: new Date(),
+  });
+
+  if (transactions.length === 0) {
+    return {
+      success: false,
+      message: "No transaction data available. Please connect your bank accounts or import transactions.",
+    };
+  }
+
+  let totalExpenses = 0;
+  let totalRevenue = 0;
+  const categorySpend: Record<string, number> = {};
+  const vendorSpend: Record<string, number> = {};
+  const monthlyData: Record<string, { expenses: number; revenue: number }> = {};
+
+  transactions.forEach((txn: any) => {
+    const amount = parseFloat(txn.amount);
+    const month = new Date(txn.date).toISOString().substring(0, 7);
+    
+    if (!monthlyData[month]) {
+      monthlyData[month] = { expenses: 0, revenue: 0 };
+    }
+
+    if (amount > 0) {
+      totalRevenue += amount;
+      monthlyData[month].revenue += amount;
+    } else {
+      const absAmount = Math.abs(amount);
+      totalExpenses += absAmount;
+      monthlyData[month].expenses += absAmount;
+      
+      const vendor = txn.vendorNormalized || txn.vendorOriginal || "Unknown";
+      vendorSpend[vendor] = (vendorSpend[vendor] || 0) + absAmount;
+    }
+  });
+
+  const monthsOfData = Object.keys(monthlyData).length || 1;
+  const avgMonthlyBurn = totalExpenses / monthsOfData;
+  const avgMonthlyRevenue = totalRevenue / monthsOfData;
+  const netBurn = avgMonthlyBurn - avgMonthlyRevenue;
+  const runway = netBurn > 0 ? currentCash / netBurn : Infinity;
+  
+  const topVendors = Object.entries(vendorSpend)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([vendor, amount]) => ({
+      vendor,
+      totalSpend: amount,
+      monthlyAvg: amount / monthsOfData,
+    }));
+
+  const sortedMonths = Object.keys(monthlyData).sort();
+  let burnTrend = "stable";
+  if (sortedMonths.length >= 2) {
+    const recent = monthlyData[sortedMonths[sortedMonths.length - 1]]?.expenses || 0;
+    const previous = monthlyData[sortedMonths[sortedMonths.length - 2]]?.expenses || 1;
+    const change = ((recent - previous) / previous) * 100;
+    burnTrend = change > 10 ? `increasing (+${change.toFixed(0)}% vs last month)` : 
+               change < -10 ? `decreasing (${change.toFixed(0)}% vs last month)` : "stable";
+  }
+
+  return {
+    success: true,
+    message: "Financial summary retrieved",
+    data: {
+      cashPosition: {
+        currentCash,
+        connectedAccounts: bankAccounts.length,
+      },
+      burnAndRunway: {
+        monthlyBurn: avgMonthlyBurn,
+        monthlyRevenue: avgMonthlyRevenue,
+        netBurn,
+        runway: runway === Infinity ? "Cash flow positive" : `${runway.toFixed(1)} months`,
+        runwayStatus: runway === Infinity ? "Profitable" :
+                     runway < 6 ? "Critical - under 6 months" :
+                     runway < 12 ? "Caution - under 12 months" :
+                     runway < 18 ? "Healthy" : "Strong - 18+ months",
+        burnTrend,
+      },
+      spending: {
+        totalExpenses6mo: totalExpenses,
+        totalRevenue6mo: totalRevenue,
+        topVendors,
+      },
+      dataQuality: {
+        transactionCount: transactions.length,
+        monthsOfData,
+        dateRange: {
+          start: sortedMonths[0],
+          end: sortedMonths[sortedMonths.length - 1],
+        },
+      },
+    },
+  };
+}
+
+async function getRecentChanges(
+  organizationId: string,
+  args: { days?: number }
+): Promise<ToolResult> {
+  const { days = 30 } = args;
+  
+  const recentDate = new Date();
+  recentDate.setDate(recentDate.getDate() - days);
+  
+  const previousDate = new Date();
+  previousDate.setDate(previousDate.getDate() - (days * 2));
+
+  const recentTransactions = await storage.getOrganizationTransactions(organizationId, {
+    startDate: recentDate,
+    endDate: new Date(),
+  });
+
+  const previousTransactions = await storage.getOrganizationTransactions(organizationId, {
+    startDate: previousDate,
+    endDate: recentDate,
+  });
+
+  const getVendorSpend = (txns: any[]) => {
+    const spend: Record<string, number> = {};
+    txns.filter(t => parseFloat(t.amount) < 0).forEach(t => {
+      const vendor = t.vendorNormalized || t.vendorOriginal || "Unknown";
+      spend[vendor] = (spend[vendor] || 0) + Math.abs(parseFloat(t.amount));
+    });
+    return spend;
+  };
+
+  const recentSpend = getVendorSpend(recentTransactions);
+  const previousSpend = getVendorSpend(previousTransactions);
+
+  const newVendors = Object.entries(recentSpend)
+    .filter(([vendor]) => !previousSpend[vendor])
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([vendor, amount]) => ({ vendor, spend: amount }));
+
+  const vendorChanges = Object.entries(recentSpend)
+    .filter(([vendor]) => previousSpend[vendor])
+    .map(([vendor, recent]) => {
+      const previous = previousSpend[vendor];
+      const change = ((recent - previous) / previous) * 100;
+      return { vendor, recent, previous, changePercent: change };
+    })
+    .filter(v => Math.abs(v.changePercent) > 20)
+    .sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
+    .slice(0, 5);
+
+  const recentTotal = recentTransactions
+    .filter((t: any) => parseFloat(t.amount) < 0)
+    .reduce((sum: number, t: any) => sum + Math.abs(parseFloat(t.amount)), 0);
+    
+  const previousTotal = previousTransactions
+    .filter((t: any) => parseFloat(t.amount) < 0)
+    .reduce((sum: number, t: any) => sum + Math.abs(parseFloat(t.amount)), 0);
+
+  const spendChange = previousTotal > 0 ? ((recentTotal - previousTotal) / previousTotal) * 100 : 0;
+
+  return {
+    success: true,
+    message: `Changes in the last ${days} days`,
+    data: {
+      period: `Last ${days} days vs previous ${days} days`,
+      overallSpending: {
+        recent: recentTotal,
+        previous: previousTotal,
+        changePercent: spendChange,
+        trend: spendChange > 10 ? "Spending increased" : 
+               spendChange < -10 ? "Spending decreased" : "Spending stable",
+      },
+      newVendors: newVendors.length > 0 ? newVendors : "No new vendors",
+      vendorChanges: vendorChanges.length > 0 ? vendorChanges.map(v => ({
+        vendor: v.vendor,
+        recent: v.recent,
+        previous: v.previous,
+        change: `${v.changePercent > 0 ? '+' : ''}${v.changePercent.toFixed(0)}%`,
+      })) : "No significant vendor changes",
+      transactionCount: {
+        recent: recentTransactions.length,
+        previous: previousTransactions.length,
+      },
+    },
+  };
+}
+
+async function getRecurringExpenses(
+  organizationId: string
+): Promise<ToolResult> {
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  
+  const transactions = await storage.getOrganizationTransactions(organizationId, {
+    startDate: sixMonthsAgo,
+    endDate: new Date(),
+  });
+
+  const recurringTxns = transactions.filter((t: any) => t.isRecurring && parseFloat(t.amount) < 0);
+  
+  const vendorRecurring: Record<string, { count: number; total: number; amounts: number[] }> = {};
+  
+  transactions.filter((t: any) => parseFloat(t.amount) < 0).forEach((t: any) => {
+    const vendor = t.vendorNormalized || t.vendorOriginal || "Unknown";
+    const amount = Math.abs(parseFloat(t.amount));
+    
+    if (!vendorRecurring[vendor]) {
+      vendorRecurring[vendor] = { count: 0, total: 0, amounts: [] };
+    }
+    vendorRecurring[vendor].count++;
+    vendorRecurring[vendor].total += amount;
+    vendorRecurring[vendor].amounts.push(amount);
+  });
+
+  const likelySubscriptions = Object.entries(vendorRecurring)
+    .filter(([, data]) => {
+      if (data.count < 3) return false;
+      const avgAmount = data.total / data.count;
+      const variance = data.amounts.reduce((sum, a) => sum + Math.pow(a - avgAmount, 2), 0) / data.count;
+      const stdDev = Math.sqrt(variance);
+      return stdDev / avgAmount < 0.15;
+    })
+    .map(([vendor, data]) => ({
+      vendor,
+      monthlyAmount: data.total / 6,
+      annualCost: (data.total / 6) * 12,
+      occurrences: data.count,
+    }))
+    .sort((a, b) => b.monthlyAmount - a.monthlyAmount);
+
+  const flaggedRecurring = recurringTxns
+    .reduce((acc: Record<string, number>, t: any) => {
+      const vendor = t.vendorNormalized || t.vendorOriginal || "Unknown";
+      acc[vendor] = (acc[vendor] || 0) + Math.abs(parseFloat(t.amount));
+      return acc;
+    }, {});
+
+  const allRecurring = [...new Set([
+    ...likelySubscriptions.map(s => s.vendor),
+    ...Object.keys(flaggedRecurring)
+  ])];
+
+  const totalMonthlyRecurring = likelySubscriptions.reduce((sum, s) => sum + s.monthlyAmount, 0);
+
+  return {
+    success: true,
+    message: "Recurring expenses analysis",
+    data: {
+      totalMonthlyRecurring,
+      totalAnnualRecurring: totalMonthlyRecurring * 12,
+      subscriptions: likelySubscriptions.slice(0, 15),
+      subscriptionCount: likelySubscriptions.length,
+      insights: totalMonthlyRecurring > 5000 
+        ? `You're spending $${totalMonthlyRecurring.toFixed(0)}/mo on recurring expenses. Consider auditing for unused subscriptions.`
+        : `Your recurring expenses of $${totalMonthlyRecurring.toFixed(0)}/mo appear reasonable.`,
+    },
+  };
+}
+
 export async function chatWithTools(
   userId: string,
   organizationId: string | null,
@@ -637,7 +957,7 @@ export async function chatWithTools(
 
   try {
     let completion = await openaiClient.chat.completions.create({
-      model: "gpt-5",
+      model: AI_MODEL,
       messages: allMessages,
       tools: organizationId ? copilotTools : undefined,
       max_completion_tokens: 2000,
@@ -671,7 +991,7 @@ export async function chatWithTools(
       }
 
       completion = await openaiClient.chat.completions.create({
-        model: "gpt-5",
+        model: AI_MODEL,
         messages: allMessages,
         tools: copilotTools,
         max_completion_tokens: 2000,
