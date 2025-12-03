@@ -1,4 +1,4 @@
-import { Bell, MessagesSquare, ChevronDown, FlaskConical, Zap } from "lucide-react";
+import { Bell, MessagesSquare, ChevronDown, FlaskConical, Zap, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
@@ -193,21 +193,10 @@ export function TopBar() {
               <ChevronDown className="w-4 h-4 hidden md:block" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem data-testid="menu-item-profile">
-              Profile Settings
-            </DropdownMenuItem>
-            <DropdownMenuItem data-testid="menu-item-billing">
-              Billing
-            </DropdownMenuItem>
-            <DropdownMenuItem data-testid="menu-item-team">
-              Team
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <a href="/api/logout" data-testid="menu-item-logout">
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem asChild className="cursor-pointer">
+              <a href="/api/logout" className="flex items-center gap-2" data-testid="menu-item-logout">
+                <LogOut className="w-4 h-4" />
                 Log out
               </a>
             </DropdownMenuItem>
