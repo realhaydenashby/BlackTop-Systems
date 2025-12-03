@@ -26,11 +26,14 @@ import {
   Sparkles,
   ChevronRight,
   Rocket,
+  Shield,
+  Users,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
+import { useQuery } from "@tanstack/react-query";
 
 const mainMenuItems = [
   {
@@ -84,12 +87,26 @@ const utilityItems = [
   },
 ];
 
+interface ApprovalStatus {
+  isApproved: boolean;
+  isAdmin: boolean;
+  email: string;
+}
+
 export function LiveSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
   const { hasActiveConnection } = useConnectionStatus();
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [fundraisingOpen, setFundraisingOpen] = useState(false);
+
+  const { data: approvalStatus } = useQuery<ApprovalStatus>({
+    queryKey: ["/api/auth/approval-status"],
+    enabled: !!user,
+    staleTime: 60000,
+  });
+
+  const isAdmin = approvalStatus?.isAdmin || false;
 
   const userInitials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`
@@ -254,6 +271,30 @@ export function LiveSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground">
+              Admin
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.startsWith("/admin/waitlist")}
+                    data-testid="nav-admin-waitlist"
+                  >
+                    <Link href="/admin/waitlist">
+                      <Users className="w-4 h-4" />
+                      <span>Waitlist</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
