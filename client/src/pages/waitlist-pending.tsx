@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,17 +6,9 @@ import { Clock, ArrowRight, LogOut, UserPlus, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function WaitlistPending() {
-  const [, setLocation] = useLocation();
-  
   const { data: waitlistStatus, isLoading } = useQuery<{ isOnWaitlist: boolean }>({
     queryKey: ["/api/auth/waitlist-status"],
   });
-
-  useEffect(() => {
-    if (!isLoading && waitlistStatus && !waitlistStatus.isOnWaitlist) {
-      setLocation("/waitlist");
-    }
-  }, [isLoading, waitlistStatus, setLocation]);
 
   const handleLogout = () => {
     window.location.href = "/api/logout";

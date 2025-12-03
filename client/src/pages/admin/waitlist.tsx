@@ -72,7 +72,7 @@ export default function AdminWaitlist() {
 
   const approveMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/admin/waitlist/${id}/approve`, { method: "POST" });
+      return apiRequest("POST", `/api/admin/waitlist/${id}/approve`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/waitlist"] });
@@ -85,7 +85,7 @@ export default function AdminWaitlist() {
 
   const rejectMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/admin/waitlist/${id}/reject`, { method: "POST" });
+      return apiRequest("POST", `/api/admin/waitlist/${id}/reject`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/waitlist"] });
@@ -324,24 +324,6 @@ export default function AdminWaitlist() {
               </div>
             )}
 
-            {filteredEntries.some(e => e.painPoint) && (
-              <div className="mt-8 border-t pt-6">
-                <h3 className="font-medium mb-4">Pain Points (for outreach)</h3>
-                <div className="space-y-3">
-                  {filteredEntries
-                    .filter(e => e.painPoint)
-                    .map(entry => (
-                      <div key={entry.id} className="bg-muted/50 rounded-lg p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">{entry.name}</span>
-                          <Badge variant="secondary" className="text-xs">{entry.role}</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{entry.painPoint}</p>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       </main>
