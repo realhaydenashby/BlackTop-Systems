@@ -1,4 +1,4 @@
-// Unified AI service supporting OpenAI, Gro and Gemini
+// Unified AI service supporting OpenAI, Groq and Gemini with retry logic
 import OpenAI from "openai";
 import Groq from "groq-sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -27,12 +27,92 @@ export interface AIRequest {
   maxTokens?: number;
   temperature?: number;
   jsonMode?: boolean;
+  retryCount?: number; // Number of retries (default: 3)
+  retryDelayMs?: number; // Base delay for exponential backoff (default: 1000ms)
 }
 
 export interface AIResponse {
   content: string;
   provider: AIProvider;
   model: string;
+  retryAttempts?: number;
+  latencyMs?: number;
+}
+
+// Fallback chain: OpenAI -> Groq -> Gemini
+const FALLBACK_CHAIN: AIProvider[] = ["openai", "groq", "gemini"];
+
+/**
+ * Sleep for exponential backoff
+ */
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Execute with retry and exponential backoff
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelayMs: number = 1000,
+  operationName: string = "AI call"
+): Promise<{ result: T; attempts: number }> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await fn();
+      return { result, attempts: attempt };
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Check if it's a retryable error
+      const isRetryable = isRetryableError(error);
+      
+      if (!isRetryable || attempt === maxRetries) {
+        console.error(`[aiService] ${operationName} failed after ${attempt} attempts:`, error);
+        throw lastError;
+      }
+      
+      // Exponential backoff with jitter
+      const delay = baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * 500;
+      console.warn(`[aiService] ${operationName} attempt ${attempt} failed, retrying in ${Math.round(delay)}ms...`);
+      await sleep(delay);
+    }
+  }
+  
+  throw lastError || new Error("Unknown error in retry logic");
+}
+
+/**
+ * Check if an error is retryable (rate limit, timeout, network issues)
+ */
+function isRetryableError(error: any): boolean {
+  if (!error) return false;
+  
+  // Rate limit errors
+  if (error.status === 429) return true;
+  
+  // Server errors (500-599)
+  if (error.status >= 500 && error.status < 600) return true;
+  
+  // Network errors
+  if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+    return true;
+  }
+  
+  // Timeout errors
+  if (error.message?.includes('timeout') || error.message?.includes('Timeout')) {
+    return true;
+  }
+  
+  // Rate limiting message
+  if (error.message?.includes('rate limit') || error.message?.includes('Rate limit')) {
+    return true;
+  }
+  
+  return false;
 }
 
 /**
@@ -136,22 +216,102 @@ export async function callGemini(request: AIRequest): Promise<AIResponse> {
 }
 
 /**
- * Generic AI call that routes to the appropriate provider
+ * Generic AI call that routes to the appropriate provider with retry logic
  */
 export async function callAI(
   provider: AIProvider,
   request: AIRequest
 ): Promise<AIResponse> {
-  switch (provider) {
-    case "openai":
-      return await callOpenAI(request);
-    case "groq":
-      return await callGroq(request);
-    case "gemini":
-      return await callGemini(request);
-    default:
-      throw new Error(`Unknown AI provider: ${provider}`);
+  const maxRetries = request.retryCount ?? 3;
+  const baseDelayMs = request.retryDelayMs ?? 1000;
+  const startTime = Date.now();
+  
+  try {
+    const { result, attempts } = await withRetry(
+      async () => {
+        switch (provider) {
+          case "openai":
+            return await callOpenAI(request);
+          case "groq":
+            return await callGroq(request);
+          case "gemini":
+            return await callGemini(request);
+          default:
+            throw new Error(`Unknown AI provider: ${provider}`);
+        }
+      },
+      maxRetries,
+      baseDelayMs,
+      `${provider} API call`
+    );
+    
+    return {
+      ...result,
+      retryAttempts: attempts,
+      latencyMs: Date.now() - startTime,
+    };
+  } catch (error) {
+    console.error(`[aiService] Primary provider ${provider} failed, response not available`);
+    throw error;
   }
+}
+
+/**
+ * AI call with automatic fallback to other providers if the primary fails
+ * Tries providers in order: OpenAI -> Groq -> Gemini
+ */
+export async function callAIWithFallback(
+  request: AIRequest,
+  preferredProvider: AIProvider = "openai"
+): Promise<AIResponse> {
+  const startTime = Date.now();
+  const errors: Array<{ provider: AIProvider; error: string }> = [];
+  
+  // Reorder fallback chain to start with preferred provider
+  const providerChain = [
+    preferredProvider,
+    ...FALLBACK_CHAIN.filter((p) => p !== preferredProvider),
+  ];
+  
+  for (const provider of providerChain) {
+    // Skip providers that aren't configured
+    if (provider === "groq" && !groqClient) continue;
+    if (provider === "gemini" && !geminiClient) continue;
+    
+    try {
+      const result = await callAI(provider, { ...request, retryCount: 2 });
+      
+      // Log if we had to fallback
+      if (errors.length > 0) {
+        console.log(`[aiService] Successfully fell back to ${provider} after ${errors.length} provider failures`);
+      }
+      
+      return {
+        ...result,
+        latencyMs: Date.now() - startTime,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      errors.push({ provider, error: errorMessage });
+      console.warn(`[aiService] Provider ${provider} failed: ${errorMessage}`);
+    }
+  }
+  
+  // All providers failed
+  const errorSummary = errors.map((e) => `${e.provider}: ${e.error}`).join("; ");
+  throw new Error(`All AI providers failed: ${errorSummary}`);
+}
+
+/**
+ * Check which AI providers are available
+ */
+export function getAvailableProviders(): AIProvider[] {
+  const available: AIProvider[] = ["openai"]; // Always available via Replit integration
+  
+  if (groqClient) available.push("groq");
+  if (geminiClient) available.push("gemini");
+  
+  return available;
 }
 
 /**
@@ -226,9 +386,11 @@ Return a JSON object with this structure:
 // Export a singleton instance for convenience
 export const aiService = {
   callAI,
+  callAIWithFallback,
   callOpenAI,
   callGroq,
   callGemini,
   explainChart,
   generateActionItems,
+  getAvailableProviders,
 };
