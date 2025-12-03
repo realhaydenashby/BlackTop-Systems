@@ -21,9 +21,12 @@ import {
   Link2,
   Shield,
   LogOut,
+  ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function AppSettings() {
   const { user } = useAuth();
@@ -37,6 +40,40 @@ export default function AppSettings() {
     burnSpikes: true,
     weeklyDigest: true,
   });
+
+  const { data: subscriptionData } = useQuery<{
+    subscription: any;
+    status: string;
+  }>({
+    queryKey: ["/api/stripe/subscription"],
+  });
+
+  const portalMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/stripe/portal", {});
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: (error: Error) => {
+      const errorMessage = error.message || "";
+      const isNoSubscription = errorMessage.includes("No subscription") || errorMessage.includes("400");
+      toast({
+        title: "Billing Portal Unavailable",
+        description: isNoSubscription 
+          ? "Please subscribe to a plan first to access the billing portal."
+          : "Unable to open billing portal. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const hasSubscription = subscriptionData?.subscription != null;
+  const subscriptionStatus = subscriptionData?.status || "inactive";
+  const planName = subscriptionData?.subscription?.items?.data?.[0]?.price?.product?.name || "Free Trial";
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
@@ -329,20 +366,40 @@ export default function AppSettings() {
           <div className="flex items-center justify-between p-4 bg-glass/30 border border-glass-border/30 rounded-xl">
             <div>
               <p className="font-medium">Current Plan</p>
-              <p className="text-sm text-muted-foreground">Free Trial</p>
+              <p className="text-sm text-muted-foreground">{planName}</p>
             </div>
-            <Badge>Active</Badge>
+            <Badge variant={subscriptionStatus === "active" ? "default" : "secondary"}>
+              {subscriptionStatus === "active" ? "Active" : 
+               subscriptionStatus === "trialing" ? "Trial" : 
+               subscriptionStatus === "canceled" ? "Canceled" : "Inactive"}
+            </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Your trial includes full access to all features. Upgrade to continue
-            after the trial period.
+            {hasSubscription 
+              ? "Manage your subscription and billing details below."
+              : "Your trial includes full access to all features. Upgrade to continue after the trial period."}
           </p>
-          <Button
-            onClick={() => (window.location.href = "/pricing")}
-            data-testid="button-upgrade"
-          >
-            View Plans
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={() => (window.location.href = "/pricing")}
+              data-testid="button-change-plan"
+            >
+              {hasSubscription ? "Change Plan" : "View Plans"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => portalMutation.mutate()}
+              disabled={portalMutation.isPending || !hasSubscription}
+              data-testid="button-billing-portal"
+            >
+              {portalMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <ExternalLink className="h-4 w-4 mr-2" />
+              )}
+              Billing Portal
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
