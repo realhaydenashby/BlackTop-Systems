@@ -238,17 +238,36 @@ export class DatabaseStorage implements IStorage {
       throw new Error("User ID is required for upsert");
     }
     
-    const existing = await db.query.users.findFirst({
+    // Check by ID first
+    const existingById = await db.query.users.findFirst({
       where: eq(users.id, userData.id),
     });
 
-    if (existing) {
+    if (existingById) {
       const [updated] = await db
         .update(users)
         .set({ ...userData, updatedAt: new Date() })
         .where(eq(users.id, userData.id))
         .returning();
       return updated;
+    }
+
+    // Also check by email to avoid unique constraint violation
+    if (userData.email) {
+      const existingByEmail = await db.query.users.findFirst({
+        where: eq(users.email, userData.email),
+      });
+      
+      if (existingByEmail) {
+        // Update the existing user's ID to the new ID (OIDC sub may have changed)
+        // Or simply update the existing record with new data
+        const [updated] = await db
+          .update(users)
+          .set({ ...userData, id: userData.id, updatedAt: new Date() })
+          .where(eq(users.email, userData.email))
+          .returning();
+        return updated;
+      }
     }
 
     const [user] = await db.insert(users).values(userData as any).returning();
