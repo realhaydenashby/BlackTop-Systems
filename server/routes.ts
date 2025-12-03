@@ -4538,6 +4538,188 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
+  // ============================================
+  // ADMIN - METRICS, USERS, SUBSCRIPTIONS
+  // ============================================
+
+  // Admin endpoint - Get dashboard metrics
+  app.get("/api/admin/metrics", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const waitlistStats = await storage.getWaitlistStats();
+      
+      // Count users with active connections
+      let usersWithConnections = 0;
+      for (const user of allUsers) {
+        const bankAccountCount = await storage.countUserBankAccounts(user.id);
+        const plaidItemCount = await storage.countPlaidItems(user.id);
+        if (bankAccountCount > 0 || plaidItemCount > 0) {
+          usersWithConnections++;
+        }
+      }
+
+      // Get subscription count from Stripe sync
+      const { stripeService } = await import("./stripeService");
+      let activeSubscriptions = 0;
+      try {
+        const subsResult = await db.execute(
+          sql`SELECT COUNT(*) as count FROM stripe.subscriptions WHERE status = 'active'`
+        );
+        activeSubscriptions = parseInt((subsResult.rows[0] as any)?.count || "0");
+      } catch (e) {
+        console.log("No stripe subscriptions table yet");
+      }
+
+      res.json({
+        totalUsers: allUsers.length,
+        approvedUsers: allUsers.filter(u => u.isApproved).length,
+        pendingWaitlist: waitlistStats.pending,
+        activeSubscriptions,
+        usersWithConnections,
+      });
+    } catch (error: any) {
+      console.error("Admin metrics error:", error);
+      res.status(500).json({ message: "Failed to fetch metrics" });
+    }
+  });
+
+  // Admin endpoint - Get all users with connection counts
+  app.get("/api/admin/users", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      
+      const usersWithDetails = await Promise.all(
+        allUsers.map(async (user) => {
+          const bankAccountCount = await storage.countUserBankAccounts(user.id);
+          const plaidItemCount = await storage.countPlaidItems(user.id);
+          
+          return {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            isApproved: user.isApproved,
+            isAdmin: user.isAdmin,
+            createdAt: user.createdAt,
+            connectionCount: bankAccountCount + plaidItemCount,
+          };
+        })
+      );
+
+      res.json({ users: usersWithDetails });
+    } catch (error: any) {
+      console.error("Admin users list error:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Admin endpoint - Approve a user directly
+  app.post("/api/admin/users/:id/approve", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updated = await storage.updateUser(id, { isApproved: true });
+      
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({ success: true, user: updated });
+    } catch (error: any) {
+      console.error("Admin user approve error:", error);
+      res.status(500).json({ message: "Failed to approve user" });
+    }
+  });
+
+  // Admin endpoint - Revoke user access
+  app.post("/api/admin/users/:id/revoke", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updated = await storage.updateUser(id, { isApproved: false });
+      
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({ success: true, user: updated });
+    } catch (error: any) {
+      console.error("Admin user revoke error:", error);
+      res.status(500).json({ message: "Failed to revoke access" });
+    }
+  });
+
+  // Admin endpoint - Get all subscriptions
+  app.get("/api/admin/subscriptions", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      // Query Stripe sync tables for subscription data
+      const result = await db.execute(sql`
+        SELECT 
+          s.id,
+          s.customer,
+          s.status,
+          s.current_period_start,
+          s.current_period_end,
+          s.canceled_at,
+          s.created,
+          c.email as customer_email,
+          c.name as customer_name
+        FROM stripe.subscriptions s
+        LEFT JOIN stripe.customers c ON s.customer = c.id
+        ORDER BY s.created DESC
+      `);
+
+      // Get price/product info for each subscription
+      const subscriptions = await Promise.all(
+        result.rows.map(async (sub: any) => {
+          // Get subscription items to find the price
+          const itemsResult = await db.execute(sql`
+            SELECT si.price, p.unit_amount, p.currency, pr.name as product_name
+            FROM stripe.subscription_items si
+            LEFT JOIN stripe.prices p ON si.price = p.id
+            LEFT JOIN stripe.products pr ON p.product = pr.id
+            WHERE si.subscription = ${sub.id}
+          `);
+          
+          const item = itemsResult.rows[0] as any;
+          
+          return {
+            id: sub.id,
+            customerEmail: sub.customer_email,
+            customerName: sub.customer_name,
+            status: sub.status,
+            productName: item?.product_name || "Unknown",
+            amount: item?.unit_amount ? item.unit_amount / 100 : 0,
+            currency: item?.currency || "usd",
+            currentPeriodStart: sub.current_period_start,
+            currentPeriodEnd: sub.current_period_end,
+            canceledAt: sub.canceled_at,
+            createdAt: sub.created,
+          };
+        })
+      );
+
+      // Calculate MRR (Monthly Recurring Revenue)
+      const mrr = subscriptions
+        .filter(s => s.status === "active")
+        .reduce((sum, s) => sum + (s.amount || 0), 0);
+
+      res.json({ 
+        subscriptions,
+        mrr,
+        totalActive: subscriptions.filter(s => s.status === "active").length,
+        totalCanceled: subscriptions.filter(s => s.status === "canceled").length,
+      });
+    } catch (error: any) {
+      console.error("Admin subscriptions error:", error);
+      // Return empty state if Stripe tables don't exist yet
+      res.json({ 
+        subscriptions: [],
+        mrr: 0,
+        totalActive: 0,
+        totalCanceled: 0,
+      });
+    }
+  });
+
   // Check if current user is approved (for access gate)
   app.get("/api/auth/approval-status", isAuthenticated, async (req, res) => {
     try {

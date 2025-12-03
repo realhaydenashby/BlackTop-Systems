@@ -225,6 +225,11 @@ export interface IStorage {
   approveWaitlistEntry(id: string, approvedBy: string): Promise<WaitlistEntry | undefined>;
   rejectWaitlistEntry(id: string): Promise<WaitlistEntry | undefined>;
   getWaitlistStats(): Promise<{ total: number; pending: number; approved: number; rejected: number }>;
+
+  // Admin - All Users
+  getAllUsers(): Promise<User[]>;
+  countUserBankAccounts(userId: string): Promise<number>;
+  countPlaidItems(userId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1001,6 +1006,26 @@ export class DatabaseStorage implements IStorage {
       approved: all.filter(e => e.status === "approved").length,
       rejected: all.filter(e => e.status === "rejected").length,
     };
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.query.users.findMany({
+      orderBy: [desc(users.createdAt)],
+    });
+  }
+
+  async countUserBankAccounts(userId: string): Promise<number> {
+    const accounts = await db.query.bankAccounts.findMany({
+      where: eq(bankAccounts.userId, userId),
+    });
+    return accounts.length;
+  }
+
+  async countPlaidItems(userId: string): Promise<number> {
+    const items = await db.query.plaidItems.findMany({
+      where: eq(plaidItems.userId, userId),
+    });
+    return items.length;
   }
 }
 
