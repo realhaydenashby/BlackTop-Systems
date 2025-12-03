@@ -8,15 +8,68 @@ import { FileText, Upload, Loader2, Download, Eye, CheckCircle2, Clock, XCircle,
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
+
+const demoDocuments = [
+  {
+    id: "demo-1",
+    type: "bank_statement",
+    status: "processed",
+    createdAt: subDays(new Date(), 2).toISOString(),
+    extractionConfidence: "0.94",
+    rawFileUrl: null,
+  },
+  {
+    id: "demo-2",
+    type: "invoice",
+    status: "processed",
+    createdAt: subDays(new Date(), 5).toISOString(),
+    extractionConfidence: "0.98",
+    rawFileUrl: null,
+  },
+  {
+    id: "demo-3",
+    type: "receipt",
+    status: "processed",
+    createdAt: subDays(new Date(), 7).toISOString(),
+    extractionConfidence: "0.91",
+    rawFileUrl: null,
+  },
+  {
+    id: "demo-4",
+    type: "payroll",
+    status: "processed",
+    createdAt: subDays(new Date(), 10).toISOString(),
+    extractionConfidence: "0.96",
+    rawFileUrl: null,
+  },
+  {
+    id: "demo-5",
+    type: "invoice",
+    status: "processing",
+    createdAt: subDays(new Date(), 1).toISOString(),
+    extractionConfidence: null,
+    rawFileUrl: null,
+  },
+  {
+    id: "demo-6",
+    type: "csv_upload",
+    status: "processed",
+    createdAt: subDays(new Date(), 14).toISOString(),
+    extractionConfidence: "1.0",
+    rawFileUrl: null,
+  },
+];
 
 export default function Documents() {
   const [documentType, setDocumentType] = useState("invoice");
   const { toast } = useToast();
 
-  const { data: documents, isLoading } = useQuery<any>({
+  const { data: apiDocuments, isLoading } = useQuery<any>({
     queryKey: ["/api/documents"],
   });
+  
+  const documents = apiDocuments?.length > 0 ? apiDocuments : demoDocuments;
 
   const uploadMutation = useMutation({
     mutationFn: async (data: { fileUrl: string; type: string }) => {

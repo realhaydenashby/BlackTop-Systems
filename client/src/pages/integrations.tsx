@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, CreditCard, FileText, Link2 } from "lucide-react";
-import { SiStripe, SiQuickbooks } from "react-icons/si";
+import { Building2, Link2, MessageSquare, Bell } from "lucide-react";
+import { SiStripe, SiQuickbooks, SiSlack } from "react-icons/si";
 
 const integrations = [
   {
@@ -25,10 +25,26 @@ const integrations = [
   {
     id: "quickbooks",
     name: "QuickBooks",
-    description: "Export financial data to QuickBooks",
+    description: "Sync and export financial data to QuickBooks",
     icon: SiQuickbooks,
     category: "accounting",
-    status: "coming_soon",
+    status: "available",
+  },
+  {
+    id: "slack",
+    name: "Slack",
+    description: "Get real-time alerts and insights in your Slack workspace",
+    icon: SiSlack,
+    category: "notifications",
+    status: "available",
+  },
+  {
+    id: "sms",
+    name: "SMS Alerts",
+    description: "Receive critical financial alerts via text message",
+    icon: MessageSquare,
+    category: "notifications",
+    status: "available",
   },
 ];
 
@@ -84,21 +100,6 @@ export default function Integrations() {
           </Card>
         ))}
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Request an Integration</CardTitle>
-          <CardDescription>
-            Don't see the integration you need? Let us know and we'll prioritize it.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="outline" data-testid="button-request-integration">
-            <FileText className="mr-2 h-4 w-4" />
-            Request Integration
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 }
