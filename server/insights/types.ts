@@ -9,7 +9,26 @@ export interface Insight {
   previousValue?: number;
   changePercent?: number;
   recommendation?: string;
+  confidence: InsightConfidence;
   createdAt?: Date;
+}
+
+/**
+ * Confidence scoring for insights
+ * - score: 0-1, where 1 is highest confidence
+ * - level: human-readable confidence level
+ * - factors: what influenced the confidence score
+ */
+export interface InsightConfidence {
+  score: number;
+  level: "high" | "medium" | "low";
+  factors: ConfidenceFactor[];
+}
+
+export interface ConfidenceFactor {
+  factor: string;
+  impact: "positive" | "negative" | "neutral";
+  detail?: string;
 }
 
 export type InsightType =
