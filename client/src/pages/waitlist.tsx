@@ -3,7 +3,6 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -24,14 +23,19 @@ export default function Waitlist() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    role: "founder",
+    role: "",
     company: "",
-    painPoint: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!formData.role) {
+      setError("Please select your role.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -119,10 +123,11 @@ export default function Waitlist() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="role">Your Role</Label>
+                  <Label htmlFor="role">Your Role *</Label>
                   <Select
                     value={formData.role}
                     onValueChange={(value) => handleChange("role", value)}
+                    required
                   >
                     <SelectTrigger data-testid="select-waitlist-role">
                       <SelectValue placeholder="Select your role" />
@@ -138,26 +143,15 @@ export default function Waitlist() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="company">Company (optional)</Label>
+                  <Label htmlFor="company">Company *</Label>
                   <Input
                     id="company"
                     type="text"
                     placeholder="Your company name"
                     value={formData.company}
                     onChange={(e) => handleChange("company", e.target.value)}
+                    required
                     data-testid="input-waitlist-company"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="painPoint">What's your biggest financial blindspot? (optional)</Label>
-                  <Textarea
-                    id="painPoint"
-                    placeholder="Tell us about the financial challenges you face..."
-                    value={formData.painPoint}
-                    onChange={(e) => handleChange("painPoint", e.target.value)}
-                    className="min-h-[80px] resize-none"
-                    data-testid="input-waitlist-painpoint"
                   />
                 </div>
 
