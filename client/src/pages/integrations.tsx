@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Link2, MessageSquare, Bell } from "lucide-react";
-import { SiStripe, SiQuickbooks, SiSlack } from "react-icons/si";
+import { Building2, Link2, MessageSquare } from "lucide-react";
+import { SiStripe, SiQuickbooks, SiSlack, SiXero } from "react-icons/si";
 
 const integrations = [
   {
@@ -27,6 +27,14 @@ const integrations = [
     name: "QuickBooks",
     description: "Sync and export financial data to QuickBooks",
     icon: SiQuickbooks,
+    category: "accounting",
+    status: "available",
+  },
+  {
+    id: "xero",
+    name: "Xero",
+    description: "Connect your Xero account for seamless accounting sync",
+    icon: SiXero,
     category: "accounting",
     status: "available",
   },
