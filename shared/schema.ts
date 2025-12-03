@@ -522,6 +522,18 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   actionPlans: many(actionPlans),
   insights: many(insights),
   integrations: many(integrationConnections),
+  auditLogs: many(auditLogs),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [auditLogs.userId],
+    references: [users.id],
+  }),
+  organization: one(organizations, {
+    fields: [auditLogs.organizationId],
+    references: [organizations.id],
+  }),
 }));
 
 export const organizationMembersRelations = relations(organizationMembers, ({ one }) => ({

@@ -41,6 +41,8 @@ import type {
   InsertRaiseRecommendation,
   ShareableReport,
   InsertShareableReport,
+  AuditLog,
+  InsertAuditLog,
 } from "@shared/schema";
 import {
   users,
@@ -64,6 +66,7 @@ import {
   raiseRecommendations,
   notificationPreferences,
   shareableReports,
+  auditLogs,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -194,6 +197,21 @@ export interface IStorage {
   getOrganizationShareableReports(organizationId: string): Promise<ShareableReport[]>;
   incrementReportViewCount(id: string): Promise<void>;
   deleteShareableReport(id: string): Promise<void>;
+
+  // Audit Logs
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(
+    organizationId: string,
+    filters?: {
+      userId?: string;
+      action?: string;
+      resourceType?: string;
+      startDate?: Date;
+      endDate?: Date;
+      limit?: number;
+    }
+  ): Promise<AuditLog[]>;
+  getRecentAuditLogs(organizationId: string, limit?: number): Promise<AuditLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -849,6 +867,56 @@ export class DatabaseStorage implements IStorage {
 
   async deleteShareableReport(id: string): Promise<void> {
     await db.delete(shareableReports).where(eq(shareableReports.id, id));
+  }
+
+  // Audit Logs
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [auditLog] = await db.insert(auditLogs).values(log).returning();
+    return auditLog;
+  }
+
+  async getAuditLogs(
+    organizationId: string,
+    filters?: {
+      userId?: string;
+      action?: string;
+      resourceType?: string;
+      startDate?: Date;
+      endDate?: Date;
+      limit?: number;
+    }
+  ): Promise<AuditLog[]> {
+    const conditions = [eq(auditLogs.organizationId, organizationId)];
+    
+    if (filters?.userId) {
+      conditions.push(eq(auditLogs.userId, filters.userId));
+    }
+    if (filters?.action) {
+      conditions.push(eq(auditLogs.action, filters.action));
+    }
+    if (filters?.resourceType) {
+      conditions.push(eq(auditLogs.resourceType, filters.resourceType));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(auditLogs.createdAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(auditLogs.createdAt, filters.endDate));
+    }
+
+    return await db.query.auditLogs.findMany({
+      where: and(...conditions),
+      orderBy: [desc(auditLogs.createdAt)],
+      limit: filters?.limit || 100,
+    });
+  }
+
+  async getRecentAuditLogs(organizationId: string, limit: number = 50): Promise<AuditLog[]> {
+    return await db.query.auditLogs.findMany({
+      where: eq(auditLogs.organizationId, organizationId),
+      orderBy: [desc(auditLogs.createdAt)],
+      limit,
+    });
   }
 }
 

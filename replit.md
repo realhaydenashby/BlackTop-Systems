@@ -208,9 +208,32 @@ Multi-channel alerts for proactive monitoring:
 
 ### Analytics Storage
 - `burn_metrics` - Calculated monthly metrics
-- `insights` - Generated insights
+- `insights` - Generated insights with confidence scores
 - `planned_hires` - Future headcount for runway calc
 - `raise_recommendations` - AI fundraising advice
+- `audit_logs` - Compliance tracking for user actions (views, exports, changes)
+
+## Production Hardening
+
+### Error Handling (`server/errors.ts`)
+Comprehensive error handling system with:
+- **Error Codes**: Covering all integration types (Plaid, QuickBooks, Yodlee, Stripe, AI, storage, encryption)
+- **HTTP Status Mapping**: Proper semantics (401 auth, 402 payment, 403 forbidden, 404 not found, 422 unprocessable, 424 dependency failed, 429 rate limit, 502 upstream failure, 503 unavailable)
+- **User-Friendly Messages**: Actionable guidance for non-technical founders
+- **Usage**: `createError("PLAID_SYNC_FAILED", { itemId })` returns typed error with proper status
+
+### Audit Logging (`server/auditLogService.ts`)
+Financial data compliance tracking:
+- **Actions**: auth.login/logout, data.view/export/modify/delete, transaction.update/categorize, integration.connect/disconnect/sync, report.generate/share
+- **Resource Types**: transaction, bank_account, plaid_item, quickbooks_token, organization, user, report, insight, settings
+- **Capture**: userId, organizationId, action, resourceType, resourceId, details, ipAddress, userAgent
+- **Usage**: `auditLogService.logIntegrationEvent(userId, orgId, "plaid_item", itemId, "connect", req)`
+
+### AI Service Resilience (`server/aiService.ts`)
+- **Retry Logic**: 3 attempts with exponential backoff (1s, 2s, 4s)
+- **Provider Fallback**: OpenAI → Groq → Gemini
+- **Rule-Based Fallback**: Deterministic vendor/category classification when AI fails
+- **Confidence Scores**: 0-1 scale on all AI-generated insights
 
 ## Technology Stack
 
