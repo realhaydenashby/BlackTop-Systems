@@ -115,7 +115,7 @@ export default function Home() {
               },
               {
                 icon: Shield,
-                title: "Built for SMBs",
+                title: "No CFO Required",
                 description: "Pre-accounting intelligence layer designed for startups without a dedicated CFO."
               }
             ].map((benefit, index) => (
