@@ -36,6 +36,14 @@ export const users = pgTable("users", {
   isLiveMode: boolean("is_live_mode").default(false), // Live mode = real bank connection, Demo mode = existing features
   isApproved: boolean("is_approved").default(false), // Waitlist: user approved to access live workspace
   isAdmin: boolean("is_admin").default(false), // Admin access for waitlist management
+  hasCompletedOnboarding: boolean("has_completed_onboarding").default(false), // Track if user finished onboarding flow
+  hasSelectedPlan: boolean("has_selected_plan").default(false), // Track if user selected a subscription plan
+  hasCompanyInfo: boolean("has_company_info").default(false), // Track if user entered company info
+  hasConnectedBank: boolean("has_connected_bank").default(false), // Track if user connected a bank account
+  companyName: varchar("company_name", { length: 255 }),
+  companyIndustry: varchar("company_industry", { length: 100 }),
+  companyStage: varchar("company_stage", { length: 50 }), // seed, series-a, series-b, growth, profitable
+  companyRevenueRange: varchar("company_revenue_range", { length: 50 }), // pre-revenue, 0-100k, 100k-1m, 1m-10m, 10m+
   yodleeUserSession: varchar("yodlee_user_session"), // Cached Yodlee user session
   currentCash: numeric("current_cash", { precision: 15, scale: 2 }), // User's current cash on hand for runway calc
   createdAt: timestamp("created_at").defaultNow(),

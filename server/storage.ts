@@ -70,6 +70,7 @@ import {
   shareableReports,
   auditLogs,
   waitlist,
+  plaidItems,
 } from "@shared/schema";
 
 export interface IStorage {

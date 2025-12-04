@@ -50,16 +50,33 @@ interface ApprovalStatus {
   isApproved: boolean;
   isAdmin: boolean;
   email: string;
+  hasCompletedOnboarding: boolean;
 }
 
-function ProtectedRoute({ component: Component, requireApproval = true }: { component: React.ComponentType; requireApproval?: boolean }) {
+interface UserWithOnboarding {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  isApproved: boolean;
+  isAdmin: boolean;
+  hasCompletedOnboarding: boolean;
+}
+
+function ProtectedRoute({ component: Component, requireApproval = true, skipOnboardingCheck = false }: { component: React.ComponentType; requireApproval?: boolean; skipOnboardingCheck?: boolean }) {
   const { user, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location] = useLocation();
 
   const { data: approvalStatus, isLoading: isCheckingApproval } = useQuery<ApprovalStatus>({
     queryKey: ["/api/auth/approval-status"],
     enabled: !!user && requireApproval,
     staleTime: 60000,
+  });
+
+  const { data: fullUser, isLoading: isLoadingUser } = useQuery<UserWithOnboarding>({
+    queryKey: ["/api/auth/user"],
+    enabled: !!user,
+    staleTime: 30000,
   });
 
   if (isLoading) {
@@ -84,7 +101,7 @@ function ProtectedRoute({ component: Component, requireApproval = true }: { comp
     );
   }
 
-  if (requireApproval && isCheckingApproval) {
+  if (requireApproval && (isCheckingApproval || isLoadingUser)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -97,6 +114,21 @@ function ProtectedRoute({ component: Component, requireApproval = true }: { comp
 
   if (requireApproval && approvalStatus && !approvalStatus.isApproved && !approvalStatus.isAdmin) {
     return <WaitlistPending />;
+  }
+
+  // Redirect approved users to onboarding if they haven't completed it
+  // Skip this check for the onboarding page itself and bank connect page
+  const isOnboardingFlow = location.startsWith("/onboarding") || location.includes("onboarding=true");
+  if (!skipOnboardingCheck && !isOnboardingFlow && fullUser && !fullUser.hasCompletedOnboarding && !fullUser.isAdmin) {
+    window.location.href = "/onboarding";
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
+          <p className="mt-4 text-muted-foreground">Redirecting to onboarding...</p>
+        </div>
+      </div>
+    );
   }
 
   return <Component />;
@@ -234,7 +266,7 @@ function ProtectedRouter() {
   return (
     <AppLayout>
       <Switch>
-        <Route path="/onboarding" component={() => <ProtectedRoute component={Onboarding} />} />
+        <Route path="/onboarding" component={() => <ProtectedRoute component={Onboarding} skipOnboardingCheck />} />
         <Route path="/app/resources" component={() => <ProtectedRoute component={Resources} />} />
         <Route component={NotFound} />
       </Switch>
@@ -249,7 +281,7 @@ function LiveModeRouter() {
         <Route path="/app" component={() => <ProtectedRoute component={AppDashboard} />} />
         <Route path="/app/transactions" component={() => <ProtectedRoute component={AppTransactions} />} />
         <Route path="/app/upload" component={() => <ProtectedRoute component={UploadPage} />} />
-        <Route path="/app/connect" component={() => <ProtectedRoute component={Connect} />} />
+        <Route path="/app/connect" component={() => <ProtectedRoute component={Connect} skipOnboardingCheck />} />
         <Route path="/app/analytics" component={() => <ProtectedRoute component={LiveAnalytics} />} />
         <Route path="/app/analytics/:section" component={() => <ProtectedRoute component={LiveAnalytics} />} />
         <Route path="/app/fundraising" component={() => <ProtectedRoute component={LiveFundraising} />} />

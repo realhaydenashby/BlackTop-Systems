@@ -6,7 +6,7 @@ import { isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
 import { User, insertOrganizationSchema, insertDocumentSchema, insertTransactionSchema, organizationMembers, transactions } from "@shared/schema";
-import { eq, and, gte, lt } from "drizzle-orm";
+import { eq, and, gte, lt, sql } from "drizzle-orm";
 import * as pdfParse from "pdf-parse";
 import Papa from "papaparse";
 import { subDays, startOfMonth, endOfMonth, addMonths } from "date-fns";
@@ -4459,24 +4459,46 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
   app.post("/api/admin/waitlist/:id/approve", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const user = req.user as User;
+      const adminUser = req.user as User;
 
       const entry = await storage.getWaitlistEntry(id);
       if (!entry) {
         return res.status(404).json({ message: "Waitlist entry not found" });
       }
 
-      const updated = await storage.approveWaitlistEntry(id, user.id);
+      const updated = await storage.approveWaitlistEntry(id, adminUser.id);
       
-      // Also update the user if they exist
+      // Create or update user record with approved status
       const existingUser = await storage.getUserByEmail(entry.email);
+      let approvedUser;
+      
       if (existingUser) {
-        await storage.updateUser(existingUser.id, { isApproved: true });
+        // Update existing user to approved
+        approvedUser = await storage.updateUser(existingUser.id, { isApproved: true });
+      } else {
+        // Create new user from waitlist entry
+        const nameParts = entry.name.split(" ");
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ") || "";
+        
+        approvedUser = await storage.upsertUser({
+          id: crypto.randomUUID(),
+          email: entry.email,
+          firstName,
+          lastName,
+          isApproved: true,
+          isLiveMode: true,
+          hasCompletedOnboarding: false,
+          hasSelectedPlan: false,
+          hasCompanyInfo: false,
+          hasConnectedBank: false,
+          companyName: entry.company || null,
+        });
       }
 
-      console.log(`[WAITLIST] Approved: ${entry.email} by ${user.email}`);
+      console.log(`[WAITLIST] Approved: ${entry.email} by ${adminUser.email} - User created/updated`);
 
-      res.json({ success: true, entry: updated });
+      res.json({ success: true, entry: updated, user: approvedUser });
     } catch (error: any) {
       console.error("Admin waitlist approve error:", error);
       res.status(500).json({ message: "Failed to approve entry" });
@@ -4717,6 +4739,64 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
         totalActive: 0,
         totalCanceled: 0,
       });
+    }
+  });
+
+  // ============================================
+  // ONBOARDING ENDPOINTS
+  // ============================================
+
+  // Update onboarding progress
+  app.post("/api/onboarding/update", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const updates = req.body;
+
+      const updated = await storage.updateUser(user.id, updates);
+      res.json({ success: true, user: updated });
+    } catch (error: any) {
+      console.error("Onboarding update error:", error);
+      res.status(500).json({ message: "Failed to update onboarding" });
+    }
+  });
+
+  // Save company info during onboarding
+  app.post("/api/onboarding/company-info", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { companyName, companyIndustry, companyStage, companyRevenueRange } = req.body;
+
+      const updated = await storage.updateUser(user.id, {
+        companyName,
+        companyIndustry,
+        companyStage,
+        companyRevenueRange,
+        hasCompanyInfo: true,
+      });
+
+      res.json({ success: true, user: updated });
+    } catch (error: any) {
+      console.error("Company info save error:", error);
+      res.status(500).json({ message: "Failed to save company info" });
+    }
+  });
+
+  // Mark onboarding as complete
+  app.post("/api/onboarding/complete", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+
+      const updated = await storage.updateUser(user.id, {
+        hasCompletedOnboarding: true,
+        isLiveMode: true,
+      });
+
+      console.log(`[ONBOARDING] Completed for user ${user.id} (${user.email})`);
+
+      res.json({ success: true, user: updated });
+    } catch (error: any) {
+      console.error("Onboarding complete error:", error);
+      res.status(500).json({ message: "Failed to complete onboarding" });
     }
   });
 
