@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ScenarioComparison } from "@/components/scenario-comparison";
+import { ConfidenceIntervalChart } from "@/components/ConfidenceIntervalChart";
 import { usePlanAccess } from "@/hooks/usePlanAccess";
 import { FeatureGate } from "@/components/UpgradePrompt";
 
@@ -169,6 +170,107 @@ function generateDataFromCompanyState(companyState: CompanyState | null): MonthR
 
 function generateDefaultData(): MonthRow[] {
   return generateDataFromCompanyState(null);
+}
+
+function MonteCarloSection({ rows, startingCash }: { rows: MonthRow[], startingCash: number }) {
+  const monteCarloData = useMemo(() => {
+    const projectedRows = rows.filter(r => !r.isActual);
+    if (projectedRows.length === 0) {
+      return null;
+    }
+
+    const recentActuals = rows.filter(r => r.isActual);
+    const revenueVariance = recentActuals.length > 1 
+      ? Math.sqrt(recentActuals.map(r => r.revenue).reduce((sum, v, _, arr) => {
+          const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+          return sum + Math.pow(v - mean, 2);
+        }, 0) / recentActuals.length) / (recentActuals.reduce((a, r) => a + r.revenue, 0) / recentActuals.length)
+      : 0.15;
+    
+    const expenseVariance = recentActuals.length > 1
+      ? Math.sqrt(recentActuals.map(r => r.totalOpex).reduce((sum, v, _, arr) => {
+          const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+          return sum + Math.pow(v - mean, 2);
+        }, 0) / recentActuals.length) / (recentActuals.reduce((a, r) => a + r.totalOpex, 0) / recentActuals.length)
+      : 0.10;
+
+    const volatilityRev = Math.max(0.05, Math.min(0.30, revenueVariance || 0.15));
+    const volatilityExp = Math.max(0.03, Math.min(0.20, expenseVariance || 0.10));
+    
+    const SIMULATION_COUNT = 1000;
+    
+    const simulations: number[][] = [];
+    for (let sim = 0; sim < SIMULATION_COUNT; sim++) {
+      let cash = startingCash;
+      const simPath: number[] = [];
+      
+      for (let monthIdx = 0; monthIdx < 12; monthIdx++) {
+        const projRow = projectedRows[Math.min(monthIdx, projectedRows.length - 1)];
+        
+        const revenueVariation = 1 + (Math.random() - 0.5) * 2 * volatilityRev;
+        const expenseVariation = 1 + (Math.random() - 0.5) * 2 * volatilityExp;
+        
+        const monthlyRevenue = projRow.revenue * revenueVariation;
+        const monthlyExpenses = projRow.totalOpex * expenseVariation;
+        
+        cash += monthlyRevenue - monthlyExpenses;
+        simPath.push(Math.max(0, cash));
+      }
+      simulations.push(simPath);
+    }
+    
+    const projections = Array.from({ length: 12 }, (_, monthIdx) => {
+      const monthValues = simulations.map(sim => sim[monthIdx]).sort((a, b) => a - b);
+      const p10Idx = Math.floor(SIMULATION_COUNT * 0.1);
+      const p50Idx = Math.floor(SIMULATION_COUNT * 0.5);
+      const p90Idx = Math.floor(SIMULATION_COUNT * 0.9);
+      
+      const month = addMonths(new Date(), monthIdx + 1);
+      
+      return {
+        month: format(month, "yyyy-MM-dd"),
+        expected: projectedRows[Math.min(monthIdx, projectedRows.length - 1)]?.netCash || startingCash,
+        p10: monthValues[p10Idx],
+        p50: monthValues[p50Idx],
+        p90: monthValues[p90Idx],
+      };
+    });
+    
+    const survivalCount = simulations.filter(sim => sim[11] > 0).length;
+    const probabilityOfSurvival = survivalCount / SIMULATION_COUNT;
+    
+    const runwayMonths = simulations.map(sim => {
+      const zeroIdx = sim.findIndex(cash => cash <= 0);
+      return zeroIdx === -1 ? 12 : zeroIdx + 1;
+    }).sort((a, b) => a - b);
+    
+    const p10Runway = runwayMonths[Math.floor(SIMULATION_COUNT * 0.1)];
+    const p50Runway = runwayMonths[Math.floor(SIMULATION_COUNT * 0.5)];
+    const p90Runway = runwayMonths[Math.floor(SIMULATION_COUNT * 0.9)];
+    
+    return {
+      projections,
+      metrics: {
+        expectedRunway: p50Runway,
+        probabilityOfSurvival,
+        p10Runway,
+        p90Runway,
+      },
+      simulationCount: SIMULATION_COUNT,
+    };
+  }, [rows, startingCash]);
+
+  if (!monteCarloData) {
+    return null;
+  }
+
+  return (
+    <ConfidenceIntervalChart
+      data={monteCarloData}
+      startingCash={startingCash}
+      title="Runway Projections with Monte Carlo Confidence Intervals"
+    />
+  );
 }
 
 function EditableCell({
@@ -556,6 +658,11 @@ export default function Workbook() {
         currentMonthlyRevenue={rows.length > 0 ? rows[rows.length - 1].revenue : 45000}
       />
 
+      <MonteCarloSection 
+        rows={rows} 
+        startingCash={companyState?.cash_balance || 500000} 
+      />
+
       <Card>
         <CardContent className="py-6">
           <div className="flex items-start gap-4">
@@ -568,6 +675,7 @@ export default function Workbook() {
                 This workbook lets you create "what-if" scenarios by adjusting projected revenue and expenses. 
                 Changes automatically recalculate derived fields like Gross Margin, Total OpEx, Net Cash, and Runway. 
                 Use the Scenario Comparison section above to compare Base, Conservative, and Aggressive growth plans side-by-side.
+                The Monte Carlo simulation provides probabilistic runway forecasts with confidence intervals.
               </p>
             </div>
           </div>

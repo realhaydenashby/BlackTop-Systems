@@ -85,15 +85,23 @@ function getSourceLabel(source: string) {
 
 function ConfidenceBar({ confidence }: { confidence: number }) {
   const percentage = Math.round(confidence * 100);
-  let color = "bg-red-500";
-  if (percentage >= 80) color = "bg-green-500";
-  else if (percentage >= 60) color = "bg-yellow-500";
-  else if (percentage >= 40) color = "bg-orange-500";
+  let colorClass = "text-red-600";
+  let barColor = "[&>div]:bg-red-500";
+  if (percentage >= 80) {
+    colorClass = "text-green-600";
+    barColor = "[&>div]:bg-green-500";
+  } else if (percentage >= 60) {
+    colorClass = "text-yellow-600";
+    barColor = "[&>div]:bg-yellow-500";
+  } else if (percentage >= 40) {
+    colorClass = "text-orange-600";
+    barColor = "[&>div]:bg-orange-500";
+  }
 
   return (
     <div className="flex items-center gap-2">
-      <Progress value={percentage} className="h-1.5 flex-1" />
-      <span className="text-xs text-muted-foreground w-8">{percentage}%</span>
+      <Progress value={percentage} className={`h-1.5 flex-1 ${barColor}`} />
+      <span className={`text-xs w-8 ${colorClass}`}>{percentage}%</span>
     </div>
   );
 }
