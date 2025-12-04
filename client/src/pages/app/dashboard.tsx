@@ -27,8 +27,11 @@ import {
   Sparkles,
   BarChart3,
   PieChart as PieChartIcon,
+  Brain,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { AnomalyAlerts } from "@/components/AnomalyAlerts";
+import { EnhancedInsights } from "@/components/EnhancedInsights";
 import { Link } from "wouter";
 import { format, parseISO, addMonths } from "date-fns";
 import {
@@ -1084,6 +1087,12 @@ export default function AppDashboard() {
       </div>
 
       <WeeklyChangesCard />
+
+      {/* AI-Powered Insights Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-testid="ai-section">
+        <AnomalyAlerts maxItems={5} showDetectButton={true} />
+        <EnhancedInsights maxItems={5} showSource={true} />
+      </div>
 
       {data.insights.length > 0 && (
         <Card>

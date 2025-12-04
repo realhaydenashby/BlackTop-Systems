@@ -2214,6 +2214,326 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== AI ENHANCEMENT ROUTES ====================
+  
+  // Get detected anomalies for organization
+  app.get("/api/ai/anomalies", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      if (!orgMember) {
+        return res.json([]);
+      }
+
+      const { status, severity, limit } = req.query;
+      const anomalies = await storage.getAnomalyEvents(orgMember.organizationId, {
+        status: status as string | undefined,
+        severity: severity as string | undefined,
+        limit: limit ? parseInt(limit as string) : 50,
+      });
+
+      res.json(anomalies);
+    } catch (error: any) {
+      console.error("Get anomalies error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch anomalies" });
+    }
+  });
+
+  // Run anomaly detection on recent transactions
+  app.post("/api/ai/detect-anomalies", isAuthenticated, requireFeature("aiCopilot"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      if (!orgMember) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+
+      const { AnomalyDetector } = await import("./analytics/anomalyDetector");
+      const detector = new AnomalyDetector(orgMember.organizationId);
+
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+      const txns = await storage.getOrganizationTransactions(orgMember.organizationId, {
+        startDate: sixMonthsAgo,
+      });
+
+      const normalizedTxns = txns.map(t => ({
+        ...t,
+        amount: parseFloat(t.amount),
+        date: new Date(t.date),
+        isRecurring: t.isRecurring ?? false,
+      }));
+
+      const anomalies = await detector.analyzeTransactionAnomalies(normalizedTxns as any);
+
+      for (const anomaly of anomalies) {
+        await storage.createAnomalyEvent({
+          organizationId: orgMember.organizationId,
+          anomalyType: anomaly.type as any,
+          severity: anomaly.severity as any,
+          metricName: anomaly.metricName,
+          expectedValue: anomaly.expectedValue?.toString(),
+          actualValue: anomaly.actualValue.toString(),
+          deviationPercent: anomaly.deviationPercent?.toString(),
+          context: anomaly.context as any,
+          status: "new",
+        });
+      }
+
+      res.json({ detected: anomalies.length, anomalies });
+    } catch (error: any) {
+      console.error("Detect anomalies error:", error);
+      res.status(500).json({ message: error.message || "Failed to detect anomalies" });
+    }
+  });
+
+  // Dismiss/acknowledge an anomaly
+  app.patch("/api/ai/anomalies/:id", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { status, resolvedBy, notes } = req.body;
+
+      const updated = await storage.updateAnomalyEvent(req.params.id, {
+        status,
+        resolvedBy: resolvedBy || user.id,
+        resolvedAt: status === "resolved" || status === "dismissed" ? new Date() : undefined,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Update anomaly error:", error);
+      res.status(500).json({ message: error.message || "Failed to update anomaly" });
+    }
+  });
+
+  // Get scenario runs for organization
+  app.get("/api/ai/scenarios", isAuthenticated, requireFeature("scenarioModeling"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      if (!orgMember) {
+        return res.json([]);
+      }
+
+      const scenarios = await storage.getScenarioRuns(orgMember.organizationId);
+      res.json(scenarios);
+    } catch (error: any) {
+      console.error("Get scenarios error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch scenarios" });
+    }
+  });
+
+  // Run Monte Carlo forecast scenario
+  app.post("/api/ai/scenarios/run", isAuthenticated, requireFeature("scenarioModeling"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      if (!orgMember) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+
+      const { name, scenarioType, assumptions, months = 12 } = req.body;
+
+      const { ForecastEngine } = await import("./analytics/forecastEngine");
+      const engine = new ForecastEngine(orgMember.organizationId);
+
+      const bankAccounts = await storage.getUserBankAccounts(userId);
+      const currentCash = bankAccounts.reduce((sum, acc) => sum + parseFloat(acc.currentBalance || "0"), 0);
+
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const txns = await storage.getOrganizationTransactions(orgMember.organizationId, {
+        startDate: sixMonthsAgo,
+      });
+
+      const normalizedTxns = txns.map(t => ({
+        ...t,
+        amount: parseFloat(t.amount),
+        date: new Date(t.date),
+        isRecurring: t.isRecurring ?? false,
+      }));
+
+      const result = await engine.generateForecast(normalizedTxns as any, currentCash, assumptions || {}, months);
+
+      const saved = await engine.saveScenarioRun(
+        name || `${scenarioType || 'base'} scenario`,
+        scenarioType || "base",
+        assumptions || {},
+        result,
+        userId
+      );
+
+      res.json({ result, savedId: saved?.id });
+    } catch (error: any) {
+      console.error("Run scenario error:", error);
+      res.status(500).json({ message: error.message || "Failed to run scenario" });
+    }
+  });
+
+  // Get a specific scenario run
+  app.get("/api/ai/scenarios/:id", isAuthenticated, requireFeature("scenarioModeling"), async (req, res) => {
+    try {
+      const scenario = await storage.getScenarioRun(req.params.id);
+      if (!scenario) {
+        return res.status(404).json({ message: "Scenario not found" });
+      }
+      res.json(scenario);
+    } catch (error: any) {
+      console.error("Get scenario error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch scenario" });
+    }
+  });
+
+  // Delete a scenario run
+  app.delete("/api/ai/scenarios/:id", isAuthenticated, requireFeature("scenarioModeling"), async (req, res) => {
+    try {
+      await storage.deleteScenarioRun(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete scenario error:", error);
+      res.status(500).json({ message: error.message || "Failed to delete scenario" });
+    }
+  });
+
+  // Run full hybrid AI analysis (algorithm + AI)
+  app.post("/api/ai/analyze", isAuthenticated, requireFeature("aiCopilot"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      if (!orgMember) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+
+      const { HybridAIPipeline } = await import("./ai/hybridPipeline");
+      const pipeline = new HybridAIPipeline(orgMember.organizationId);
+
+      const bankAccounts = await storage.getUserBankAccounts(userId);
+      const currentCash = bankAccounts.reduce((sum, acc) => sum + parseFloat(acc.currentBalance || "0"), 0);
+
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const txns = await storage.getOrganizationTransactions(orgMember.organizationId, {
+        startDate: sixMonthsAgo,
+      });
+
+      const normalizedTxns = txns.map(t => ({
+        ...t,
+        amount: parseFloat(t.amount),
+        date: new Date(t.date),
+        isRecurring: t.isRecurring ?? false,
+      }));
+
+      const result = await pipeline.runFullAnalysis(normalizedTxns as any, currentCash);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Hybrid AI analysis error:", error);
+      res.status(500).json({ message: error.message || "Failed to run AI analysis" });
+    }
+  });
+
+  // Get AI-generated insights with confidence scores
+  app.get("/api/ai/insights", isAuthenticated, requireFeature("aiCopilot"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      if (!orgMember) {
+        return res.json([]);
+      }
+
+      const { HybridAIPipeline } = await import("./ai/hybridPipeline");
+      const pipeline = new HybridAIPipeline(orgMember.organizationId);
+
+      const bankAccounts = await storage.getUserBankAccounts(userId);
+      const currentCash = bankAccounts.reduce((sum, acc) => sum + parseFloat(acc.currentBalance || "0"), 0);
+
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const txns = await storage.getOrganizationTransactions(orgMember.organizationId, {
+        startDate: sixMonthsAgo,
+      });
+
+      const normalizedTxns = txns.map(t => ({
+        ...t,
+        amount: parseFloat(t.amount),
+        date: new Date(t.date),
+        isRecurring: t.isRecurring ?? false,
+      }));
+
+      const { FinancialMetricsEngine } = await import("./analytics/metricsEngine");
+      const metricsEngine = new FinancialMetricsEngine(orgMember.organizationId);
+      const metrics = await metricsEngine.computeAllMetrics(currentCash);
+
+      const result = await pipeline.generateInsights(normalizedTxns as any, metrics);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Get AI insights error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate insights" });
+    }
+  });
+
+  // Get AI audit logs (admin only)
+  app.get("/api/ai/audit-logs", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const dbUser = await storage.getUser(user.id);
+      
+      if (!dbUser?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { organizationId, taskType, provider, limit } = req.query;
+      const logs = await storage.getAIAuditLogs({
+        organizationId: organizationId as string | undefined,
+        taskType: taskType as string | undefined,
+        provider: provider as string | undefined,
+        limit: limit ? parseInt(limit as string) : 100,
+      });
+
+      res.json(logs);
+    } catch (error: any) {
+      console.error("Get AI audit logs error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch audit logs" });
+    }
+  });
+
+  // Get AI model performance metrics (admin only)
+  app.get("/api/ai/model-performance", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const dbUser = await storage.getUser(user.id);
+      
+      if (!dbUser?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { provider, taskType } = req.query;
+      const performance = await storage.getAIModelPerformance({
+        provider: provider as string | undefined,
+        taskType: taskType as string | undefined,
+      });
+
+      res.json(performance);
+    } catch (error: any) {
+      console.error("Get model performance error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch performance metrics" });
+    }
+  });
+
   // ==================== LIVE MODE API ROUTES ====================
   // These routes are for the Live Mode (bank-connected) experience
 
