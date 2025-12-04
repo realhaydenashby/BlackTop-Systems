@@ -58,6 +58,8 @@ A three-tier pricing model (Lite, Core, Growth) gates features on both the front
 ### Integrations
 - Plaid (bank connections)
 - Yodlee FastLink (bank connections, fallback)
+- QuickBooks (accounting software - OAuth 2.0)
+- Xero (accounting software - OAuth 2.0)
 - Stripe (revenue data)
 - Slack (notifications)
 - Twilio (SMS notifications)

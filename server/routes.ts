@@ -1995,6 +1995,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Xero Integration endpoints
+  app.get("/api/xero/auth-url", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const { xeroService } = await import("./xeroService");
+      const authUrl = await xeroService.getAuthUrl(userId);
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error("Xero auth URL error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate auth URL" });
+    }
+  });
+
+  app.get("/api/xero/callback", async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      
+      if (!code || !state) {
+        return res.redirect("/app/connect?error=missing_params");
+      }
+
+      let stateData;
+      try {
+        stateData = JSON.parse(Buffer.from(state as string, "base64").toString());
+      } catch (e) {
+        console.error("Invalid state parameter:", e);
+        return res.redirect("/app/connect?error=invalid_state");
+      }
+      
+      const userId = stateData.userId;
+      if (!userId) {
+        return res.redirect("/app/connect?error=invalid_state");
+      }
+
+      const { xeroService } = await import("./xeroService");
+      const fullUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+      await xeroService.handleCallback(fullUrl, userId);
+
+      res.redirect("/app/connect?success=xero");
+    } catch (error: any) {
+      console.error("Xero callback error:", error);
+      res.redirect("/app/connect?error=callback_failed");
+    }
+  });
+
+  app.get("/api/xero/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const { xeroService } = await import("./xeroService");
+      const status = await xeroService.getConnectionStatus(userId);
+      res.json(status);
+    } catch (error: any) {
+      console.error("Xero status error:", error);
+      res.status(500).json({ message: error.message || "Failed to get connection status" });
+    }
+  });
+
+  app.post("/api/xero/sync", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const { startDate, endDate } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Start and end dates are required" });
+      }
+
+      const { xeroService } = await import("./xeroService");
+      const result = await xeroService.syncTransactions(userId, new Date(startDate), new Date(endDate));
+      res.json(result);
+    } catch (error: any) {
+      console.error("Xero sync error:", error);
+      res.status(500).json({ message: error.message || "Failed to sync transactions" });
+    }
+  });
+
+  app.get("/api/xero/organisation", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const { xeroService } = await import("./xeroService");
+      const org = await xeroService.getOrganisationInfo(userId);
+      res.json(org);
+    } catch (error: any) {
+      console.error("Xero organisation error:", error);
+      res.status(500).json({ message: error.message || "Failed to get organisation info" });
+    }
+  });
+
+  app.get("/api/xero/bank-accounts", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const { xeroService } = await import("./xeroService");
+      const accounts = await xeroService.getBankAccounts(userId);
+      res.json(accounts);
+    } catch (error: any) {
+      console.error("Xero bank accounts error:", error);
+      res.status(500).json({ message: error.message || "Failed to get bank accounts" });
+    }
+  });
+
+  app.post("/api/xero/disconnect", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const { xeroService } = await import("./xeroService");
+      await xeroService.disconnect(userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Xero disconnect error:", error);
+      res.status(500).json({ message: error.message || "Failed to disconnect" });
+    }
+  });
+
   // AI endpoints
   app.post("/api/ai/:provider", isAuthenticated, async (req, res) => {
     try {

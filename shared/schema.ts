@@ -468,6 +468,29 @@ export const quickbooksTokens = pgTable("quickbooks_tokens", {
   index("idx_qb_tokens_realm").on(table.realmId),
 ]);
 
+// Xero OAuth Tokens
+export const xeroTokens = pgTable("xero_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  tenantId: varchar("tenant_id", { length: 100 }).notNull(), // Xero organization/tenant ID
+  tenantName: varchar("tenant_name", { length: 255 }), // Xero organization name
+  tenantType: varchar("tenant_type", { length: 50 }), // ORGANISATION or PRACTICE
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  idToken: text("id_token"), // OpenID Connect ID token
+  accessTokenExpiresAt: timestamp("access_token_expires_at").notNull(),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at").notNull(), // 60 days for Xero
+  scope: text("scope"), // Store granted scopes
+  lastSyncedAt: timestamp("last_synced_at"),
+  status: varchar("status", { length: 50 }).default("active"), // active, expired, revoked
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_xero_tokens_user").on(table.userId),
+  index("idx_xero_tokens_tenant").on(table.tenantId),
+]);
+
 // Subscription Plans
 export const subscriptionPlans = pgTable("subscription_plans", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -724,6 +747,7 @@ export const insertPlannedHireSchema = createInsertSchema(plannedHires).omit({ i
 export const insertBurnMetricSchema = createInsertSchema(burnMetrics).omit({ id: true, createdAt: true });
 export const insertRaiseRecommendationSchema = createInsertSchema(raiseRecommendations).omit({ id: true, createdAt: true });
 export const insertQuickbooksTokenSchema = createInsertSchema(quickbooksTokens).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertXeroTokenSchema = createInsertSchema(xeroTokens).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertWaitlistSchema = createInsertSchema(waitlist).omit({ id: true, createdAt: true, approvedAt: true, approvedBy: true });
 
 // Types
@@ -773,6 +797,8 @@ export type RaiseRecommendation = typeof raiseRecommendations.$inferSelect;
 export type InsertRaiseRecommendation = z.infer<typeof insertRaiseRecommendationSchema>;
 export type QuickbooksToken = typeof quickbooksTokens.$inferSelect;
 export type InsertQuickbooksToken = z.infer<typeof insertQuickbooksTokenSchema>;
+export type XeroToken = typeof xeroTokens.$inferSelect;
+export type InsertXeroToken = z.infer<typeof insertXeroTokenSchema>;
 
 // Waitlist types
 export type WaitlistEntry = typeof waitlist.$inferSelect;

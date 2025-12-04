@@ -24,7 +24,7 @@ import {
   Link as LinkIcon,
   Unlink
 } from "lucide-react";
-import { SiQuickbooks } from "react-icons/si";
+import { SiQuickbooks, SiXero } from "react-icons/si";
 import type { BankAccount } from "@shared/schema";
 import { Link, useLocation } from "wouter";
 import { format, subMonths } from "date-fns";
@@ -67,6 +67,13 @@ interface QBStatus {
   status?: string;
 }
 
+interface XeroStatus {
+  connected: boolean;
+  tenantName?: string;
+  lastSynced?: string;
+  status?: string;
+}
+
 export default function Connect() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -105,12 +112,17 @@ export default function Connect() {
         title: "QuickBooks Connected",
         description: "Your QuickBooks account has been successfully connected.",
       });
-      // Clear params
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("success") === "xero") {
+      toast({
+        title: "Xero Connected",
+        description: "Your Xero account has been successfully connected.",
+      });
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("error")) {
       toast({
         title: "Connection Failed",
-        description: "Unable to connect to QuickBooks. Please try again.",
+        description: "Unable to connect your accounting software. Please try again.",
         variant: "destructive",
       });
       window.history.replaceState({}, "", window.location.pathname);
@@ -120,6 +132,11 @@ export default function Connect() {
   // Fetch QuickBooks connection status
   const { data: qbStatus, isLoading: qbLoading } = useQuery<QBStatus>({
     queryKey: ["/api/quickbooks/status"],
+  });
+
+  // Fetch Xero connection status
+  const { data: xeroStatus, isLoading: xeroLoading } = useQuery<XeroStatus>({
+    queryKey: ["/api/xero/status"],
   });
 
   // Fetch connected bank accounts
@@ -192,6 +209,71 @@ export default function Connect() {
       toast({
         title: "Disconnected",
         description: "QuickBooks has been disconnected.",
+      });
+    },
+  });
+
+  // Connect to Xero
+  const connectXeroMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("GET", "/api/xero/auth-url");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (window.self !== window.top) {
+        window.open(data.authUrl, "_blank", "noopener");
+        toast({
+          title: "Xero Authorization",
+          description: "A new tab opened for Xero login. Complete authorization there and return here.",
+        });
+      } else {
+        window.location.href = data.authUrl;
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Unable to connect to Xero.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Sync Xero data
+  const syncXeroMutation = useMutation({
+    mutationFn: async () => {
+      const endDate = format(new Date(), "yyyy-MM-dd");
+      const startDate = format(subMonths(new Date(), 6), "yyyy-MM-dd");
+      const res = await apiRequest("POST", "/api/xero/sync", { startDate, endDate });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/xero/status"] });
+      toast({
+        title: "Sync Complete",
+        description: `Imported ${data.imported} transactions (${data.errors} errors).`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Unable to sync Xero data.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Disconnect Xero
+  const disconnectXeroMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/xero/disconnect");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/xero/status"] });
+      toast({
+        title: "Disconnected",
+        description: "Xero has been disconnected.",
       });
     },
   });
@@ -440,7 +522,7 @@ export default function Connect() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  const isLoading = qbLoading || bankLoading;
+  const isLoading = qbLoading || xeroLoading || bankLoading;
 
   return (
     <div className="p-6 space-y-8">
@@ -537,6 +619,90 @@ export default function Connect() {
                   <LinkIcon className="h-4 w-4 mr-2" />
                 )}
                 Connect QuickBooks
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Xero Card */}
+        <Card data-testid="card-xero" className="hover:shadow-glow transition-all duration-base">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+            <div className="flex items-center gap-4">
+              <div className="rounded-xl bg-[#13B5EA]/10 border border-[#13B5EA]/20 p-3">
+                <SiXero className="h-6 w-6 text-[#13B5EA]" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Xero</CardTitle>
+                <CardDescription>
+                  {xeroStatus?.connected 
+                    ? `Connected to ${xeroStatus.tenantName || "your organization"}`
+                    : "Sync your accounting data from Xero"}
+                </CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {xeroLoading ? (
+                <Skeleton className="h-6 w-20" />
+              ) : xeroStatus?.connected ? (
+                <Badge variant="default" className="bg-[#13B5EA]/10 text-[#13B5EA] border-[#13B5EA]/20">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="secondary">
+                  Not Connected
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {xeroStatus?.connected ? (
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  {xeroStatus.lastSynced && (
+                    <span>Last synced: {new Date(xeroStatus.lastSynced).toLocaleDateString()}</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncXeroMutation.mutate()}
+                    disabled={syncXeroMutation.isPending}
+                    data-testid="button-sync-xero"
+                  >
+                    {syncXeroMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Sync Now
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => disconnectXeroMutation.mutate()}
+                    disabled={disconnectXeroMutation.isPending}
+                    data-testid="button-disconnect-xero"
+                  >
+                    <Unlink className="h-4 w-4 mr-2" />
+                    Disconnect
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                onClick={() => connectXeroMutation.mutate()}
+                disabled={connectXeroMutation.isPending}
+                className="bg-[#13B5EA] hover:bg-[#0DA0D1]"
+                data-testid="button-connect-xero"
+              >
+                {connectXeroMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <LinkIcon className="h-4 w-4 mr-2" />
+                )}
+                Connect Xero
               </Button>
             )}
           </CardContent>
