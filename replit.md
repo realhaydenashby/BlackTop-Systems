@@ -35,6 +35,30 @@ The application operates in distinct Demo and Live modes.
 - **Audit Logging:** Tracks user actions for compliance, capturing details on financial data interactions, integrations, and report generation.
 - **AI Service Resilience:** Includes retry logic with exponential backoff, provider fallback (OpenAI → Groq → Gemini), and rule-based fallbacks for AI failures, alongside confidence scores for AI-generated data.
 
+### AI Enhancement Architecture (Multi-Model Ensemble)
+The platform uses an **algorithm-first, AI-augmented** approach where deterministic calculations execute first, then AI interprets results.
+
+#### Core Analytics Services (`server/analytics/`)
+- **FinancialMetricsEngine** (`metricsEngine.ts`): Deterministic financial calculations for burn rate, runway, margins, cash flow, growth rates. Computes trend analysis, moving averages, and exponential smoothing.
+- **AnomalyDetector** (`anomalyDetector.ts`): Statistical anomaly detection using z-scores, IQR (interquartile range), moving average deviations, and seasonal decomposition. Detects unusual spending patterns, vendor anomalies, and category spikes.
+- **ForecastEngine** (`forecastEngine.ts`): Monte Carlo simulations (1000 runs default) for probabilistic forecasting. Generates confidence intervals (p10/p50/p90), runway distributions, and sensitivity analysis.
+- **OrganizationFeatureStore** (`featureStore.ts`): Company-specific pattern learning. Tracks spending trends, vendor behavior profiles, recurring transaction patterns, and seasonal indices over time.
+
+#### Multi-Model AI Orchestration (`server/ai/`)
+- **AIOrchestrator** (`orchestrator.ts`): Multi-model ensemble with circuit breakers, health monitoring, and automatic failover. Supports OpenAI, Groq, and Gemini with consensus voting for critical decisions. Includes provider weight scoring based on success rate and latency.
+- **HybridAIPipeline** (`hybridPipeline.ts`): Combines algorithm outputs with AI interpretation. Algorithm insights are generated first, then AI adds complementary insights. Includes output validation to ensure AI responses address key metrics.
+
+#### AI Enhancement Database Tables (8 new tables)
+- `metric_snapshots`: Computed metrics stored periodically with confidence scores
+- `org_feature_history`: Time-series features for pattern learning (trends, rolling stats, seasonal indices)
+- `vendor_behavior_profiles`: Vendor-specific patterns (billing frequency, price changes, volatility)
+- `anomaly_baselines`: Statistical baselines per metric (mean, stdDev, IQR, thresholds)
+- `anomaly_events`: Detected anomalies with severity, status, and context
+- `scenario_runs`: Advanced scenario modeling with Monte Carlo results
+- `ai_audit_logs`: Full audit trail of AI decisions (provider, model, confidence, validation)
+- `ai_context_notes`: Human feedback for AI learning (corrections, approvals, rejections)
+- `ai_model_performance`: Track model performance over time (latency, error rate, consensus rate)
+
 ### Plan-Based Feature Gating
 A three-tier pricing model (Lite, Core, Growth) gates features on both the frontend (using `usePlanAccess` hook and `FeatureGate` components) and backend (using `requireFeature` middleware) to control access to advanced functionalities like the AI Copilot, scenario modeling, and shareable reports.
 

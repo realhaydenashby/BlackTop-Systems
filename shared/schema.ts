@@ -610,6 +610,305 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
 
+// ============================================
+// AI ENHANCEMENT TABLES - Advanced Intelligence Layer
+// ============================================
+
+// Metric Snapshots - Computed financial metrics stored periodically
+export const metricTypeEnum = pgEnum("metric_type", [
+  "burn_rate", "net_burn", "gross_burn", "runway_months", 
+  "gross_margin", "operating_margin", "cash_flow", 
+  "revenue_growth", "expense_growth", "ltv_cac_ratio",
+  "monthly_recurring_revenue", "annual_recurring_revenue",
+  "customer_acquisition_cost", "average_revenue_per_user"
+]);
+
+export const metricSnapshots = pgTable("metric_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  metricType: metricTypeEnum("metric_type").notNull(),
+  value: numeric("value", { precision: 18, scale: 4 }).notNull(),
+  previousValue: numeric("previous_value", { precision: 18, scale: 4 }),
+  changePercent: numeric("change_percent", { precision: 8, scale: 4 }),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  periodType: varchar("period_type", { length: 20 }).default("monthly"), // daily, weekly, monthly
+  confidence: numeric("confidence", { precision: 3, scale: 2 }), // 0-1 confidence score
+  computedAt: timestamp("computed_at").defaultNow(),
+  metadata: jsonb("metadata"), // Additional context
+}, (table) => [
+  index("idx_metric_snapshots_org_type").on(table.organizationId, table.metricType),
+  index("idx_metric_snapshots_period").on(table.periodStart, table.periodEnd),
+]);
+
+// Organization Feature History - Time-series features for pattern learning
+export const orgFeatureHistory = pgTable("org_feature_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  featureName: varchar("feature_name", { length: 100 }).notNull(), // e.g., "avg_daily_spend", "vendor_count", "recurring_ratio"
+  value: numeric("value", { precision: 18, scale: 4 }).notNull(),
+  trend: varchar("trend", { length: 20 }), // increasing, decreasing, stable, volatile
+  trendStrength: numeric("trend_strength", { precision: 5, scale: 4 }), // -1 to 1
+  rollingMean: numeric("rolling_mean", { precision: 18, scale: 4 }),
+  rollingStdDev: numeric("rolling_std_dev", { precision: 18, scale: 4 }),
+  seasonalIndex: numeric("seasonal_index", { precision: 5, scale: 4 }), // For seasonal patterns
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_org_features_org_name").on(table.organizationId, table.featureName),
+  index("idx_org_features_period").on(table.periodStart),
+]);
+
+// Vendor Behavior Profiles - Vendor-specific patterns for learning
+export const vendorBehaviorProfiles = pgTable("vendor_behavior_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  vendorId: varchar("vendor_id").references(() => vendors.id, { onDelete: "cascade" }),
+  vendorName: varchar("vendor_name", { length: 255 }).notNull(),
+  avgMonthlySpend: numeric("avg_monthly_spend", { precision: 12, scale: 2 }),
+  spendVolatility: numeric("spend_volatility", { precision: 8, scale: 4 }), // Standard deviation as % of mean
+  typicalBillingDay: integer("typical_billing_day"), // Day of month (1-31)
+  billingFrequency: varchar("billing_frequency", { length: 20 }), // monthly, quarterly, annual, irregular
+  isRecurring: boolean("is_recurring").default(false),
+  firstSeen: timestamp("first_seen"),
+  lastSeen: timestamp("last_seen"),
+  transactionCount: integer("transaction_count").default(0),
+  priceIncreaseCount: integer("price_increase_count").default(0), // Track price hikes
+  lastPriceChange: numeric("last_price_change", { precision: 8, scale: 4 }), // % change
+  contractMetadata: jsonb("contract_metadata"), // Contract end date, terms, etc.
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_vendor_profiles_org").on(table.organizationId),
+  index("idx_vendor_profiles_vendor").on(table.vendorId),
+]);
+
+// Anomaly Baselines - Statistical baselines for anomaly detection
+export const anomalyDetectorEnum = pgEnum("anomaly_detector", [
+  "zscore", "iqr", "moving_average", "seasonal_decomposition", 
+  "isolation_forest", "peer_comparison", "rule_based"
+]);
+
+export const anomalyBaselines = pgTable("anomaly_baselines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  metricName: varchar("metric_name", { length: 100 }).notNull(), // What we're tracking
+  detector: anomalyDetectorEnum("detector").notNull(),
+  windowDays: integer("window_days").default(90), // Rolling window for baseline
+  mean: numeric("mean", { precision: 18, scale: 4 }),
+  stdDev: numeric("std_dev", { precision: 18, scale: 4 }),
+  median: numeric("median", { precision: 18, scale: 4 }),
+  q1: numeric("q1", { precision: 18, scale: 4 }), // First quartile
+  q3: numeric("q3", { precision: 18, scale: 4 }), // Third quartile
+  iqr: numeric("iqr", { precision: 18, scale: 4 }), // Interquartile range
+  upperThreshold: numeric("upper_threshold", { precision: 18, scale: 4 }),
+  lowerThreshold: numeric("lower_threshold", { precision: 18, scale: 4 }),
+  sensitivityMultiplier: numeric("sensitivity_multiplier", { precision: 4, scale: 2 }).default("2.0"), // For z-score: 2 = 95%, 3 = 99.7%
+  seasonalAdjustments: jsonb("seasonal_adjustments"), // Monthly/weekly adjustments
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_anomaly_baselines_org_metric").on(table.organizationId, table.metricName),
+]);
+
+// Anomaly Events - Detected anomalies
+export const anomalySeverityEnum = pgEnum("anomaly_severity", ["low", "medium", "high", "critical"]);
+export const anomalyStatusEnum = pgEnum("anomaly_status", ["new", "acknowledged", "resolved", "false_positive"]);
+
+export const anomalyEvents = pgTable("anomaly_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  baselineId: varchar("baseline_id").references(() => anomalyBaselines.id, { onDelete: "set null" }),
+  detector: anomalyDetectorEnum("detector").notNull(),
+  metricName: varchar("metric_name", { length: 100 }).notNull(),
+  observedValue: numeric("observed_value", { precision: 18, scale: 4 }).notNull(),
+  expectedValue: numeric("expected_value", { precision: 18, scale: 4 }),
+  deviationScore: numeric("deviation_score", { precision: 8, scale: 4 }), // Z-score or equivalent
+  severity: anomalySeverityEnum("severity").default("medium"),
+  status: anomalyStatusEnum("status").default("new"),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  contextPayload: jsonb("context_payload"), // Additional data for AI interpretation
+  detectedAt: timestamp("detected_at").defaultNow(),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  acknowledgedBy: varchar("acknowledged_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_anomaly_events_org").on(table.organizationId),
+  index("idx_anomaly_events_severity").on(table.severity),
+  index("idx_anomaly_events_status").on(table.status),
+  index("idx_anomaly_events_detected").on(table.detectedAt),
+]);
+
+// Scenario Runs - Advanced scenario modeling with Monte Carlo simulations
+export const scenarioTypeEnum = pgEnum("scenario_type", [
+  "hiring", "expense", "revenue", "fundraise", "custom", "monte_carlo"
+]);
+
+export const scenarioRuns = pgTable("scenario_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  createdBy: varchar("created_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  scenarioType: scenarioTypeEnum("scenario_type").notNull(),
+  assumptions: jsonb("assumptions").notNull(), // Input parameters
+  results: jsonb("results"), // Computed outputs
+  
+  // Monte Carlo specific fields
+  simulationCount: integer("simulation_count").default(1000),
+  confidenceIntervals: jsonb("confidence_intervals"), // p10, p50, p90 results
+  sensitivityAnalysis: jsonb("sensitivity_analysis"), // Which inputs affect outputs most
+  
+  // Driver-based modeling fields
+  revenueDrivers: jsonb("revenue_drivers"), // Growth rates, churn, etc.
+  expenseDrivers: jsonb("expense_drivers"), // Fixed vs variable costs
+  
+  // Results summary
+  projectedRunway: integer("projected_runway"), // Months
+  projectedBurnRate: numeric("projected_burn_rate", { precision: 12, scale: 2 }),
+  breakEvenDate: timestamp("break_even_date"),
+  probabilityOfSuccess: numeric("probability_of_success", { precision: 5, scale: 4 }), // 0-1
+  
+  isBaseline: boolean("is_baseline").default(false), // Mark as baseline scenario
+  comparedToId: varchar("compared_to_id"), // Compare to another scenario
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_scenario_runs_org").on(table.organizationId),
+  index("idx_scenario_runs_type").on(table.scenarioType),
+  index("idx_scenario_runs_created_by").on(table.createdBy),
+]);
+
+// AI Audit Logs - Full audit trail of AI decisions
+export const aiProviderEnum = pgEnum("ai_provider", ["openai", "groq", "gemini", "ensemble", "algorithm"]);
+export const aiTaskTypeEnum = pgEnum("ai_task_type", [
+  "insight_generation", "anomaly_detection", "categorization", "normalization",
+  "copilot_response", "forecast", "scenario_modeling", "report_generation"
+]);
+
+export const aiAuditLogs = pgTable("ai_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  taskType: aiTaskTypeEnum("task_type").notNull(),
+  provider: aiProviderEnum("provider").notNull(),
+  model: varchar("model", { length: 100 }), // e.g., "gpt-4", "llama-3.1"
+  
+  // Request/Response
+  inputTokens: integer("input_tokens"),
+  outputTokens: integer("output_tokens"),
+  inputSummary: text("input_summary"), // Summarized input (not full prompt for privacy)
+  outputSummary: text("output_summary"), // Summarized output
+  
+  // Ensemble/Multi-model fields
+  modelsUsed: text("models_used").array(), // List of models consulted
+  consensusAchieved: boolean("consensus_achieved"),
+  votingResults: jsonb("voting_results"), // How each model voted
+  
+  // Quality metrics
+  confidence: numeric("confidence", { precision: 5, scale: 4 }), // 0-1
+  latencyMs: integer("latency_ms"),
+  retryCount: integer("retry_count").default(0),
+  success: boolean("success").default(true),
+  errorMessage: text("error_message"),
+  
+  // Validation
+  algorithmValidated: boolean("algorithm_validated"), // Did algorithm check pass?
+  validationDetails: jsonb("validation_details"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_ai_audit_org").on(table.organizationId),
+  index("idx_ai_audit_task").on(table.taskType),
+  index("idx_ai_audit_provider").on(table.provider),
+  index("idx_ai_audit_created").on(table.createdAt),
+]);
+
+// AI Context Notes - Human feedback and corrections for learning
+export const feedbackTypeEnum = pgEnum("feedback_type", [
+  "correction", "approval", "rejection", "enhancement", "note"
+]);
+
+export const aiContextNotes = pgTable("ai_context_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  aiAuditLogId: varchar("ai_audit_log_id").references(() => aiAuditLogs.id, { onDelete: "set null" }),
+  feedbackType: feedbackTypeEnum("feedback_type").notNull(),
+  originalOutput: text("original_output"),
+  correctedOutput: text("corrected_output"),
+  note: text("note"),
+  entityType: varchar("entity_type", { length: 100 }), // transaction, vendor, category, insight
+  entityId: varchar("entity_id", { length: 255 }),
+  isUsedForTraining: boolean("is_used_for_training").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_ai_context_org").on(table.organizationId),
+  index("idx_ai_context_user").on(table.userId),
+  index("idx_ai_context_type").on(table.feedbackType),
+]);
+
+// AI Model Performance - Track model performance over time
+export const aiModelPerformance = pgTable("ai_model_performance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: aiProviderEnum("provider").notNull(),
+  model: varchar("model", { length: 100 }).notNull(),
+  taskType: aiTaskTypeEnum("task_type").notNull(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  totalRequests: integer("total_requests").default(0),
+  successfulRequests: integer("successful_requests").default(0),
+  avgLatencyMs: integer("avg_latency_ms"),
+  avgConfidence: numeric("avg_confidence", { precision: 5, scale: 4 }),
+  errorRate: numeric("error_rate", { precision: 5, scale: 4 }),
+  consensusRate: numeric("consensus_rate", { precision: 5, scale: 4 }), // How often this model agrees with ensemble
+  userApprovalRate: numeric("user_approval_rate", { precision: 5, scale: 4 }), // Based on feedback
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_ai_perf_provider_model").on(table.provider, table.model),
+  index("idx_ai_perf_task").on(table.taskType),
+  index("idx_ai_perf_period").on(table.periodStart),
+]);
+
+// Types for new AI tables
+export type MetricSnapshot = typeof metricSnapshots.$inferSelect;
+export type InsertMetricSnapshot = typeof metricSnapshots.$inferInsert;
+export const insertMetricSnapshotSchema = createInsertSchema(metricSnapshots).omit({ id: true, computedAt: true });
+
+export type OrgFeatureHistory = typeof orgFeatureHistory.$inferSelect;
+export type InsertOrgFeatureHistory = typeof orgFeatureHistory.$inferInsert;
+export const insertOrgFeatureHistorySchema = createInsertSchema(orgFeatureHistory).omit({ id: true, createdAt: true });
+
+export type VendorBehaviorProfile = typeof vendorBehaviorProfiles.$inferSelect;
+export type InsertVendorBehaviorProfile = typeof vendorBehaviorProfiles.$inferInsert;
+export const insertVendorBehaviorProfileSchema = createInsertSchema(vendorBehaviorProfiles).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type AnomalyBaseline = typeof anomalyBaselines.$inferSelect;
+export type InsertAnomalyBaseline = typeof anomalyBaselines.$inferInsert;
+export const insertAnomalyBaselineSchema = createInsertSchema(anomalyBaselines).omit({ id: true, createdAt: true, lastUpdated: true });
+
+export type AnomalyEvent = typeof anomalyEvents.$inferSelect;
+export type InsertAnomalyEvent = typeof anomalyEvents.$inferInsert;
+export const insertAnomalyEventSchema = createInsertSchema(anomalyEvents).omit({ id: true, createdAt: true, detectedAt: true });
+
+export type ScenarioRun = typeof scenarioRuns.$inferSelect;
+export type InsertScenarioRun = typeof scenarioRuns.$inferInsert;
+export const insertScenarioRunSchema = createInsertSchema(scenarioRuns).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type AIAuditLog = typeof aiAuditLogs.$inferSelect;
+export type InsertAIAuditLog = typeof aiAuditLogs.$inferInsert;
+export const insertAIAuditLogSchema = createInsertSchema(aiAuditLogs).omit({ id: true, createdAt: true });
+
+export type AIContextNote = typeof aiContextNotes.$inferSelect;
+export type InsertAIContextNote = typeof aiContextNotes.$inferInsert;
+export const insertAIContextNoteSchema = createInsertSchema(aiContextNotes).omit({ id: true, createdAt: true });
+
+export type AIModelPerformance = typeof aiModelPerformance.$inferSelect;
+export type InsertAIModelPerformance = typeof aiModelPerformance.$inferInsert;
+export const insertAIModelPerformanceSchema = createInsertSchema(aiModelPerformance).omit({ id: true, createdAt: true });
+
 // Drizzle Relations
 export const usersRelations = relations(users, ({ many }) => ({
   organizationMembers: many(organizationMembers),

@@ -49,6 +49,24 @@ import type {
   InsertAuditLog,
   WaitlistEntry,
   InsertWaitlistEntry,
+  MetricSnapshot,
+  InsertMetricSnapshot,
+  OrgFeatureHistory,
+  InsertOrgFeatureHistory,
+  VendorBehaviorProfile,
+  InsertVendorBehaviorProfile,
+  AnomalyBaseline,
+  InsertAnomalyBaseline,
+  AnomalyEvent,
+  InsertAnomalyEvent,
+  ScenarioRun,
+  InsertScenarioRun,
+  AIAuditLog,
+  InsertAIAuditLog,
+  AIContextNote,
+  InsertAIContextNote,
+  AIModelPerformance,
+  InsertAIModelPerformance,
 } from "@shared/schema";
 import {
   users,
@@ -77,6 +95,15 @@ import {
   auditLogs,
   waitlist,
   plaidItems,
+  metricSnapshots,
+  orgFeatureHistory,
+  vendorBehaviorProfiles,
+  anomalyBaselines,
+  anomalyEvents,
+  scenarioRuns,
+  aiAuditLogs,
+  aiContextNotes,
+  aiModelPerformance,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -253,6 +280,45 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   countUserBankAccounts(userId: string): Promise<number>;
   countPlaidItems(userId: string): Promise<number>;
+
+  // AI Enhancement - Metric Snapshots
+  createMetricSnapshot(snapshot: InsertMetricSnapshot): Promise<MetricSnapshot>;
+  getMetricSnapshots(organizationId: string, metricType: string, months?: number): Promise<MetricSnapshot[]>;
+
+  // AI Enhancement - Organization Feature History
+  createOrgFeatureHistory(feature: InsertOrgFeatureHistory): Promise<OrgFeatureHistory>;
+  getOrgFeatureHistory(organizationId: string, featureName?: string): Promise<OrgFeatureHistory[]>;
+
+  // AI Enhancement - Vendor Behavior Profiles
+  upsertVendorBehaviorProfile(profile: InsertVendorBehaviorProfile): Promise<VendorBehaviorProfile>;
+  getVendorBehaviorProfiles(organizationId: string): Promise<VendorBehaviorProfile[]>;
+  getVendorBehaviorProfile(organizationId: string, vendorId: string): Promise<VendorBehaviorProfile | undefined>;
+
+  // AI Enhancement - Anomaly Detection
+  upsertAnomalyBaseline(baseline: InsertAnomalyBaseline): Promise<AnomalyBaseline>;
+  getAnomalyBaselines(organizationId: string): Promise<AnomalyBaseline[]>;
+  createAnomalyEvent(event: InsertAnomalyEvent): Promise<AnomalyEvent>;
+  getAnomalyEvents(organizationId: string, filters?: { status?: string; severity?: string; limit?: number }): Promise<AnomalyEvent[]>;
+  updateAnomalyEvent(id: string, data: Partial<AnomalyEvent>): Promise<AnomalyEvent | undefined>;
+
+  // AI Enhancement - Scenario Runs
+  createScenarioRun(run: InsertScenarioRun): Promise<ScenarioRun>;
+  getScenarioRuns(organizationId: string): Promise<ScenarioRun[]>;
+  getScenarioRun(id: string): Promise<ScenarioRun | undefined>;
+  updateScenarioRun(id: string, data: Partial<InsertScenarioRun>): Promise<ScenarioRun | undefined>;
+  deleteScenarioRun(id: string): Promise<void>;
+
+  // AI Enhancement - AI Audit Logs
+  createAIAuditLog(log: InsertAIAuditLog): Promise<AIAuditLog>;
+  getAIAuditLogs(filters?: { organizationId?: string; taskType?: string; provider?: string; limit?: number }): Promise<AIAuditLog[]>;
+
+  // AI Enhancement - AI Context Notes
+  createAIContextNote(note: InsertAIContextNote): Promise<AIContextNote>;
+  getAIContextNotes(organizationId: string): Promise<AIContextNote[]>;
+
+  // AI Enhancement - Model Performance
+  upsertAIModelPerformance(perf: InsertAIModelPerformance): Promise<AIModelPerformance>;
+  getAIModelPerformance(filters?: { provider?: string; taskType?: string }): Promise<AIModelPerformance[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1165,6 +1231,259 @@ export class DatabaseStorage implements IStorage {
       where: eq(plaidItems.userId, userId),
     });
     return items.length;
+  }
+
+  // AI Enhancement - Metric Snapshots
+  async createMetricSnapshot(snapshot: InsertMetricSnapshot): Promise<MetricSnapshot> {
+    const [created] = await db.insert(metricSnapshots).values(snapshot).returning();
+    return created;
+  }
+
+  async getMetricSnapshots(organizationId: string, metricType: string, months: number = 12): Promise<MetricSnapshot[]> {
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - months);
+    
+    return await db.query.metricSnapshots.findMany({
+      where: and(
+        eq(metricSnapshots.organizationId, organizationId),
+        eq(metricSnapshots.metricType, metricType as any),
+        gte(metricSnapshots.periodStart, cutoff)
+      ),
+      orderBy: [desc(metricSnapshots.periodStart)],
+    });
+  }
+
+  // AI Enhancement - Organization Feature History
+  async createOrgFeatureHistory(feature: InsertOrgFeatureHistory): Promise<OrgFeatureHistory> {
+    const [created] = await db.insert(orgFeatureHistory).values(feature).returning();
+    return created;
+  }
+
+  async getOrgFeatureHistory(organizationId: string, featureName?: string): Promise<OrgFeatureHistory[]> {
+    if (featureName) {
+      return await db.query.orgFeatureHistory.findMany({
+        where: and(
+          eq(orgFeatureHistory.organizationId, organizationId),
+          eq(orgFeatureHistory.featureName, featureName)
+        ),
+        orderBy: [desc(orgFeatureHistory.periodStart)],
+      });
+    }
+    return await db.query.orgFeatureHistory.findMany({
+      where: eq(orgFeatureHistory.organizationId, organizationId),
+      orderBy: [desc(orgFeatureHistory.periodStart)],
+    });
+  }
+
+  // AI Enhancement - Vendor Behavior Profiles
+  async upsertVendorBehaviorProfile(profile: InsertVendorBehaviorProfile): Promise<VendorBehaviorProfile> {
+    if (profile.vendorId) {
+      const existing = await db.query.vendorBehaviorProfiles.findFirst({
+        where: and(
+          eq(vendorBehaviorProfiles.organizationId, profile.organizationId),
+          eq(vendorBehaviorProfiles.vendorId, profile.vendorId)
+        ),
+      });
+
+      if (existing) {
+        const [updated] = await db
+          .update(vendorBehaviorProfiles)
+          .set({ ...profile, updatedAt: new Date() })
+          .where(eq(vendorBehaviorProfiles.id, existing.id))
+          .returning();
+        return updated;
+      }
+    }
+    
+    const [created] = await db.insert(vendorBehaviorProfiles).values(profile).returning();
+    return created;
+  }
+
+  async getVendorBehaviorProfiles(organizationId: string): Promise<VendorBehaviorProfile[]> {
+    return await db.query.vendorBehaviorProfiles.findMany({
+      where: eq(vendorBehaviorProfiles.organizationId, organizationId),
+      orderBy: [desc(vendorBehaviorProfiles.avgMonthlySpend)],
+    });
+  }
+
+  async getVendorBehaviorProfile(organizationId: string, vendorId: string): Promise<VendorBehaviorProfile | undefined> {
+    return await db.query.vendorBehaviorProfiles.findFirst({
+      where: and(
+        eq(vendorBehaviorProfiles.organizationId, organizationId),
+        eq(vendorBehaviorProfiles.vendorId, vendorId)
+      ),
+    });
+  }
+
+  // AI Enhancement - Anomaly Detection
+  async upsertAnomalyBaseline(baseline: InsertAnomalyBaseline): Promise<AnomalyBaseline> {
+    const existing = await db.query.anomalyBaselines.findFirst({
+      where: and(
+        eq(anomalyBaselines.organizationId, baseline.organizationId),
+        eq(anomalyBaselines.metricName, baseline.metricName)
+      ),
+    });
+
+    if (existing) {
+      const [updated] = await db
+        .update(anomalyBaselines)
+        .set({ ...baseline, lastUpdated: new Date() })
+        .where(eq(anomalyBaselines.id, existing.id))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db.insert(anomalyBaselines).values(baseline).returning();
+    return created;
+  }
+
+  async getAnomalyBaselines(organizationId: string): Promise<AnomalyBaseline[]> {
+    return await db.query.anomalyBaselines.findMany({
+      where: eq(anomalyBaselines.organizationId, organizationId),
+    });
+  }
+
+  async createAnomalyEvent(event: InsertAnomalyEvent): Promise<AnomalyEvent> {
+    const [created] = await db.insert(anomalyEvents).values(event).returning();
+    return created;
+  }
+
+  async getAnomalyEvents(organizationId: string, filters?: { status?: string; severity?: string; limit?: number }): Promise<AnomalyEvent[]> {
+    const conditions = [eq(anomalyEvents.organizationId, organizationId)];
+    
+    if (filters?.status) {
+      conditions.push(eq(anomalyEvents.status, filters.status as any));
+    }
+    if (filters?.severity) {
+      conditions.push(eq(anomalyEvents.severity, filters.severity as any));
+    }
+
+    return await db.query.anomalyEvents.findMany({
+      where: and(...conditions),
+      orderBy: [desc(anomalyEvents.detectedAt)],
+      limit: filters?.limit || 100,
+    });
+  }
+
+  async updateAnomalyEvent(id: string, data: Partial<AnomalyEvent>): Promise<AnomalyEvent | undefined> {
+    const [updated] = await db
+      .update(anomalyEvents)
+      .set(data)
+      .where(eq(anomalyEvents.id, id))
+      .returning();
+    return updated;
+  }
+
+  // AI Enhancement - Scenario Runs
+  async createScenarioRun(run: InsertScenarioRun): Promise<ScenarioRun> {
+    const [created] = await db.insert(scenarioRuns).values(run).returning();
+    return created;
+  }
+
+  async getScenarioRuns(organizationId: string): Promise<ScenarioRun[]> {
+    return await db.query.scenarioRuns.findMany({
+      where: eq(scenarioRuns.organizationId, organizationId),
+      orderBy: [desc(scenarioRuns.createdAt)],
+    });
+  }
+
+  async getScenarioRun(id: string): Promise<ScenarioRun | undefined> {
+    return await db.query.scenarioRuns.findFirst({
+      where: eq(scenarioRuns.id, id),
+    });
+  }
+
+  async updateScenarioRun(id: string, data: Partial<InsertScenarioRun>): Promise<ScenarioRun | undefined> {
+    const { organizationId, createdBy, ...updateData } = data as any;
+    const [updated] = await db
+      .update(scenarioRuns)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(scenarioRuns.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteScenarioRun(id: string): Promise<void> {
+    await db.delete(scenarioRuns).where(eq(scenarioRuns.id, id));
+  }
+
+  // AI Enhancement - AI Audit Logs
+  async createAIAuditLog(log: InsertAIAuditLog): Promise<AIAuditLog> {
+    const [created] = await db.insert(aiAuditLogs).values(log).returning();
+    return created;
+  }
+
+  async getAIAuditLogs(filters?: { organizationId?: string; taskType?: string; provider?: string; limit?: number }): Promise<AIAuditLog[]> {
+    const conditions: any[] = [];
+    
+    if (filters?.organizationId) {
+      conditions.push(eq(aiAuditLogs.organizationId, filters.organizationId));
+    }
+    if (filters?.taskType) {
+      conditions.push(eq(aiAuditLogs.taskType, filters.taskType as any));
+    }
+    if (filters?.provider) {
+      conditions.push(eq(aiAuditLogs.provider, filters.provider as any));
+    }
+
+    return await db.query.aiAuditLogs.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      orderBy: [desc(aiAuditLogs.createdAt)],
+      limit: filters?.limit || 100,
+    });
+  }
+
+  // AI Enhancement - AI Context Notes
+  async createAIContextNote(note: InsertAIContextNote): Promise<AIContextNote> {
+    const [created] = await db.insert(aiContextNotes).values(note).returning();
+    return created;
+  }
+
+  async getAIContextNotes(organizationId: string): Promise<AIContextNote[]> {
+    return await db.query.aiContextNotes.findMany({
+      where: eq(aiContextNotes.organizationId, organizationId),
+      orderBy: [desc(aiContextNotes.createdAt)],
+    });
+  }
+
+  // AI Enhancement - Model Performance
+  async upsertAIModelPerformance(perf: InsertAIModelPerformance): Promise<AIModelPerformance> {
+    const existing = await db.query.aiModelPerformance.findFirst({
+      where: and(
+        eq(aiModelPerformance.provider, perf.provider),
+        eq(aiModelPerformance.model, perf.model),
+        eq(aiModelPerformance.taskType, perf.taskType),
+        eq(aiModelPerformance.periodStart, perf.periodStart)
+      ),
+    });
+
+    if (existing) {
+      const [updated] = await db
+        .update(aiModelPerformance)
+        .set(perf)
+        .where(eq(aiModelPerformance.id, existing.id))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db.insert(aiModelPerformance).values(perf).returning();
+    return created;
+  }
+
+  async getAIModelPerformance(filters?: { provider?: string; taskType?: string }): Promise<AIModelPerformance[]> {
+    const conditions: any[] = [];
+    
+    if (filters?.provider) {
+      conditions.push(eq(aiModelPerformance.provider, filters.provider as any));
+    }
+    if (filters?.taskType) {
+      conditions.push(eq(aiModelPerformance.taskType, filters.taskType as any));
+    }
+
+    return await db.query.aiModelPerformance.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      orderBy: [desc(aiModelPerformance.periodStart)],
+    });
   }
 }
 
