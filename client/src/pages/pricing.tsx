@@ -197,12 +197,6 @@ export default function Pricing() {
           </div>
         </div>
       </section>
-
-      <footer className="border-t px-6 py-12">
-        <div className="max-w-7xl mx-auto text-center text-sm text-muted-foreground">
-          <p>&copy; 2025 BlackTop Systems. All rights reserved.</p>
-        </div>
-      </footer>
     </div>
   );
 }
