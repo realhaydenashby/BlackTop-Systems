@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -11,6 +11,7 @@ import * as pdfParse from "pdf-parse";
 import Papa from "papaparse";
 import { subDays, startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { generateMockDashboardStats, generateMockAnalytics, generateMockInsights } from "./mockData";
+import { hasFeatureAccess, type FeatureKey, FEATURE_LABELS, getMinimumTierForFeature, type SubscriptionTier } from "@shared/planFeatures";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -18,6 +19,43 @@ const objectStorageService = new ObjectStorageService();
 function getUserId(user: any): string {
   // Try user.id first (new sessions), fall back to claims.sub (old sessions)
   return user?.id || user?.claims?.sub;
+}
+
+// Feature gating middleware factory
+function requireFeature(feature: FeatureKey): RequestHandler {
+  return async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (!user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      const tier = dbUser.subscriptionTier as SubscriptionTier;
+      
+      if (!hasFeatureAccess(tier, feature)) {
+        const requiredTier = getMinimumTierForFeature(feature);
+        const featureLabel = FEATURE_LABELS[feature];
+        return res.status(403).json({ 
+          message: `${featureLabel} requires a ${requiredTier === "core" ? "Core" : "Growth"} plan or higher.`,
+          feature,
+          requiredTier,
+          currentTier: tier,
+        });
+      }
+      
+      next();
+    } catch (error: any) {
+      console.error("Feature gating error:", error);
+      res.status(500).json({ message: "Failed to verify feature access" });
+    }
+  };
 }
 
 function formatCurrency(amount: number): string {
@@ -1173,8 +1211,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Budgets
-  app.get("/api/budgets", isAuthenticated, async (req, res) => {
+  // Budgets (Core+ only - department budgets)
+  app.get("/api/budgets", isAuthenticated, requireFeature("departmentBudgets"), async (req, res) => {
     try {
       const user = req.user as any;
       const userId = user.claims.sub;
@@ -1213,7 +1251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/budgets/generate", isAuthenticated, async (req, res) => {
+  app.post("/api/budgets/generate", isAuthenticated, requireFeature("departmentBudgets"), async (req, res) => {
     try {
       const user = req.user as any;
       const userId = user.claims.sub;
@@ -2554,8 +2592,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ========== END CONNECTION STATUS ==========
 
-  // Run auto-model pipeline manually
-  app.post("/api/live/auto-model/run", isAuthenticated, async (req, res) => {
+  // Run auto-model pipeline manually (Core+ only - scenario modeling)
+  app.post("/api/live/auto-model/run", isAuthenticated, requireFeature("scenarioModeling"), async (req, res) => {
     try {
       const user = req.user as any;
       const userId = getUserId(user);
@@ -2622,7 +2660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get Live Mode dashboard analytics
+  // Get Live Mode dashboard analytics (tier-filtered response)
   app.get("/api/live/analytics/dashboard", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
@@ -2631,6 +2669,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
       }
+      
+      // Get user tier for response filtering
+      const dbUser = await storage.getUser(userId);
+      const userTier = (dbUser?.subscriptionTier as SubscriptionTier) || null;
+      const hasAnomalyDetection = hasFeatureAccess(userTier, "anomalyDetection");
       
       const orgMember = await storage.getOrganizationMember(userId);
       
@@ -2761,66 +2804,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // Generate insights with anomaly detection
+      // Generate insights (anomaly detection only for Core+ users)
       const insights: Array<{ type: string; message: string; severity: string }> = [];
       
-      // Import anomaly detection functions
-      const { detectVendorSpikes, detectSubscriptionCreep, detectPayrollDrift, detectAmountAnomalies } = await import("./insights/anomalies");
-      
-      // Transform transactions for anomaly detection (need id field)
-      const anomalyTxns = rawTransactions.map((txn: any) => ({
-        id: txn.id,
-        date: new Date(txn.date),
-        amount: parseFloat(txn.amount) || 0,
-        type: parseFloat(txn.amount) >= 0 ? "credit" : "debit" as "credit" | "debit",
-        vendorNormalized: txn.vendorNormalized || txn.vendorOriginal || txn.description,
-        categoryId: txn.categoryId,
-        isRecurring: txn.isRecurring || false,
-        isPayroll: txn.isPayroll || false,
-      }));
-      
-      // Detect vendor spikes
-      const vendorSpikes = detectVendorSpikes({ transactions: anomalyTxns }, 25);
-      for (const spike of vendorSpikes.slice(0, 3)) {
-        insights.push({
-          type: "vendor_spike",
-          message: `${spike.vendor} spend spiked ${spike.changePercent.toFixed(0)}% vs last month ($${spike.previousPeriod.toLocaleString()} → $${spike.currentPeriod.toLocaleString()})`,
-          severity: spike.changePercent > 50 ? "warning" : "info",
-        });
+      // Anomaly detection is Core+ only (requires anomalyDetection feature)
+      if (hasAnomalyDetection) {
+        // Import anomaly detection functions
+        const { detectVendorSpikes, detectSubscriptionCreep, detectPayrollDrift, detectAmountAnomalies } = await import("./insights/anomalies");
+        
+        // Transform transactions for anomaly detection (need id field)
+        const anomalyTxns = rawTransactions.map((txn: any) => ({
+          id: txn.id,
+          date: new Date(txn.date),
+          amount: parseFloat(txn.amount) || 0,
+          type: parseFloat(txn.amount) >= 0 ? "credit" : "debit" as "credit" | "debit",
+          vendorNormalized: txn.vendorNormalized || txn.vendorOriginal || txn.description,
+          categoryId: txn.categoryId,
+          isRecurring: txn.isRecurring || false,
+          isPayroll: txn.isPayroll || false,
+        }));
+        
+        // Detect vendor spikes
+        const vendorSpikes = detectVendorSpikes({ transactions: anomalyTxns }, 25);
+        for (const spike of vendorSpikes.slice(0, 3)) {
+          insights.push({
+            type: "vendor_spike",
+            message: `${spike.vendor} spend spiked ${spike.changePercent.toFixed(0)}% vs last month ($${spike.previousPeriod.toLocaleString()} → $${spike.currentPeriod.toLocaleString()})`,
+            severity: spike.changePercent > 50 ? "warning" : "info",
+          });
+        }
+        
+        // Detect subscription creep
+        const subCreep = detectSubscriptionCreep({ transactions: anomalyTxns });
+        if (subCreep.change > 15 && subCreep.totalRecurring > 1000) {
+          insights.push({
+            type: "subscription_creep",
+            message: `Recurring SaaS spend is up ${subCreep.change.toFixed(0)}% to $${subCreep.totalRecurring.toLocaleString()}/mo. Consider an audit.`,
+            severity: subCreep.change > 30 ? "warning" : "info",
+          });
+        }
+        
+        // Detect payroll drift
+        const payrollDrift = detectPayrollDrift({ transactions: anomalyTxns });
+        if (Math.abs(payrollDrift.drift) > 10 && payrollDrift.currentPayroll > 5000) {
+          const direction = payrollDrift.drift > 0 ? "up" : "down";
+          insights.push({
+            type: "payroll_drift",
+            message: `Payroll is ${direction} ${Math.abs(payrollDrift.drift).toFixed(0)}% vs expected ($${payrollDrift.currentPayroll.toLocaleString()} vs $${payrollDrift.expectedPayroll.toLocaleString()})`,
+            severity: Math.abs(payrollDrift.drift) > 20 ? "warning" : "info",
+          });
+        }
+        
+        // Detect unusual transactions
+        const anomalies = detectAmountAnomalies({ transactions: anomalyTxns }, 2.5);
+        if (anomalies.length > 0) {
+          const top = anomalies[0];
+          insights.push({
+            type: "amount_anomaly",
+            message: `Unusual charge from ${top.vendor}: $${top.amount.toLocaleString()} (normally ~$${top.expectedAmount.toLocaleString()})`,
+            severity: top.deviation > 3 ? "warning" : "info",
+          });
+        }
       }
       
-      // Detect subscription creep
-      const subCreep = detectSubscriptionCreep({ transactions: anomalyTxns });
-      if (subCreep.change > 15 && subCreep.totalRecurring > 1000) {
-        insights.push({
-          type: "subscription_creep",
-          message: `Recurring SaaS spend is up ${subCreep.change.toFixed(0)}% to $${subCreep.totalRecurring.toLocaleString()}/mo. Consider an audit.`,
-          severity: subCreep.change > 30 ? "warning" : "info",
-        });
-      }
-      
-      // Detect payroll drift
-      const payrollDrift = detectPayrollDrift({ transactions: anomalyTxns });
-      if (Math.abs(payrollDrift.drift) > 10 && payrollDrift.currentPayroll > 5000) {
-        const direction = payrollDrift.drift > 0 ? "up" : "down";
-        insights.push({
-          type: "payroll_drift",
-          message: `Payroll is ${direction} ${Math.abs(payrollDrift.drift).toFixed(0)}% vs expected ($${payrollDrift.currentPayroll.toLocaleString()} vs $${payrollDrift.expectedPayroll.toLocaleString()})`,
-          severity: Math.abs(payrollDrift.drift) > 20 ? "warning" : "info",
-        });
-      }
-      
-      // Detect unusual transactions
-      const anomalies = detectAmountAnomalies({ transactions: anomalyTxns }, 2.5);
-      if (anomalies.length > 0) {
-        const top = anomalies[0];
-        insights.push({
-          type: "amount_anomaly",
-          message: `Unusual charge from ${top.vendor}: $${top.amount.toLocaleString()} (normally ~$${top.expectedAmount.toLocaleString()})`,
-          severity: top.deviation > 3 ? "warning" : "info",
-        });
-      }
-      
+      // Basic insights for all users (Lite tier)
       // Runway warnings
       if (runwayMetrics.runwayMonths < 6 && runwayMetrics.runwayMonths !== Infinity) {
         insights.push({
@@ -2909,7 +2956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   /**
    * Get hiring/headcount data for the Hiring page
    */
-  app.get("/api/live/hiring", isAuthenticated, async (req, res) => {
+  app.get("/api/live/hiring", isAuthenticated, requireFeature("hiringPlanning"), async (req, res) => {
     try {
       const user = req.user as any;
       const userId = getUserId(user);
@@ -2990,10 +3037,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
   
   /**
-   * Get complete company state for AI copilot
+   * Get complete company state for AI copilot (Core+ only)
    * Aggregates all financial data into the AI-ready JSON schema
    */
-  app.get("/api/live/company-state", isAuthenticated, async (req, res) => {
+  app.get("/api/live/company-state", isAuthenticated, requireFeature("aiCopilot"), async (req, res) => {
     try {
       const user = req.user as any;
       const userId = getUserId(user);
@@ -3252,8 +3299,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Auto-infer budget baselines from 3-month transaction history
-  app.get("/api/live/budget-baselines", isAuthenticated, async (req, res) => {
+  // Get user plan/subscription info
+  app.get("/api/user/plan", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({
+        subscriptionTier: dbUser.subscriptionTier || null,
+        isAdmin: dbUser.isAdmin || false,
+        stripeCustomerId: dbUser.stripeCustomerId,
+        stripeSubscriptionId: dbUser.stripeSubscriptionId,
+      });
+    } catch (error: any) {
+      console.error("Get user plan error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch user plan" });
+    }
+  });
+
+  // Update user subscription tier (called after Stripe checkout or by admin)
+  app.post("/api/user/subscription", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const { tier, stripeCustomerId, stripeSubscriptionId } = req.body;
+      
+      if (tier && !["lite", "core", "growth"].includes(tier)) {
+        return res.status(400).json({ message: "Invalid subscription tier" });
+      }
+      
+      const updateData: any = {};
+      if (tier) updateData.subscriptionTier = tier;
+      if (stripeCustomerId) updateData.stripeCustomerId = stripeCustomerId;
+      if (stripeSubscriptionId) updateData.stripeSubscriptionId = stripeSubscriptionId;
+      updateData.hasSelectedPlan = true;
+      
+      const updated = await storage.updateUser(userId, updateData);
+      res.json({ success: true, user: updated });
+    } catch (error: any) {
+      console.error("Update subscription error:", error);
+      res.status(500).json({ message: error.message || "Failed to update subscription" });
+    }
+  });
+
+  // Auto-infer budget baselines from 3-month transaction history (Core+ only)
+  app.get("/api/live/budget-baselines", isAuthenticated, requireFeature("departmentBudgets"), async (req, res) => {
     try {
       const user = req.user as User;
       
@@ -3368,7 +3463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // What Changed This Week - weekly summary of financial changes
-  app.get("/api/live/weekly-changes", isAuthenticated, async (req, res) => {
+  app.get("/api/live/weekly-changes", isAuthenticated, requireFeature("departmentBudgets"), async (req, res) => {
     try {
       const user = req.user as User;
       
@@ -3567,7 +3662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })).optional(),
   });
 
-  app.post("/api/live/copilot/chat", isAuthenticated, async (req, res) => {
+  app.post("/api/live/copilot/chat", isAuthenticated, requireFeature("aiCopilot"), async (req, res) => {
     try {
       const user = req.user as User;
       
@@ -4242,8 +4337,8 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
 
   // ========== Shareable Reports ==========
 
-  // Create a new shareable report
-  app.post("/api/live/reports", isAuthenticated, async (req, res) => {
+  // Create a new shareable report (Core+ only)
+  app.post("/api/live/reports", isAuthenticated, requireFeature("shareableReports"), async (req, res) => {
     try {
       const user = req.user as User;
       const { title, expiresAt } = req.body;
@@ -4277,8 +4372,8 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
-  // List shareable reports
-  app.get("/api/live/reports", isAuthenticated, async (req, res) => {
+  // List shareable reports (Core+ only)
+  app.get("/api/live/reports", isAuthenticated, requireFeature("shareableReports"), async (req, res) => {
     try {
       const user = req.user as User;
 
@@ -4302,8 +4397,8 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
-  // Delete a shareable report
-  app.delete("/api/live/reports/:id", isAuthenticated, async (req, res) => {
+  // Delete a shareable report (Core+ only)
+  app.delete("/api/live/reports/:id", isAuthenticated, requireFeature("shareableReports"), async (req, res) => {
     try {
       const user = req.user as User;
       const { id } = req.params;

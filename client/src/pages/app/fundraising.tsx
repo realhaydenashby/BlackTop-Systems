@@ -8,6 +8,8 @@ import { CHART_COLORS, chartStyles, lineStyles, barStyles, areaStyles } from "@/
 import { TrendingDown, TrendingUp, DollarSign, Timer, Building2, Users, UserPlus, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
+import { FeatureGate } from "@/components/UpgradePrompt";
 
 interface LiveAnalytics {
   hasData: boolean;
@@ -109,6 +111,9 @@ export default function LiveFundraising() {
   const [, params] = useRoute("/app/fundraising/:section");
   const [, setLocation] = useLocation();
   const section = params?.section || "burn";
+  const { canAccess } = usePlanAccess();
+  const hasRaiseAccess = canAccess("raisePlanning");
+  const hasHiringAccess = canAccess("hiringPlanning");
 
   const { data: analytics, isLoading, error } = useQuery<LiveAnalytics>({
     queryKey: ["/api/live/analytics/dashboard"],
@@ -193,12 +198,31 @@ export default function LiveFundraising() {
         <p className="text-muted-foreground">Financial planning for fundraising preparation</p>
       </div>
 
-      <Tabs value={section} onValueChange={handleTabChange}>
+      <Tabs value={section} onValueChange={(value) => {
+          if ((value === "raise" && !hasRaiseAccess) || (value === "hiring" && !hasHiringAccess)) {
+            return;
+          }
+          handleTabChange(value);
+        }}>
         <TabsList>
           <TabsTrigger value="burn" data-testid="tab-burn">Burn</TabsTrigger>
           <TabsTrigger value="runway" data-testid="tab-runway">Runway</TabsTrigger>
-          <TabsTrigger value="raise" data-testid="tab-raise">Raise</TabsTrigger>
-          <TabsTrigger value="hiring" data-testid="tab-hiring">Hiring</TabsTrigger>
+          <TabsTrigger 
+            value="raise" 
+            data-testid="tab-raise"
+            disabled={!hasRaiseAccess}
+            className={!hasRaiseAccess ? "opacity-50" : ""}
+          >
+            Raise {!hasRaiseAccess && <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">Core</Badge>}
+          </TabsTrigger>
+          <TabsTrigger 
+            value="hiring" 
+            data-testid="tab-hiring"
+            disabled={!hasHiringAccess}
+            className={!hasHiringAccess ? "opacity-50" : ""}
+          >
+            Hiring {!hasHiringAccess && <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">Core</Badge>}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -433,7 +457,7 @@ export default function LiveFundraising() {
       )}
 
       {section === "raise" && (
-        <>
+        <FeatureGate feature="raisePlanning" hasAccess={hasRaiseAccess}>
           <Card>
             <CardHeader>
               <CardTitle>Recommended Raise Amount</CardTitle>
@@ -544,7 +568,7 @@ export default function LiveFundraising() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </>
+        </FeatureGate>
       )}
 
       {section === "cash" && (
@@ -642,7 +666,7 @@ export default function LiveFundraising() {
       )}
 
       {section === "hiring" && (
-        <>
+        <FeatureGate feature="hiringPlanning" hasAccess={hasHiringAccess}>
           {hiringData?.hasData ? (
             <>
               {/* Summary Metrics */}
@@ -840,7 +864,7 @@ export default function LiveFundraising() {
               </CardContent>
             </Card>
           )}
-        </>
+        </FeatureGate>
       )}
     </div>
   );

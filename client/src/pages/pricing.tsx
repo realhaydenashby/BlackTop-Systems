@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Check, X } from "lucide-react";
+import { Check, X, Users, Zap, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const mainPlans = [
@@ -8,76 +8,73 @@ const mainPlans = [
     name: "Blacktop Lite",
     price: "$99",
     period: "month",
-    tagline: "Get the basics right. Know your burn, see your runway.",
-    label: "Perfect for pre-revenue founders",
+    tagline: "See your money clearly. Know your burn and runway at a glance.",
+    seats: "1 seat",
+    icon: Zap,
     features: [
-      "Bank + QuickBooks + Stripe sync",
-      "Auto-transaction categorization",
-      "Basic burn rate tracking",
-      "Basic runway calculation",
+      "Connect bank, QuickBooks & Stripe",
+      "Auto-categorized transactions",
+      "Dashboard with burn & runway",
+      "Spend trends & revenue charts",
+      "AI-generated insights (3-5 per sync)",
       "Subscription detection",
-      "One scenario: \"When do I run out?\"",
-      "One-page founder snapshot",
-      "3 AI action items per month",
       "Email support",
     ],
     omitted: [
-      "Hiring planning",
-      "Raise planning",
+      "AI Copilot chat",
       "Scenario modeling",
+      "Hiring & raise planning",
       "Board packets",
-      "Multi-user access",
+      "Team access",
     ],
     cta: "Start Free Trial",
-    tier: "blacktop-lite",
+    tier: "lite",
   },
   {
     name: "Blacktop Core",
     price: "$199",
     period: "month",
-    tagline: "Everything you need to raise money and run your finances like a pro.",
-    label: "",
+    tagline: "Plan, model, and show up prepared for investors. Your financial copilot.",
+    seats: "2-3 seats",
+    icon: Users,
     features: [
       "Everything in Lite, plus:",
-      "Full financial forecasting",
-      "Hiring plan modeling",
+      "AI Copilot chat interface",
+      "Scenario modeling workbook",
+      "Hiring planning with runway impact",
       "Raise planning & recommendations",
-      "Multi-scenario engine",
+      "Investor-ready board packets",
+      "Shareable financial reports",
+      "Anomaly detection & alerts",
       "Department budgets",
-      "Investor-ready board packet",
-      "Unlimited AI insights",
-      "Deep anomaly detection",
-      "\"What changed and why\" analysis",
-      "Monthly founder health report",
-      "3-5 team seats",
       "Priority support",
     ],
     omitted: [],
     cta: "Start Free Trial",
-    tier: "blacktop-core",
+    tier: "core",
     popular: true,
   },
   {
     name: "Blacktop Growth",
-    price: "$399",
-    period: "month",
-    tagline: "For scaling teams that need custom insights and automation.",
-    label: "",
+    price: null,
+    period: null,
+    tagline: "Scale your finance ops with unlimited access and dedicated support.",
+    seats: "Unlimited seats",
+    icon: Building2,
     features: [
       "Everything in Core, plus:",
-      "10 team seats",
-      "Custom KPIs & metrics",
-      "Custom dashboards",
+      "Unlimited team members",
+      "Custom KPIs & dashboards",
       "Multi-entity consolidation",
       "Automated monthly board packets",
       "API access",
       "Priority Slack support",
-      "AI-drafted investor update narratives",
+      "AI-drafted investor updates",
       "Dedicated onboarding session",
     ],
     omitted: [],
-    cta: "Talk to Sales",
-    tier: "blacktop-growth",
+    cta: "Contact Sales",
+    tier: "growth",
   },
 ];
 
@@ -91,8 +88,7 @@ export default function Pricing() {
               Simple, Transparent Pricing
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Know your burn and runway. See where money is going. Show up prepared for investors.
-              No CFO required.
+              From visibility to full financial command. Choose the plan that fits your stage.
             </p>
           </div>
 
@@ -113,23 +109,33 @@ export default function Pricing() {
                   </div>
                 )}
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-2xl" data-testid={`text-plan-name-${plan.tier}`}>
-                    {plan.name}
-                  </CardTitle>
+                  <div className="flex items-center gap-2 mb-2">
+                    <plan.icon className="w-5 h-5 text-primary" />
+                    <CardTitle className="text-2xl" data-testid={`text-plan-name-${plan.tier}`}>
+                      {plan.name}
+                    </CardTitle>
+                  </div>
                   <div className="mt-4 mb-2">
-                    <span className="text-4xl font-bold" data-testid={`text-price-${plan.tier}`}>
-                      {plan.price}
-                    </span>
-                    <span className="text-muted-foreground text-lg">/{plan.period}</span>
+                    {plan.price ? (
+                      <>
+                        <span className="text-4xl font-bold" data-testid={`text-price-${plan.tier}`}>
+                          {plan.price}
+                        </span>
+                        <span className="text-muted-foreground text-lg">/{plan.period}</span>
+                      </>
+                    ) : (
+                      <span className="text-3xl font-bold text-primary" data-testid={`text-price-${plan.tier}`}>
+                        Contact Sales
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+                    <Users className="w-4 h-4" />
+                    <span>{plan.seats}</span>
                   </div>
                   <CardDescription className="text-base" data-testid={`text-tagline-${plan.tier}`}>
                     {plan.tagline}
                   </CardDescription>
-                  {plan.label && (
-                    <p className="text-xs text-muted-foreground mt-2" data-testid={`text-label-${plan.tier}`}>
-                      {plan.label}
-                    </p>
-                  )}
                 </CardHeader>
                 <CardContent className="flex-1 pb-6">
                   <ul className="space-y-3">
@@ -155,15 +161,27 @@ export default function Pricing() {
                   )}
                 </CardContent>
                 <CardFooter>
-                  <a href="/api/login" className="w-full">
-                    <Button
-                      className="w-full"
-                      variant={plan.popular ? "default" : "outline"}
-                      data-testid={`button-cta-${plan.tier}`}
-                    >
-                      {plan.cta}
-                    </Button>
-                  </a>
+                  {plan.tier === "growth" ? (
+                    <a href="mailto:sales@blacktop.systems" className="w-full">
+                      <Button
+                        className="w-full"
+                        variant="outline"
+                        data-testid={`button-cta-${plan.tier}`}
+                      >
+                        {plan.cta}
+                      </Button>
+                    </a>
+                  ) : (
+                    <a href="/api/login" className="w-full">
+                      <Button
+                        className="w-full"
+                        variant={plan.popular ? "default" : "outline"}
+                        data-testid={`button-cta-${plan.tier}`}
+                      >
+                        {plan.cta}
+                      </Button>
+                    </a>
+                  )}
                 </CardFooter>
               </Card>
             ))}
@@ -195,7 +213,10 @@ export default function Pricing() {
               </thead>
               <tbody className="divide-y">
                 <tr>
-                  <td className="py-3 px-4">Bank/QuickBooks/Stripe sync</td>
+                  <td className="py-3 px-4 font-medium" colSpan={4}>Data Connections</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Bank / QuickBooks / Stripe sync</td>
                   <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
                   <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
                   <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
@@ -207,22 +228,40 @@ export default function Pricing() {
                   <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
                 </tr>
                 <tr>
-                  <td className="py-3 px-4">Burn & Runway</td>
-                  <td className="text-center py-3 px-4 text-muted-foreground">Basic</td>
-                  <td className="text-center py-3 px-4 bg-primary/5">Full</td>
-                  <td className="text-center py-3 px-4">Full</td>
+                  <td className="py-3 px-4 font-medium" colSpan={4}>Dashboard & Insights</td>
                 </tr>
                 <tr>
-                  <td className="py-3 px-4">Scenarios</td>
-                  <td className="text-center py-3 px-4 text-muted-foreground">1</td>
-                  <td className="text-center py-3 px-4 bg-primary/5">Unlimited</td>
-                  <td className="text-center py-3 px-4">Unlimited</td>
+                  <td className="py-3 px-4">Burn & Runway Dashboard</td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Spend & Revenue Charts</td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
                 </tr>
                 <tr>
                   <td className="py-3 px-4">AI Insights</td>
-                  <td className="text-center py-3 px-4 text-muted-foreground">3/month</td>
+                  <td className="text-center py-3 px-4 text-muted-foreground">3-5 per sync</td>
                   <td className="text-center py-3 px-4 bg-primary/5">Unlimited</td>
                   <td className="text-center py-3 px-4">Unlimited</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4 font-medium" colSpan={4}>AI & Planning</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">AI Copilot Chat</td>
+                  <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Scenario Modeling</td>
+                  <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
                 </tr>
                 <tr>
                   <td className="py-3 px-4">Hiring Planning</td>
@@ -237,19 +276,43 @@ export default function Pricing() {
                   <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
                 </tr>
                 <tr>
-                  <td className="py-3 px-4">Board Packets</td>
+                  <td className="py-3 px-4">Anomaly Detection & Alerts</td>
+                  <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4 font-medium" colSpan={4}>Reporting & Collaboration</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Investor Board Packets</td>
                   <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
                   <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
                   <td className="text-center py-3 px-4">Automated</td>
                 </tr>
                 <tr>
-                  <td className="py-3 px-4">Team Seats</td>
-                  <td className="text-center py-3 px-4 text-muted-foreground">1</td>
-                  <td className="text-center py-3 px-4 bg-primary/5">3-5</td>
-                  <td className="text-center py-3 px-4">10</td>
+                  <td className="py-3 px-4">Shareable Reports</td>
+                  <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
                 </tr>
                 <tr>
-                  <td className="py-3 px-4">Custom Dashboards</td>
+                  <td className="py-3 px-4">Team Seats</td>
+                  <td className="text-center py-3 px-4 text-muted-foreground">1</td>
+                  <td className="text-center py-3 px-4 bg-primary/5">2-3</td>
+                  <td className="text-center py-3 px-4">Unlimited</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4 font-medium" colSpan={4}>Growth Features</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Custom KPIs & Dashboards</td>
+                  <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Multi-Entity Consolidation</td>
                   <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
                   <td className="text-center py-3 px-4 bg-primary/5"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
                   <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
@@ -261,10 +324,25 @@ export default function Pricing() {
                   <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
                 </tr>
                 <tr>
-                  <td className="py-3 px-4">Support</td>
+                  <td className="py-3 px-4">AI Investor Update Drafts</td>
+                  <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4 font-medium" colSpan={4}>Support</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Support Level</td>
                   <td className="text-center py-3 px-4 text-muted-foreground">Email</td>
                   <td className="text-center py-3 px-4 bg-primary/5">Priority</td>
                   <td className="text-center py-3 px-4">Priority Slack</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4">Dedicated Onboarding</td>
+                  <td className="text-center py-3 px-4"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4 bg-primary/5"><X className="w-5 h-5 text-muted-foreground/50 mx-auto" /></td>
+                  <td className="text-center py-3 px-4"><Check className="w-5 h-5 text-primary mx-auto" /></td>
                 </tr>
               </tbody>
             </table>

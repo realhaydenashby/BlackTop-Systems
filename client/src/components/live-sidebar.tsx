@@ -28,11 +28,14 @@ import {
   Rocket,
   Shield,
   Users,
+  Lock,
+  Crown,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
 import { useQuery } from "@tanstack/react-query";
 
 const mainMenuItems = [
@@ -97,6 +100,7 @@ export function LiveSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
   const { hasActiveConnection } = useConnectionStatus();
+  const { canAccess, tier } = usePlanAccess();
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [fundraisingOpen, setFundraisingOpen] = useState(false);
 
@@ -107,6 +111,10 @@ export function LiveSidebar() {
   });
 
   const isAdmin = approvalStatus?.isAdmin || false;
+  
+  const canAccessCopilot = canAccess("aiCopilot");
+  const canAccessForecasting = canAccess("scenarioModeling");
+  const canAccessFundraising = canAccess("hiringPlanning");
 
   const userInitials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`
@@ -137,20 +145,34 @@ export function LiveSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    <Link href={item.url}>
-                      <item.icon className="w-4 h-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {mainMenuItems.map((item) => {
+                const isCopilot = item.title === "Copilot";
+                const isLocked = isCopilot && !canAccessCopilot;
+                
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild={!isLocked}
+                      isActive={isActive(item.url)}
+                      data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                      className={isLocked ? "opacity-60 cursor-not-allowed" : ""}
+                    >
+                      {isLocked ? (
+                        <div className="flex items-center gap-2 w-full">
+                          <item.icon className="w-4 h-4" />
+                          <span>{item.title}</span>
+                          <Lock className="w-3 h-3 ml-auto text-muted-foreground" />
+                        </div>
+                      ) : (
+                        <Link href={item.url}>
+                          <item.icon className="w-4 h-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      )}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -191,32 +213,41 @@ export function LiveSidebar() {
                   </SidebarMenuItem>
                 </Collapsible>
 
-                <Collapsible open={fundraisingOpen} onOpenChange={setFundraisingOpen}>
+                <Collapsible open={fundraisingOpen} onOpenChange={canAccessFundraising ? setFundraisingOpen : undefined}>
                   <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton data-testid="nav-fundraising-prep">
+                    <CollapsibleTrigger asChild disabled={!canAccessFundraising}>
+                      <SidebarMenuButton 
+                        data-testid="nav-fundraising-prep"
+                        className={!canAccessFundraising ? "opacity-60" : ""}
+                      >
                         <Rocket className="w-4 h-4" />
                         <span>Fundraising Prep</span>
-                        <ChevronRight className={`ml-auto w-4 h-4 transition-transform ${fundraisingOpen ? 'rotate-90' : ''}`} />
+                        {canAccessFundraising ? (
+                          <ChevronRight className={`ml-auto w-4 h-4 transition-transform ${fundraisingOpen ? 'rotate-90' : ''}`} />
+                        ) : (
+                          <Badge variant="outline" className="ml-auto text-[10px] px-1.5 py-0">Core</Badge>
+                        )}
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {fundraisingItems.map((item) => (
-                          <SidebarMenuSubItem key={item.title}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={location === item.url}
-                              data-testid={`nav-fundraising-${item.title.toLowerCase()}`}
-                            >
-                              <Link href={item.url}>
-                                <span>{item.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
+                    {canAccessFundraising && (
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {fundraisingItems.map((item) => (
+                            <SidebarMenuSubItem key={item.title}>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={location === item.url}
+                                data-testid={`nav-fundraising-${item.title.toLowerCase()}`}
+                              >
+                                <Link href={item.url}>
+                                  <span>{item.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    )}
                   </SidebarMenuItem>
                 </Collapsible>
               </SidebarMenu>
@@ -225,22 +256,32 @@ export function LiveSidebar() {
         )}
 
         <SidebarGroup>
-          <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground">
+          <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
             Forecasting
+            {!canAccessForecasting && <Lock className="w-3 h-3 text-muted-foreground" />}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {forecastingItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
-                    asChild
+                    asChild={canAccessForecasting}
                     isActive={isActive(item.url)}
                     data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    className={!canAccessForecasting ? "opacity-60 cursor-not-allowed" : ""}
                   >
-                    <Link href={item.url}>
-                      <item.icon className="w-4 h-4" />
-                      <span>{item.title}</span>
-                    </Link>
+                    {canAccessForecasting ? (
+                      <Link href={item.url}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    ) : (
+                      <div className="flex items-center gap-2 w-full">
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.title}</span>
+                        <Badge variant="outline" className="ml-auto text-[10px] px-1.5 py-0">Core</Badge>
+                      </div>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -330,6 +371,15 @@ export function LiveSidebar() {
                     ? `${user.firstName} ${user.lastName}`
                     : user?.email}
                 </p>
+                {tier && (
+                  <Badge 
+                    variant={tier === "core" ? "default" : tier === "growth" ? "default" : "secondary"} 
+                    className="text-[10px] px-1.5 py-0 mt-0.5"
+                    data-testid="badge-user-tier"
+                  >
+                    {tier === "lite" ? "Lite" : tier === "core" ? "Core" : "Growth"}
+                  </Badge>
+                )}
               </div>
             </div>
           </SidebarMenuItem>

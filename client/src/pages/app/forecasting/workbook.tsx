@@ -29,6 +29,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ScenarioComparison } from "@/components/scenario-comparison";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
+import { FeatureGate } from "@/components/UpgradePrompt";
 
 interface CompanyState {
   company_name: string;
@@ -238,6 +240,9 @@ function EditableCell({
 }
 
 export default function Workbook() {
+  const { canAccess } = usePlanAccess();
+  const hasWorkbookAccess = canAccess("scenarioModeling");
+  
   const { data: companyState, isLoading } = useQuery<CompanyState>({
     queryKey: ["/api/live/company-state"],
   });
@@ -304,6 +309,7 @@ export default function Workbook() {
   const averageRunway = projectedRows[0]?.runway;
 
   return (
+    <FeatureGate feature="scenarioModeling" hasAccess={hasWorkbookAccess}>
     <div className="p-6 space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -568,5 +574,6 @@ export default function Workbook() {
         </CardContent>
       </Card>
     </div>
+    </FeatureGate>
   );
 }

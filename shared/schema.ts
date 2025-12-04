@@ -26,6 +26,9 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// Subscription tier enum - defined before users table since it's used there
+export const subscriptionTierEnumPg = pgEnum("subscription_tier", ["lite", "core", "growth"]);
+
 // User storage table (required for Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -40,6 +43,9 @@ export const users = pgTable("users", {
   hasSelectedPlan: boolean("has_selected_plan").default(false), // Track if user selected a subscription plan
   hasCompanyInfo: boolean("has_company_info").default(false), // Track if user entered company info
   hasConnectedBank: boolean("has_connected_bank").default(false), // Track if user connected a bank account
+  subscriptionTier: varchar("subscription_tier", { length: 20 }), // lite, core, growth - null means no subscription
+  stripeCustomerId: varchar("stripe_customer_id"), // Stripe customer ID
+  stripeSubscriptionId: varchar("stripe_subscription_id"), // Stripe subscription ID
   companyName: varchar("company_name", { length: 255 }),
   companyIndustry: varchar("company_industry", { length: 100 }),
   companyStage: varchar("company_stage", { length: 50 }), // seed, series-a, series-b, growth, profitable

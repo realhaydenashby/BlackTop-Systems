@@ -13,6 +13,8 @@ import {
   ArrowUp
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
+import { FeatureGate } from "@/components/UpgradePrompt";
 import { apiRequest } from "@/lib/queryClient";
 
 interface Message {
@@ -31,10 +33,13 @@ const SUGGESTED_PROMPTS = [
 
 export default function Copilot() {
   const { user } = useAuth();
+  const { canAccess, isLoading: planLoading } = usePlanAccess();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  
+  const hasCopilotAccess = canAccess("aiCopilot");
 
   const chatMutation = useMutation({
     mutationFn: async (userMessage: string) => {
@@ -100,6 +105,7 @@ export default function Copilot() {
   const showWelcome = messages.length === 0;
 
   return (
+    <FeatureGate feature="aiCopilot" hasAccess={hasCopilotAccess}>
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       <ScrollArea className="flex-1" ref={scrollRef}>
         <div className="max-w-2xl mx-auto px-4 py-8">
@@ -213,5 +219,6 @@ export default function Copilot() {
         </div>
       </div>
     </div>
+    </FeatureGate>
   );
 }

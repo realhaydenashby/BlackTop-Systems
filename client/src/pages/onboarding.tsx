@@ -136,8 +136,30 @@ export default function Onboarding() {
     },
   });
 
-  const handleSelectPlan = () => {
-    setLocation("/pricing?onboarding=true");
+  const selectPlanMutation = useMutation({
+    mutationFn: async (tier: string) => {
+      return await apiRequest("POST", "/api/user/subscription", { tier });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/plan"] });
+      toast({
+        title: "Plan selected",
+        description: "Now let's set up your company info.",
+      });
+      setCurrentStep("company");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSelectPlan = (tier: string) => {
+    selectPlanMutation.mutate(tier);
   };
 
   const handleConnectBank = () => {
@@ -271,7 +293,8 @@ export default function Onboarding() {
               <div className="grid gap-4">
                 <div 
                   className="flex items-center justify-between p-4 rounded-lg border-2 border-primary/20 hover-elevate cursor-pointer"
-                  onClick={handleSelectPlan}
+                  onClick={() => handleSelectPlan("lite")}
+                  data-testid="card-plan-lite-onboarding"
                 >
                   <div>
                     <div className="flex items-center gap-2">
@@ -279,24 +302,27 @@ export default function Onboarding() {
                       <Badge variant="secondary">$99/mo</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Basic burn and runway tracking
+                      Dashboard, charts, AI insights — see your money clearly
                     </p>
                   </div>
                   <ArrowRight className="h-5 w-5 text-muted-foreground" />
                 </div>
                 
                 <div 
-                  className="flex items-center justify-between p-4 rounded-lg border-2 border-primary hover-elevate cursor-pointer"
-                  onClick={handleSelectPlan}
+                  className="flex items-center justify-between p-4 rounded-lg border-2 border-primary hover-elevate cursor-pointer relative"
+                  onClick={() => handleSelectPlan("core")}
+                  data-testid="card-plan-core-onboarding"
                 >
+                  <Badge className="absolute -top-3 left-4 bg-primary text-primary-foreground">
+                    Recommended
+                  </Badge>
                   <div>
                     <div className="flex items-center gap-2">
                       <h4 className="font-semibold">Blacktop Core</h4>
-                      <Badge>Most Popular</Badge>
                       <Badge variant="secondary">$199/mo</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Full forecasting, raise planning, board packets
+                      AI Copilot, scenario modeling, raise planning, board packets
                     </p>
                   </div>
                   <ArrowRight className="h-5 w-5 text-muted-foreground" />
@@ -304,15 +330,16 @@ export default function Onboarding() {
 
                 <div 
                   className="flex items-center justify-between p-4 rounded-lg border-2 border-primary/20 hover-elevate cursor-pointer"
-                  onClick={handleSelectPlan}
+                  onClick={() => window.location.href = "mailto:sales@blacktop.systems?subject=Blacktop Growth Inquiry"}
+                  data-testid="card-plan-growth-onboarding"
                 >
                   <div>
                     <div className="flex items-center gap-2">
                       <h4 className="font-semibold">Blacktop Growth</h4>
-                      <Badge variant="secondary">$399/mo</Badge>
+                      <Badge variant="outline">Contact Sales</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Custom metrics, API access, dedicated support
+                      Unlimited seats, custom KPIs, API access, dedicated support
                     </p>
                   </div>
                   <ArrowRight className="h-5 w-5 text-muted-foreground" />
@@ -320,25 +347,12 @@ export default function Onboarding() {
               </div>
 
               <Button
-                size="lg"
-                className="w-full"
-                onClick={handleSelectPlan}
-                data-testid="button-view-pricing"
-              >
-                View Full Pricing
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-
-              <Button
                 variant="ghost"
                 className="w-full"
-                onClick={() => {
-                  updateOnboardingMutation.mutate({ hasSelectedPlan: true });
-                  setCurrentStep("company");
-                }}
-                data-testid="button-skip-plan"
+                onClick={() => handleSelectPlan("lite")}
+                data-testid="button-start-trial"
               >
-                Skip for now (start free trial)
+                Start with Lite (14-day free trial)
               </Button>
             </CardContent>
           </Card>
