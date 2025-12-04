@@ -523,6 +523,47 @@ export type ShareableReport = typeof shareableReports.$inferSelect;
 export type InsertShareableReport = typeof shareableReports.$inferInsert;
 export const insertShareableReportSchema = createInsertSchema(shareableReports).omit({ id: true, createdAt: true, viewCount: true });
 
+// Saved Investor Updates - Persist generated/edited investor updates for Growth tier
+export const savedInvestorUpdates = pgTable("saved_investor_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  createdBy: varchar("created_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+  period: varchar("period", { length: 50 }).notNull(),
+  updateData: jsonb("update_data").notNull(),
+  isDraft: boolean("is_draft").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_saved_investor_updates_org").on(table.organizationId),
+  index("idx_saved_investor_updates_created_by").on(table.createdBy),
+  index("idx_saved_investor_updates_period").on(table.period),
+]);
+
+export type SavedInvestorUpdate = typeof savedInvestorUpdates.$inferSelect;
+export type InsertSavedInvestorUpdate = typeof savedInvestorUpdates.$inferInsert;
+export const insertSavedInvestorUpdateSchema = createInsertSchema(savedInvestorUpdates).omit({ id: true, createdAt: true, updatedAt: true });
+
+// Saved Board Packets - Persist generated board packets for Growth tier
+export const savedBoardPackets = pgTable("saved_board_packets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  createdBy: varchar("created_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+  period: varchar("period", { length: 50 }).notNull(),
+  boardMeetingDate: varchar("board_meeting_date", { length: 50 }),
+  packetData: jsonb("packet_data").notNull(),
+  isDraft: boolean("is_draft").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_saved_board_packets_org").on(table.organizationId),
+  index("idx_saved_board_packets_created_by").on(table.createdBy),
+  index("idx_saved_board_packets_period").on(table.period),
+]);
+
+export type SavedBoardPacket = typeof savedBoardPackets.$inferSelect;
+export type InsertSavedBoardPacket = typeof savedBoardPackets.$inferInsert;
+export const insertSavedBoardPacketSchema = createInsertSchema(savedBoardPackets).omit({ id: true, createdAt: true, updatedAt: true });
+
 // Audit Logs - Track user actions on financial data for compliance
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

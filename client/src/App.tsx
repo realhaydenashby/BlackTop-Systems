@@ -40,6 +40,8 @@ import Workbook from "@/pages/app/forecasting/workbook";
 import Copilot from "@/pages/app/copilot";
 import LiveAnalytics from "@/pages/app/analytics";
 import LiveFundraising from "@/pages/app/fundraising";
+import InvestorUpdates from "@/pages/app/investor-updates";
+import BoardPackets from "@/pages/app/board-packets";
 // Waitlist Pages
 import Waitlist from "@/pages/waitlist";
 import WaitlistSuccess from "@/pages/waitlist-success";
@@ -288,6 +290,8 @@ function LiveModeRouter() {
         <Route path="/app/fundraising/:section" component={() => <ProtectedRoute component={LiveFundraising} />} />
         <Route path="/app/forecasting/workbook" component={() => <ProtectedRoute component={Workbook} />} />
         <Route path="/app/copilot" component={() => <ProtectedRoute component={Copilot} />} />
+        <Route path="/app/investor-updates" component={() => <ProtectedRoute component={InvestorUpdates} />} />
+        <Route path="/app/board-packets" component={() => <ProtectedRoute component={BoardPackets} />} />
         <Route path="/app/settings" component={() => <ProtectedRoute component={AppSettings} />} />
         <Route component={NotFound} />
       </Switch>

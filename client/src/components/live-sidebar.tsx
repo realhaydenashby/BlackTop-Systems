@@ -30,6 +30,9 @@ import {
   Users,
   Lock,
   Crown,
+  FileText,
+  Mail,
+  Briefcase,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -115,6 +118,9 @@ export function LiveSidebar() {
   const canAccessCopilot = canAccess("aiCopilot");
   const canAccessForecasting = canAccess("scenarioModeling");
   const canAccessFundraising = canAccess("hiringPlanning");
+  const canAccessInvestorUpdates = canAccess("aiInvestorUpdates");
+  const canAccessBoardPackets = canAccess("automatedBoardPackets");
+  const [reportsOpen, setReportsOpen] = useState(false);
 
   const userInitials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`
@@ -288,6 +294,61 @@ export function LiveSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {(canAccessInvestorUpdates || canAccessBoardPackets) && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground">
+              Reports
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <Collapsible open={reportsOpen} onOpenChange={setReportsOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton data-testid="nav-reports">
+                        <FileText className="w-4 h-4" />
+                        <span>Reports</span>
+                        <ChevronRight className={`ml-auto w-4 h-4 transition-transform ${reportsOpen ? 'rotate-90' : ''}`} />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {canAccessInvestorUpdates && (
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location === "/app/investor-updates"}
+                              data-testid="nav-investor-updates"
+                            >
+                              <Link href="/app/investor-updates">
+                                <Mail className="w-3 h-3 mr-1" />
+                                <span>Investor Updates</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        )}
+                        {canAccessBoardPackets && (
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location === "/app/board-packets"}
+                              data-testid="nav-board-packets"
+                            >
+                              <Link href="/app/board-packets">
+                                <Briefcase className="w-3 h-3 mr-1" />
+                                <span>Board Packets</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        )}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground">

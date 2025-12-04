@@ -41,6 +41,10 @@ import type {
   InsertRaiseRecommendation,
   ShareableReport,
   InsertShareableReport,
+  SavedInvestorUpdate,
+  InsertSavedInvestorUpdate,
+  SavedBoardPacket,
+  InsertSavedBoardPacket,
   AuditLog,
   InsertAuditLog,
   WaitlistEntry,
@@ -68,6 +72,8 @@ import {
   raiseRecommendations,
   notificationPreferences,
   shareableReports,
+  savedInvestorUpdates,
+  savedBoardPackets,
   auditLogs,
   waitlist,
   plaidItems,
@@ -201,6 +207,22 @@ export interface IStorage {
   getOrganizationShareableReports(organizationId: string): Promise<ShareableReport[]>;
   incrementReportViewCount(id: string): Promise<void>;
   deleteShareableReport(id: string): Promise<void>;
+
+  // Saved Investor Updates (Growth tier)
+  createSavedInvestorUpdate(update: InsertSavedInvestorUpdate): Promise<SavedInvestorUpdate>;
+  getSavedInvestorUpdate(id: string): Promise<SavedInvestorUpdate | undefined>;
+  getLatestSavedInvestorUpdate(organizationId: string, period: string): Promise<SavedInvestorUpdate | undefined>;
+  getOrganizationInvestorUpdates(organizationId: string): Promise<SavedInvestorUpdate[]>;
+  updateSavedInvestorUpdate(id: string, data: Partial<InsertSavedInvestorUpdate>): Promise<SavedInvestorUpdate | undefined>;
+  deleteSavedInvestorUpdate(id: string): Promise<void>;
+
+  // Saved Board Packets (Growth tier)
+  createSavedBoardPacket(packet: InsertSavedBoardPacket): Promise<SavedBoardPacket>;
+  getSavedBoardPacket(id: string): Promise<SavedBoardPacket | undefined>;
+  getLatestSavedBoardPacket(organizationId: string, period: string): Promise<SavedBoardPacket | undefined>;
+  getOrganizationBoardPackets(organizationId: string): Promise<SavedBoardPacket[]>;
+  updateSavedBoardPacket(id: string, data: Partial<InsertSavedBoardPacket>): Promise<SavedBoardPacket | undefined>;
+  deleteSavedBoardPacket(id: string): Promise<void>;
 
   // Audit Logs
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
@@ -918,6 +940,90 @@ export class DatabaseStorage implements IStorage {
 
   async deleteShareableReport(id: string): Promise<void> {
     await db.delete(shareableReports).where(eq(shareableReports.id, id));
+  }
+
+  // Saved Investor Updates
+  async createSavedInvestorUpdate(updateData: InsertSavedInvestorUpdate): Promise<SavedInvestorUpdate> {
+    const [update] = await db.insert(savedInvestorUpdates).values(updateData).returning();
+    return update;
+  }
+
+  async getSavedInvestorUpdate(id: string): Promise<SavedInvestorUpdate | undefined> {
+    return await db.query.savedInvestorUpdates.findFirst({
+      where: eq(savedInvestorUpdates.id, id),
+    });
+  }
+
+  async getLatestSavedInvestorUpdate(organizationId: string, period: string): Promise<SavedInvestorUpdate | undefined> {
+    return await db.query.savedInvestorUpdates.findFirst({
+      where: and(
+        eq(savedInvestorUpdates.organizationId, organizationId),
+        eq(savedInvestorUpdates.period, period)
+      ),
+      orderBy: desc(savedInvestorUpdates.updatedAt),
+    });
+  }
+
+  async getOrganizationInvestorUpdates(organizationId: string): Promise<SavedInvestorUpdate[]> {
+    return await db.query.savedInvestorUpdates.findMany({
+      where: eq(savedInvestorUpdates.organizationId, organizationId),
+      orderBy: desc(savedInvestorUpdates.createdAt),
+    });
+  }
+
+  async updateSavedInvestorUpdate(id: string, data: Partial<InsertSavedInvestorUpdate>): Promise<SavedInvestorUpdate | undefined> {
+    const [updated] = await db
+      .update(savedInvestorUpdates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(savedInvestorUpdates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSavedInvestorUpdate(id: string): Promise<void> {
+    await db.delete(savedInvestorUpdates).where(eq(savedInvestorUpdates.id, id));
+  }
+
+  // Saved Board Packets
+  async createSavedBoardPacket(packetData: InsertSavedBoardPacket): Promise<SavedBoardPacket> {
+    const [packet] = await db.insert(savedBoardPackets).values(packetData).returning();
+    return packet;
+  }
+
+  async getSavedBoardPacket(id: string): Promise<SavedBoardPacket | undefined> {
+    return await db.query.savedBoardPackets.findFirst({
+      where: eq(savedBoardPackets.id, id),
+    });
+  }
+
+  async getLatestSavedBoardPacket(organizationId: string, period: string): Promise<SavedBoardPacket | undefined> {
+    return await db.query.savedBoardPackets.findFirst({
+      where: and(
+        eq(savedBoardPackets.organizationId, organizationId),
+        eq(savedBoardPackets.period, period)
+      ),
+      orderBy: desc(savedBoardPackets.updatedAt),
+    });
+  }
+
+  async getOrganizationBoardPackets(organizationId: string): Promise<SavedBoardPacket[]> {
+    return await db.query.savedBoardPackets.findMany({
+      where: eq(savedBoardPackets.organizationId, organizationId),
+      orderBy: desc(savedBoardPackets.createdAt),
+    });
+  }
+
+  async updateSavedBoardPacket(id: string, data: Partial<InsertSavedBoardPacket>): Promise<SavedBoardPacket | undefined> {
+    const [updated] = await db
+      .update(savedBoardPackets)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(savedBoardPackets.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSavedBoardPacket(id: string): Promise<void> {
+    await db.delete(savedBoardPackets).where(eq(savedBoardPackets.id, id));
   }
 
   // Audit Logs

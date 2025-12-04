@@ -4456,6 +4456,313 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
+  // ========== AI Investor Updates (Growth tier) ==========
+
+  // Get investor update data - loads saved draft or generates new (Growth+ only)
+  app.get("/api/live/reports/investor-update", isAuthenticated, requireFeature("aiInvestorUpdates"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { generateInvestorUpdateData } = await import("./reports/investorUpdate");
+      const updateData = await generateInvestorUpdateData(userId, orgMember.organizationId);
+      
+      // Check for existing saved draft for this period
+      const savedUpdate = await storage.getLatestSavedInvestorUpdate(
+        orgMember.organizationId,
+        updateData.period
+      );
+      
+      if (savedUpdate) {
+        // Return saved draft with merged fresh metrics
+        const savedData = savedUpdate.updateData as any;
+        res.json({
+          ...savedData,
+          id: savedUpdate.id,
+          metrics: updateData.metrics, // Always use fresh metrics
+        });
+      } else {
+        // Create a new saved draft
+        const saved = await storage.createSavedInvestorUpdate({
+          organizationId: orgMember.organizationId,
+          createdBy: userId,
+          period: updateData.period,
+          updateData: updateData,
+          isDraft: true,
+        });
+        res.json({ ...updateData, id: saved.id });
+      }
+    } catch (error: any) {
+      console.error("Get investor update error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate investor update" });
+    }
+  });
+
+  // Generate/regenerate investor update - creates fresh data and saves it (Growth+ only)
+  app.post("/api/live/reports/investor-update/generate", isAuthenticated, requireFeature("aiInvestorUpdates"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { generateInvestorUpdateData } = await import("./reports/investorUpdate");
+      const updateData = await generateInvestorUpdateData(userId, orgMember.organizationId);
+      
+      // Save the new data (or update existing for same period)
+      const existing = await storage.getLatestSavedInvestorUpdate(
+        orgMember.organizationId,
+        updateData.period
+      );
+      
+      let savedId: string;
+      if (existing) {
+        await storage.updateSavedInvestorUpdate(existing.id, {
+          updateData: updateData,
+          isDraft: true,
+        });
+        savedId = existing.id;
+      } else {
+        const saved = await storage.createSavedInvestorUpdate({
+          organizationId: orgMember.organizationId,
+          createdBy: userId,
+          period: updateData.period,
+          updateData: updateData,
+          isDraft: true,
+        });
+        savedId = saved.id;
+      }
+      
+      res.json({ success: true, data: { ...updateData, id: savedId } });
+    } catch (error: any) {
+      console.error("Generate investor update error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate investor update" });
+    }
+  });
+
+  // Save edited investor update (Growth+ only)
+  app.put("/api/live/reports/investor-update/:id", isAuthenticated, requireFeature("aiInvestorUpdates"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const { id } = req.params;
+      const { updateData } = req.body;
+      
+      if (!updateData) {
+        return res.status(400).json({ message: "Update data is required" });
+      }
+
+      const existing = await storage.getSavedInvestorUpdate(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Saved update not found" });
+      }
+
+      const updated = await storage.updateSavedInvestorUpdate(id, {
+        updateData: updateData,
+        isDraft: true,
+      });
+      
+      res.json({ success: true, data: updated });
+    } catch (error: any) {
+      console.error("Save investor update error:", error);
+      res.status(500).json({ message: error.message || "Failed to save investor update" });
+    }
+  });
+
+  // Get investor update as HTML from saved draft (Growth+ only)
+  app.get("/api/live/reports/investor-update/html", isAuthenticated, requireFeature("aiInvestorUpdates"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { generateInvestorUpdateData, generateInvestorUpdateHTML } = await import("./reports/investorUpdate");
+      const freshData = await generateInvestorUpdateData(userId, orgMember.organizationId);
+      
+      // Try to get saved draft first
+      const savedUpdate = await storage.getLatestSavedInvestorUpdate(
+        orgMember.organizationId,
+        freshData.period
+      );
+      
+      const updateData = savedUpdate 
+        ? { ...(savedUpdate.updateData as any), metrics: freshData.metrics }
+        : freshData;
+      
+      const html = generateInvestorUpdateHTML(updateData);
+      
+      res.setHeader("Content-Type", "text/html");
+      res.send(html);
+    } catch (error: any) {
+      console.error("Get investor update HTML error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate investor update HTML" });
+    }
+  });
+
+  // Generate HTML from edited content (Growth+ only)
+  app.post("/api/live/reports/investor-update/html", isAuthenticated, requireFeature("aiInvestorUpdates"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const { updateData } = req.body;
+      
+      if (!updateData) {
+        return res.status(400).json({ message: "Update data is required" });
+      }
+
+      const { generateInvestorUpdateHTML } = await import("./reports/investorUpdate");
+      const html = generateInvestorUpdateHTML(updateData);
+      
+      res.setHeader("Content-Type", "text/html");
+      res.send(html);
+    } catch (error: any) {
+      console.error("Generate investor update HTML error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate investor update HTML" });
+    }
+  });
+
+  // ========== Automated Board Packets (Growth tier) ==========
+
+  // Get board packet data - loads saved draft or generates new (Growth+ only)
+  app.get("/api/live/reports/board-packet", isAuthenticated, requireFeature("automatedBoardPackets"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { generateBoardPacketData } = await import("./reports/boardPacket");
+      const packetData = await generateBoardPacketData(userId, orgMember.organizationId);
+      
+      // Check for existing saved packet for this period
+      const savedPacket = await storage.getLatestSavedBoardPacket(
+        orgMember.organizationId,
+        packetData.period
+      );
+      
+      if (savedPacket) {
+        // Return saved packet with merged fresh financials
+        const savedData = savedPacket.packetData as any;
+        res.json({
+          ...savedData,
+          id: savedPacket.id,
+          financials: packetData.financials, // Always use fresh financials
+        });
+      } else {
+        // Create a new saved packet
+        const saved = await storage.createSavedBoardPacket({
+          organizationId: orgMember.organizationId,
+          createdBy: userId,
+          period: packetData.period,
+          boardMeetingDate: packetData.boardMeetingDate,
+          packetData: packetData,
+          isDraft: true,
+        });
+        res.json({ ...packetData, id: saved.id });
+      }
+    } catch (error: any) {
+      console.error("Get board packet error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate board packet" });
+    }
+  });
+
+  // Generate/regenerate board packet (Growth+ only)
+  app.post("/api/live/reports/board-packet/generate", isAuthenticated, requireFeature("automatedBoardPackets"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const { boardMeetingDate } = req.body;
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { generateBoardPacketData } = await import("./reports/boardPacket");
+      const packetData = await generateBoardPacketData(userId, orgMember.organizationId, boardMeetingDate);
+      
+      // Save the new data (or update existing for same period)
+      const existing = await storage.getLatestSavedBoardPacket(
+        orgMember.organizationId,
+        packetData.period
+      );
+      
+      let savedId: string;
+      if (existing) {
+        await storage.updateSavedBoardPacket(existing.id, {
+          packetData: packetData,
+          boardMeetingDate: boardMeetingDate,
+          isDraft: true,
+        });
+        savedId = existing.id;
+      } else {
+        const saved = await storage.createSavedBoardPacket({
+          organizationId: orgMember.organizationId,
+          createdBy: userId,
+          period: packetData.period,
+          boardMeetingDate: boardMeetingDate,
+          packetData: packetData,
+          isDraft: true,
+        });
+        savedId = saved.id;
+      }
+      
+      res.json({ success: true, data: { ...packetData, id: savedId } });
+    } catch (error: any) {
+      console.error("Generate board packet error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate board packet" });
+    }
+  });
+
+  // Get board packet as HTML from saved draft (Growth+ only)
+  app.get("/api/live/reports/board-packet/html", isAuthenticated, requireFeature("automatedBoardPackets"), async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { generateBoardPacketData, generateBoardPacketHTML } = await import("./reports/boardPacket");
+      const freshData = await generateBoardPacketData(userId, orgMember.organizationId);
+      
+      // Try to get saved packet first
+      const savedPacket = await storage.getLatestSavedBoardPacket(
+        orgMember.organizationId,
+        freshData.period
+      );
+      
+      const packetData = savedPacket 
+        ? { ...(savedPacket.packetData as any), financials: freshData.financials }
+        : freshData;
+      
+      const html = generateBoardPacketHTML(packetData);
+      
+      res.setHeader("Content-Type", "text/html");
+      res.send(html);
+    } catch (error: any) {
+      console.error("Get board packet HTML error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate board packet HTML" });
+    }
+  });
+
   // ============================================
   // WAITLIST ENDPOINTS
   // ============================================
