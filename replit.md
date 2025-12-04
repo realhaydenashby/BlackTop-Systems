@@ -27,6 +27,8 @@ The application operates in distinct Demo and Live modes.
 - **Shareable Reports:** Generates investor-ready HTML reports with key financial metrics accessible via UUID-based public links.
 - **Notification System:** Multi-channel alerts (email, Slack, SMS) for proactive monitoring, including threshold warnings and weekly digests.
 - **Waitlist & Access Control:** Implements a controlled waitlist for early access, with an admin panel for approval management and backend access gating based on user approval status.
+- **AI Investor Updates (Growth tier):** AI-generated monthly investor updates with editable sections for highlights, challenges, metrics narrative, outlook, and asks. Includes structured card view and full text export with persistence layer to save edits.
+- **Automated Board Packets (Growth tier):** Comprehensive board meeting preparation documents with executive summary, financial overview, key metrics dashboard, headcount analysis, risks/mitigations, and strategic updates. Supports scheduled generation and HTML export.
 
 ### Production Hardening
 - **Error Handling:** Comprehensive system with error codes, HTTP status mapping, and user-friendly messages for various integration and internal errors.
