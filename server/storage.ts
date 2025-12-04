@@ -234,10 +234,23 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private static ADMIN_EMAILS = [
+    "ashby.hayden8@gmail.com",
+    "williamsyring@gmail.com",
+  ];
+
   async upsertUser(userData: UpsertUser): Promise<User> {
     if (!userData.id) {
       throw new Error("User ID is required for upsert");
     }
+
+    // Auto-set isAdmin for known admin emails
+    const isAdminEmail = userData.email && DatabaseStorage.ADMIN_EMAILS.includes(userData.email.toLowerCase());
+    const dataWithAdmin = {
+      ...userData,
+      isAdmin: isAdminEmail ? true : userData.isAdmin,
+      isApproved: isAdminEmail ? true : userData.isApproved,
+    };
     
     // Check by ID first
     const existingById = await db.query.users.findFirst({
@@ -247,7 +260,7 @@ export class DatabaseStorage implements IStorage {
     if (existingById) {
       const [updated] = await db
         .update(users)
-        .set({ ...userData, updatedAt: new Date() })
+        .set({ ...dataWithAdmin, updatedAt: new Date() })
         .where(eq(users.id, userData.id))
         .returning();
       return updated;
@@ -264,14 +277,14 @@ export class DatabaseStorage implements IStorage {
         // Or simply update the existing record with new data
         const [updated] = await db
           .update(users)
-          .set({ ...userData, id: userData.id, updatedAt: new Date() })
+          .set({ ...dataWithAdmin, id: userData.id, updatedAt: new Date() })
           .where(eq(users.email, userData.email))
           .returning();
         return updated;
       }
     }
 
-    const [user] = await db.insert(users).values(userData as any).returning();
+    const [user] = await db.insert(users).values(dataWithAdmin as any).returning();
     return user;
   }
 
