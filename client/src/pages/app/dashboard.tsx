@@ -1086,13 +1086,13 @@ export default function AppDashboard() {
         />
       </div>
 
-      <WeeklyChangesCard />
-
       {/* AI-Powered Insights Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-testid="ai-section">
         <AnomalyAlerts maxItems={5} showDetectButton={true} />
         <EnhancedInsights maxItems={5} showSource={true} />
       </div>
+
+      <WeeklyChangesCard />
 
       {data.insights.length > 0 && (
         <Card>

@@ -8,6 +8,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { CHART_COLORS, chartStyles, lineStyles, barStyles } from "@/lib/chartTheme";
 import { ActionPlanModule } from "@/components/ActionPlanModule";
+import { AnomalyAlerts } from "@/components/AnomalyAlerts";
+import { EnhancedInsights } from "@/components/EnhancedInsights";
 import { demoDataService, type DashboardStats, type Insight } from "@/services/demoDataService";
 
 export default function Dashboard() {
@@ -22,6 +24,9 @@ export default function Dashboard() {
     queryKey: ["insights", "demo"],
     queryFn: () => demoDataService.getInsights(),
   });
+
+  const demoAnomalies = demoDataService.getAnomalyAlerts();
+  const demoInsightsData = demoDataService.getEnhancedInsights();
 
   if (statsLoading) {
     return (
@@ -302,6 +307,12 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {/* AI-Powered Insights Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-testid="demo-ai-section">
+        <AnomalyAlerts maxItems={5} demoData={demoAnomalies} />
+        <EnhancedInsights maxItems={5} showSource={true} demoData={demoInsightsData} />
+      </div>
 
       <ActionPlanModule 
         title="AI-Generated Action Plan"

@@ -34,6 +34,7 @@ interface InsightsResult {
 interface EnhancedInsightsProps {
   maxItems?: number;
   showSource?: boolean;
+  demoData?: InsightsResult;
 }
 
 function getPriorityColor(priority: string) {
@@ -106,12 +107,15 @@ function ConfidenceBar({ confidence }: { confidence: number }) {
   );
 }
 
-export function EnhancedInsights({ maxItems = 5, showSource = true }: EnhancedInsightsProps) {
+export function EnhancedInsights({ maxItems = 5, showSource = true, demoData }: EnhancedInsightsProps) {
+  const isDemo = !!demoData;
+  
   const { data: insightsData, isLoading, error } = useQuery<InsightsResult>({
     queryKey: ["/api/ai/insights"],
+    enabled: !isDemo,
   });
 
-  if (isLoading) {
+  if (!isDemo && isLoading) {
     return (
       <Card data-testid="card-enhanced-insights">
         <CardHeader className="pb-2">
@@ -129,7 +133,9 @@ export function EnhancedInsights({ maxItems = 5, showSource = true }: EnhancedIn
     );
   }
 
-  if (error || !insightsData) {
+  const dataToUse = isDemo ? demoData : insightsData;
+
+  if (!isDemo && (error || !dataToUse)) {
     return (
       <Card data-testid="card-enhanced-insights">
         <CardHeader className="pb-2">
@@ -149,7 +155,7 @@ export function EnhancedInsights({ maxItems = 5, showSource = true }: EnhancedIn
     );
   }
 
-  const { insights, confidence, source } = insightsData;
+  const { insights, confidence, source } = dataToUse!;
 
   return (
     <Card data-testid="card-enhanced-insights">

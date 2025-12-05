@@ -863,4 +863,102 @@ export const demoDataService = {
   getFundraisingData: async () => {
     return (await demoDataService.getAnalytics()).fundraising;
   },
+
+  getAnomalyAlerts: () => {
+    const now = new Date();
+    return [
+      {
+        id: "demo-anomaly-1",
+        organizationId: "demo",
+        anomalyType: "spending_spike" as const,
+        severity: "high" as const,
+        metricName: "Daily Spend",
+        expectedValue: "4200",
+        actualValue: "8750",
+        deviationPercent: "108",
+        context: { vendor: "AWS", category: "Cloud Infrastructure" },
+        status: "new" as const,
+        detectedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: "demo-anomaly-2",
+        organizationId: "demo",
+        anomalyType: "vendor_anomaly" as const,
+        severity: "medium" as const,
+        metricName: "Salesforce",
+        expectedValue: "1200",
+        actualValue: "1850",
+        deviationPercent: "54",
+        context: { category: "SaaS" },
+        status: "new" as const,
+        detectedAt: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: "demo-anomaly-3",
+        organizationId: "demo",
+        anomalyType: "category_spike" as const,
+        severity: "low" as const,
+        metricName: "Marketing",
+        expectedValue: "12000",
+        actualValue: "15400",
+        deviationPercent: "28",
+        context: {},
+        status: "acknowledged" as const,
+        detectedAt: new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString(),
+      },
+    ];
+  },
+
+  getEnhancedInsights: () => {
+    return {
+      insights: [
+        {
+          title: "Runway Warning",
+          description: "At current burn rate of $85K/month, you have approximately 5.7 months of runway remaining. Consider reducing non-essential spend or beginning fundraising discussions.",
+          category: "runway",
+          priority: "high" as const,
+          confidence: 0.92,
+          actionable: true,
+          suggestedActions: [
+            "Review and cut non-essential subscriptions",
+            "Start investor outreach within 60 days",
+          ],
+        },
+        {
+          title: "Subscription Creep Detected",
+          description: "Your SaaS subscription costs have increased 23% over the past 3 months, from $8,200 to $10,100/month. 4 new tools were added without offsetting cancellations.",
+          category: "subscriptions",
+          priority: "medium" as const,
+          confidence: 0.88,
+          actionable: true,
+          suggestedActions: [
+            "Audit current subscriptions for unused tools",
+            "Consolidate overlapping functionality",
+          ],
+        },
+        {
+          title: "Revenue Growth Trend",
+          description: "Monthly recurring revenue has grown 12% over the last quarter, outpacing expense growth of 8%. This trend improves your path to profitability.",
+          category: "revenue",
+          priority: "low" as const,
+          confidence: 0.95,
+          actionable: false,
+        },
+        {
+          title: "Vendor Concentration Risk",
+          description: "AWS represents 34% of your total monthly spend. Consider multi-cloud strategy or negotiating enterprise discounts to reduce dependency.",
+          category: "vendors",
+          priority: "medium" as const,
+          confidence: 0.85,
+          actionable: true,
+          suggestedActions: [
+            "Request enterprise pricing from AWS",
+            "Evaluate reserved instance commitments",
+          ],
+        },
+      ],
+      confidence: 0.89,
+      source: "hybrid" as const,
+    };
+  },
 };

@@ -37,6 +37,7 @@ interface AnomalyAlertsProps {
   maxItems?: number;
   showDetectButton?: boolean;
   compact?: boolean;
+  demoData?: AnomalyEvent[];
 }
 
 function getSeverityColor(severity: string) {
@@ -98,9 +99,12 @@ function formatAnomalyMessage(anomaly: AnomalyEvent): string {
   }
 }
 
-export function AnomalyAlerts({ maxItems = 5, showDetectButton = true, compact = false }: AnomalyAlertsProps) {
+export function AnomalyAlerts({ maxItems = 5, showDetectButton = true, compact = false, demoData }: AnomalyAlertsProps) {
+  const isDemo = !!demoData;
+  
   const { data: anomalies, isLoading } = useQuery<AnomalyEvent[]>({
     queryKey: ["/api/ai/anomalies", { status: "new,acknowledged", limit: maxItems }],
+    enabled: !isDemo,
   });
 
   const detectMutation = useMutation({
@@ -124,7 +128,7 @@ export function AnomalyAlerts({ maxItems = 5, showDetectButton = true, compact =
     },
   });
 
-  if (isLoading) {
+  if (!isDemo && isLoading) {
     return (
       <Card data-testid="card-anomaly-alerts">
         <CardHeader className="pb-2">
@@ -142,7 +146,8 @@ export function AnomalyAlerts({ maxItems = 5, showDetectButton = true, compact =
     );
   }
 
-  const activeAnomalies = anomalies?.filter(a => a.status === "new" || a.status === "acknowledged") || [];
+  const dataToUse = isDemo ? demoData : anomalies;
+  const activeAnomalies = dataToUse?.filter(a => a.status === "new" || a.status === "acknowledged") || [];
 
   return (
     <Card data-testid="card-anomaly-alerts">
@@ -156,7 +161,7 @@ export function AnomalyAlerts({ maxItems = 5, showDetectButton = true, compact =
             </Badge>
           )}
         </CardTitle>
-        {showDetectButton && (
+        {showDetectButton && !isDemo && (
           <Button
             variant="ghost"
             size="sm"
@@ -204,30 +209,32 @@ export function AnomalyAlerts({ maxItems = 5, showDetectButton = true, compact =
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {anomaly.status === "new" && (
+                  {!isDemo && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {anomaly.status === "new" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => acknowledgeMutation.mutate(anomaly.id)}
+                          title="Acknowledge"
+                          data-testid={`button-ack-anomaly-${anomaly.id}`}
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        onClick={() => acknowledgeMutation.mutate(anomaly.id)}
-                        title="Acknowledge"
-                        data-testid={`button-ack-anomaly-${anomaly.id}`}
+                        onClick={() => dismissMutation.mutate(anomaly.id)}
+                        title="Dismiss"
+                        data-testid={`button-dismiss-anomaly-${anomaly.id}`}
                       >
-                        <Eye className="h-3 w-3" />
+                        <X className="h-3 w-3" />
                       </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => dismissMutation.mutate(anomaly.id)}
-                      title="Dismiss"
-                      data-testid={`button-dismiss-anomaly-${anomaly.id}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
