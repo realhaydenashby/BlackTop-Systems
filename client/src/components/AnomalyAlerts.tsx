@@ -10,7 +10,6 @@ import {
   Eye,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { formatDistanceToNow } from "date-fns";
 
 interface AnomalyEvent {
   id: string;
@@ -26,6 +25,7 @@ interface AnomalyEvent {
   detectedAt: string;
   resolvedAt?: string;
   resolvedBy?: string;
+  explanation?: string;
 }
 
 interface AnomalyAlertsProps {
@@ -167,17 +167,17 @@ export function AnomalyAlerts({ maxItems = 5, showDetectButton = true, compact =
               >
                 <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${getSeverityDotColor(anomaly.severity)}`} />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className={`text-sm font-medium ${compact ? "line-clamp-1" : ""}`}>
-                      {formatAnomalyTitle(anomaly)}
-                    </span>
-                    <span className="text-xs text-muted-foreground flex-shrink-0">
-                      {formatDistanceToNow(new Date(anomaly.detectedAt), { addSuffix: true })}
-                    </span>
+                  <div className={`text-sm font-medium ${compact ? "line-clamp-1" : ""}`}>
+                    {formatAnomalyTitle(anomaly)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {formatAnomalyDetail(anomaly)}
                   </p>
+                  {anomaly.explanation && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {anomaly.explanation}
+                    </p>
+                  )}
                 </div>
                 {!isDemo && (
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">

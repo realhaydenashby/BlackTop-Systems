@@ -879,6 +879,7 @@ export const demoDataService = {
         context: { vendor: "AWS", category: "Cloud Infrastructure" },
         status: "new" as const,
         detectedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(),
+        explanation: "Review recent infrastructure changes or scaling events that may have triggered this increase.",
       },
       {
         id: "demo-anomaly-2",
@@ -892,6 +893,7 @@ export const demoDataService = {
         context: { category: "SaaS" },
         status: "new" as const,
         detectedAt: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
+        explanation: "Check for new user licenses or plan tier changes that may have affected billing.",
       },
       {
         id: "demo-anomaly-3",
@@ -905,6 +907,7 @@ export const demoDataService = {
         context: {},
         status: "acknowledged" as const,
         detectedAt: new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString(),
+        explanation: "This may be related to a campaign launch or seasonal advertising push.",
       },
     ];
   },
