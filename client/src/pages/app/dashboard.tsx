@@ -1094,22 +1094,6 @@ export default function AppDashboard() {
 
       <WeeklyChangesCard />
 
-      {data.insights.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Action Items
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {data.insights.map((insight, i) => (
-              <InsightCard key={i} insight={insight} />
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardContent className="p-0 divide-y">
           <Section title="Spend by Category" icon={TrendingDown} defaultOpen>

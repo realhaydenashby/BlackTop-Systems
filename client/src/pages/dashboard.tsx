@@ -1,16 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, FileText, AlertTriangle, Wallet, Users } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, FileText, Wallet, Users } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { CHART_COLORS, chartStyles, lineStyles, barStyles } from "@/lib/chartTheme";
-import { ActionPlanModule } from "@/components/ActionPlanModule";
 import { AnomalyAlerts } from "@/components/AnomalyAlerts";
 import { EnhancedInsights } from "@/components/EnhancedInsights";
-import { demoDataService, type DashboardStats, type Insight } from "@/services/demoDataService";
+import { demoDataService, type DashboardStats } from "@/services/demoDataService";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -18,11 +15,6 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["dashboard-stats", "demo"],
     queryFn: () => demoDataService.getDashboardStats(),
-  });
-
-  const { data: insights, isLoading: insightsLoading } = useQuery<Insight[]>({
-    queryKey: ["insights", "demo"],
-    queryFn: () => demoDataService.getInsights(),
   });
 
   const demoAnomalies = demoDataService.getAnomalyAlerts();
@@ -172,30 +164,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {!insightsLoading && insights && insights.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Financial Insights</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {insights.slice(0, 4).map((insight) => (
-              <Alert
-                key={insight.id}
-                variant={insight.severity === "critical" || insight.severity === "high" ? "destructive" : "default"}
-                data-testid={`alert-insight-${insight.type}`}
-              >
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle className="flex items-center gap-2">
-                  {insight.title}
-                  <Badge variant={insight.severity === "critical" || insight.severity === "high" ? "destructive" : "secondary"}>
-                    {insight.severity}
-                  </Badge>
-                </AlertTitle>
-                <AlertDescription>{insight.description}</AlertDescription>
-              </Alert>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -313,12 +281,6 @@ export default function Dashboard() {
         <AnomalyAlerts maxItems={5} demoData={demoAnomalies} />
         <EnhancedInsights maxItems={5} showSource={true} demoData={demoInsightsData} />
       </div>
-
-      <ActionPlanModule 
-        title="AI-Generated Action Plan"
-        description="Top priorities for your financial health"
-        items={stats?.dashboardActionPlan || []}
-      />
     </div>
   );
 }

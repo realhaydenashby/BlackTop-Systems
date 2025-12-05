@@ -70,6 +70,12 @@
   --destructive-foreground: 0 0% 98%;
   --destructive-glow: 0 72% 55%;
   
+  /* Severity indicators */
+  --severity-critical: 0 72% 55%;
+  --severity-high: 25 95% 53%;
+  --severity-medium: 45 93% 47%;
+  --severity-low: 217 91% 60%;
+  
   /* Form inputs */
   --input: 217 20% 20%;
   --ring: 217 91% 50%;
@@ -178,6 +184,12 @@
   --destructive-foreground: 0 0% 100%;
   --destructive-glow: 0 72% 50%;
   
+  /* Severity indicators - light mode */
+  --severity-critical: 0 72% 50%;
+  --severity-high: 25 95% 48%;
+  --severity-medium: 45 93% 42%;
+  --severity-low: 217 91% 55%;
+  
   --input: 220 15% 92%;
   --ring: 217 91% 50%;
   
@@ -256,6 +268,12 @@
   --destructive: 0 72% 55%;
   --destructive-foreground: 0 0% 98%;
   --destructive-glow: 0 72% 55%;
+  
+  /* Severity indicators - dark mode */
+  --severity-critical: 0 72% 55%;
+  --severity-high: 25 95% 53%;
+  --severity-medium: 45 93% 47%;
+  --severity-low: 217 91% 60%;
   
   --input: 217 20% 20%;
   --ring: 217 91% 50%;
