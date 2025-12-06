@@ -316,7 +316,7 @@ export function ForecastCharts({ rows, demoData }: ForecastChartsProps) {
       />
 
       <ChartCard
-        title="Profit / Loss"
+        title="Profit"
         icon={<DollarSign className="h-4 w-4 text-primary" />}
         dataKey="profit"
         gradientId="profitGradient"

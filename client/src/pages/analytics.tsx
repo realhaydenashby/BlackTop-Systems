@@ -420,26 +420,6 @@ export default function Analytics() {
             }}
           />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Scenario Analysis</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={analytics?.forecasting?.scenarioAnalysis || []}>
-                  <CartesianGrid {...chartStyles.cartesianGrid} />
-                  <XAxis dataKey="scenario" {...chartStyles.xAxis} />
-                  <YAxis {...chartStyles.yAxis} />
-                  <Tooltip {...chartStyles.tooltip} />
-                  <Legend {...chartStyles.legend} />
-                  <Bar dataKey="revenue" fill={CHART_COLORS[0]} name="Revenue" {...barStyles} />
-                  <Bar dataKey="expenses" fill={CHART_COLORS[3]} name="Expenses" {...barStyles} />
-                  <Bar dataKey="profit" fill={CHART_COLORS[1]} name="Profit" {...barStyles} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
           <ActionPlanModule 
             title="Forecasting Action Plan"
             description="Strategic planning for future growth"
