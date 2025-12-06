@@ -8,6 +8,7 @@ import { useRoute, useLocation } from "wouter";
 import { CHART_COLORS, chartStyles, lineStyles, areaStyles, barStyles } from "@/lib/chartTheme";
 import { ActionPlanModule, type ActionPlanItem } from "@/components/ActionPlanModule";
 import { demoDataService } from "@/services/demoDataService";
+import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 
 function ForecastingChart({ analytics }: { analytics: any }) {
   const [forecastHorizon, setForecastHorizon] = useState("6months");
@@ -166,6 +167,215 @@ function ForecastingChart({ analytics }: { analytics: any }) {
         </ResponsiveContainer>
       </CardContent>
     </Card>
+  );
+}
+
+function formatCurrency(amount: number): string {
+  if (Math.abs(amount) >= 1000000) {
+    return `$${(amount / 1000000).toFixed(1)}M`;
+  }
+  if (Math.abs(amount) >= 1000) {
+    return `$${(amount / 1000).toFixed(0)}k`;
+  }
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function DemoForecastCharts({ analytics }: { analytics: any }) {
+  if (!analytics?.forecasting) return null;
+
+  const { historicalData = [], currentMonth, forecast6Months = [] } = analytics.forecasting;
+  
+  const historical = [
+    ...historicalData,
+    ...(currentMonth ? [currentMonth] : []),
+  ];
+  
+  const forecast = forecast6Months.length > 0 && historical.length > 0
+    ? [historical[historical.length - 1], ...forecast6Months]
+    : forecast6Months;
+  
+  const allData = [...historical, ...forecast.slice(1)];
+  const actualCount = historical.length;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TrendingUp className="h-4 w-4 text-green-500" />
+            Revenue
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={allData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="demoRevenueGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={CHART_COLORS[0]} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART_COLORS[0]} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid {...chartStyles.cartesianGrid} />
+                <XAxis 
+                  dataKey="month" 
+                  tick={{ fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  interval={0}
+                  angle={-45}
+                  textAnchor="end"
+                  height={50}
+                />
+                <YAxis 
+                  tickFormatter={(v) => formatCurrency(v)}
+                  tick={{ fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={60}
+                />
+                <Tooltip {...chartStyles.tooltip} />
+                {actualCount > 0 && actualCount < allData.length && (
+                  <ReferenceLine
+                    x={allData[actualCount - 1]?.month}
+                    stroke="hsl(var(--muted-foreground))"
+                    strokeDasharray="3 3"
+                    label={{ value: "Now", position: "top", fontSize: 10 }}
+                  />
+                )}
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke={CHART_COLORS[0]}
+                  fill="url(#demoRevenueGradient)"
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TrendingDown className="h-4 w-4 text-red-500" />
+            Expenses
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={allData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="demoExpensesGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={CHART_COLORS[3]} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART_COLORS[3]} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid {...chartStyles.cartesianGrid} />
+                <XAxis 
+                  dataKey="month" 
+                  tick={{ fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  interval={0}
+                  angle={-45}
+                  textAnchor="end"
+                  height={50}
+                />
+                <YAxis 
+                  tickFormatter={(v) => formatCurrency(v)}
+                  tick={{ fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={60}
+                />
+                <Tooltip {...chartStyles.tooltip} />
+                {actualCount > 0 && actualCount < allData.length && (
+                  <ReferenceLine
+                    x={allData[actualCount - 1]?.month}
+                    stroke="hsl(var(--muted-foreground))"
+                    strokeDasharray="3 3"
+                    label={{ value: "Now", position: "top", fontSize: 10 }}
+                  />
+                )}
+                <Area
+                  type="monotone"
+                  dataKey="expenses"
+                  stroke={CHART_COLORS[3]}
+                  fill="url(#demoExpensesGradient)"
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <DollarSign className="h-4 w-4 text-primary" />
+            Profit / Loss
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={allData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="demoProfitGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={CHART_COLORS[1]} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART_COLORS[1]} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid {...chartStyles.cartesianGrid} />
+                <XAxis 
+                  dataKey="month" 
+                  tick={{ fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  interval={0}
+                  angle={-45}
+                  textAnchor="end"
+                  height={50}
+                />
+                <YAxis 
+                  tickFormatter={(v) => formatCurrency(v)}
+                  tick={{ fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={60}
+                />
+                <Tooltip {...chartStyles.tooltip} />
+                <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeWidth={1} />
+                {actualCount > 0 && actualCount < allData.length && (
+                  <ReferenceLine
+                    x={allData[actualCount - 1]?.month}
+                    stroke="hsl(var(--muted-foreground))"
+                    strokeDasharray="3 3"
+                    label={{ value: "Now", position: "top", fontSize: 10 }}
+                  />
+                )}
+                <Area
+                  type="monotone"
+                  dataKey="profit"
+                  stroke={CHART_COLORS[1]}
+                  fill="url(#demoProfitGradient)"
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -569,6 +779,8 @@ export default function Analytics() {
 
       {section === "forecasting" && (
         <>
+          <DemoForecastCharts analytics={analytics} />
+
           <ForecastingChart analytics={analytics} />
 
           <div className="grid gap-6 md:grid-cols-2">
