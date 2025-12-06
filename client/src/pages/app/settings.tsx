@@ -23,10 +23,24 @@ import {
   LogOut,
   ExternalLink,
   Loader2,
+  Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+
+interface UserData {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  subscriptionTier: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  trialStartDate: string | null;
+  trialEndsAt: string | null;
+}
 
 export default function AppSettings() {
   const { user } = useAuth();
@@ -41,12 +55,35 @@ export default function AppSettings() {
     weeklyDigest: true,
   });
 
+  const { data: userData } = useQuery<UserData>({
+    queryKey: ["/api/auth/user"],
+  });
+
   const { data: subscriptionData } = useQuery<{
     subscription: any;
     status: string;
   }>({
     queryKey: ["/api/stripe/subscription"],
   });
+
+  // Calculate trial status
+  const getTrialInfo = () => {
+    if (!userData?.trialEndsAt) {
+      return { isOnTrial: false, daysRemaining: 0, isExpired: false };
+    }
+    const now = new Date();
+    const trialEnd = new Date(userData.trialEndsAt);
+    const diffMs = trialEnd.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    return {
+      isOnTrial: daysRemaining > 0,
+      daysRemaining: Math.max(0, daysRemaining),
+      isExpired: daysRemaining <= 0,
+    };
+  };
+
+  const trialInfo = getTrialInfo();
+  const hasActiveSubscription = subscriptionData?.subscription != null && subscriptionData?.status === "active";
 
   const portalMutation = useMutation({
     mutationFn: async () => {
@@ -71,9 +108,35 @@ export default function AppSettings() {
     },
   });
 
+  const checkoutMutation = useMutation({
+    mutationFn: async (priceId: string) => {
+      const response = await apiRequest("POST", "/api/stripe/checkout", { priceId });
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Checkout Error",
+        description: error.message || "Unable to start checkout. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const hasSubscription = subscriptionData?.subscription != null;
   const subscriptionStatus = subscriptionData?.status || "inactive";
-  const planName = subscriptionData?.subscription?.items?.data?.[0]?.price?.product?.name || "Free Trial";
+  const planName = hasActiveSubscription 
+    ? (subscriptionData?.subscription?.items?.data?.[0]?.price?.product?.name || "Pro Plan")
+    : (trialInfo.isOnTrial ? `${userData?.subscriptionTier || "Core"} Trial` : "No Plan");
+
+  // Get the plan tier for display
+  const tierDisplay = userData?.subscriptionTier 
+    ? userData.subscriptionTier.charAt(0).toUpperCase() + userData.subscriptionTier.slice(1)
+    : "Core";
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
@@ -363,42 +426,78 @@ export default function AppSettings() {
           <CardDescription>Your plan and billing details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Current Plan */}
           <div className="flex items-center justify-between p-4 bg-glass/30 border border-glass-border/30 rounded-xl">
             <div>
               <p className="font-medium">Current Plan</p>
-              <p className="text-sm text-muted-foreground">{planName}</p>
+              <p className="text-sm text-muted-foreground">
+                {hasActiveSubscription ? planName : `${tierDisplay} Plan`}
+              </p>
             </div>
-            <Badge variant={subscriptionStatus === "active" ? "default" : "secondary"}>
-              {subscriptionStatus === "active" ? "Active" : 
-               subscriptionStatus === "trialing" ? "Trial" : 
-               subscriptionStatus === "canceled" ? "Canceled" : "Inactive"}
+            <Badge variant={hasActiveSubscription ? "default" : trialInfo.isOnTrial ? "secondary" : "destructive"}>
+              {hasActiveSubscription ? "Active" : 
+               trialInfo.isOnTrial ? "Trial" : 
+               trialInfo.isExpired ? "Expired" : "Inactive"}
             </Badge>
           </div>
+
+          {/* Trial Status */}
+          {!hasActiveSubscription && trialInfo.isOnTrial && (
+            <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-xl">
+              <Clock className="h-5 w-5 text-primary" />
+              <div className="flex-1">
+                <p className="font-medium" data-testid="text-trial-status">
+                  {trialInfo.daysRemaining} day{trialInfo.daysRemaining !== 1 ? "s" : ""} left in your trial
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Upgrade anytime to keep full access to all features.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Trial Expired Warning */}
+          {!hasActiveSubscription && trialInfo.isExpired && (
+            <div className="flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/30 rounded-xl">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <div className="flex-1">
+                <p className="font-medium text-destructive" data-testid="text-trial-expired">
+                  Your trial has expired
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Upgrade now to continue using BlackTop.
+                </p>
+              </div>
+            </div>
+          )}
+
           <p className="text-sm text-muted-foreground">
-            {hasSubscription 
+            {hasActiveSubscription 
               ? "Manage your subscription and billing details below."
               : "Your trial includes full access to all features. Upgrade to continue after the trial period."}
           </p>
           <div className="flex flex-wrap gap-3">
             <Button
               onClick={() => (window.location.href = "/pricing")}
-              data-testid="button-change-plan"
+              data-testid="button-upgrade"
             >
-              {hasSubscription ? "Change Plan" : "View Plans"}
+              {hasActiveSubscription ? "Change Plan" : "Upgrade Now"}
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => portalMutation.mutate()}
-              disabled={portalMutation.isPending || !hasSubscription}
-              data-testid="button-billing-portal"
-            >
-              {portalMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <ExternalLink className="h-4 w-4 mr-2" />
-              )}
-              Billing Portal
-            </Button>
+            {hasActiveSubscription && (
+              <Button
+                variant="outline"
+                onClick={() => portalMutation.mutate()}
+                disabled={portalMutation.isPending}
+                data-testid="button-billing-portal"
+              >
+                {portalMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                )}
+                Billing Portal
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
