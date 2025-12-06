@@ -33,6 +33,7 @@ import {
   FileText,
   Mail,
   Briefcase,
+  Clock,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -99,6 +100,15 @@ interface ApprovalStatus {
   email: string;
 }
 
+interface UserData {
+  id: string;
+  email: string;
+  subscriptionTier: string | null;
+  stripeSubscriptionId: string | null;
+  trialStartDate: string | null;
+  trialEndsAt: string | null;
+}
+
 export function LiveSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
@@ -113,7 +123,32 @@ export function LiveSidebar() {
     staleTime: 60000,
   });
 
+  const { data: userData } = useQuery<UserData>({
+    queryKey: ["/api/auth/user"],
+    enabled: !!user,
+    staleTime: 30000,
+  });
+
   const isAdmin = approvalStatus?.isAdmin || false;
+
+  // Calculate trial status
+  const getTrialInfo = () => {
+    if (!userData?.trialEndsAt) {
+      return { isOnTrial: false, daysRemaining: 0, isExpired: false };
+    }
+    const now = new Date();
+    const trialEnd = new Date(userData.trialEndsAt);
+    const diffMs = trialEnd.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    return {
+      isOnTrial: daysRemaining > 0,
+      daysRemaining: Math.max(0, daysRemaining),
+      isExpired: daysRemaining <= 0,
+    };
+  };
+
+  const trialInfo = getTrialInfo();
+  const hasActiveSubscription = !!userData?.stripeSubscriptionId;
   
   const canAccessCopilot = canAccess("aiCopilot");
   const canAccessForecasting = canAccess("scenarioModeling");
@@ -420,6 +455,40 @@ export function LiveSidebar() {
 
       <SidebarFooter>
         <SidebarMenu>
+          {/* Trial Status Indicator */}
+          {!hasActiveSubscription && trialInfo.isOnTrial && (
+            <SidebarMenuItem>
+              <Link href="/app/settings">
+                <div className="flex items-center gap-2 px-2 py-2 mb-1 bg-primary/10 border border-primary/20 rounded-lg hover-elevate">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-primary" data-testid="text-trial-days">
+                      {trialInfo.daysRemaining} day{trialInfo.daysRemaining !== 1 ? "s" : ""} left
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">Upgrade anytime</p>
+                  </div>
+                </div>
+              </Link>
+            </SidebarMenuItem>
+          )}
+          
+          {/* Trial Expired Warning */}
+          {!hasActiveSubscription && trialInfo.isExpired && (
+            <SidebarMenuItem>
+              <Link href="/app/settings">
+                <div className="flex items-center gap-2 px-2 py-2 mb-1 bg-destructive/10 border border-destructive/30 rounded-lg hover-elevate">
+                  <Clock className="w-4 h-4 text-destructive" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-destructive" data-testid="text-trial-expired-sidebar">
+                      Trial expired
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">Upgrade to continue</p>
+                  </div>
+                </div>
+              </Link>
+            </SidebarMenuItem>
+          )}
+
           <SidebarMenuItem>
             <div className="flex items-center gap-3 px-2 py-2">
               <Avatar className="h-8 w-8">
