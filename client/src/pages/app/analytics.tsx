@@ -7,6 +7,8 @@ import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { CHART_COLORS, chartStyles, lineStyles, areaStyles, barStyles } from "@/lib/chartTheme";
 import { Building2, TrendingDown, TrendingUp, DollarSign, Timer } from "lucide-react";
+import { ForecastCharts } from "@/components/ForecastCharts";
+import { ActionPlanModule } from "@/components/ActionPlanModule";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 
@@ -131,6 +133,7 @@ export default function LiveAnalytics() {
       case "profitability": return "Profitability Analytics";
       case "burn": return "Burn Rate Analytics";
       case "runway": return "Runway Analytics";
+      case "forecasting": return "Forecasting";
       default: return "Spend Analytics";
     }
   };
@@ -141,6 +144,7 @@ export default function LiveAnalytics() {
       case "profitability": return "Analyze your margins and profit trends";
       case "burn": return "Understand your burn rate breakdown";
       case "runway": return "Monitor your financial runway";
+      case "forecasting": return "AI-powered projections for revenue, expenses, and profit";
       default: return "Deep insights into your spending patterns";
     }
   };
@@ -196,6 +200,7 @@ export default function LiveAnalytics() {
           <TabsTrigger value="spend" data-testid="tab-spend">Spend</TabsTrigger>
           <TabsTrigger value="revenue" data-testid="tab-revenue">Revenue</TabsTrigger>
           <TabsTrigger value="profitability" data-testid="tab-profitability">Profitability</TabsTrigger>
+          <TabsTrigger value="forecasting" data-testid="tab-forecasting">Forecasting</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -813,6 +818,90 @@ export default function LiveAnalytics() {
               </CardContent>
             </Card>
           )}
+        </>
+      )}
+
+      {section === "forecasting" && (
+        <>
+          <ForecastCharts 
+            demoData={(() => {
+              const historicalData = analytics.revenue.trend.map((revItem, idx) => {
+                const spendItem = analytics.spend.trend[idx];
+                return {
+                  month: revItem.month,
+                  revenue: revItem.amount,
+                  expenses: spendItem?.amount || 0,
+                  profit: revItem.amount - (spendItem?.amount || 0),
+                  isHistorical: true,
+                };
+              });
+
+              const lastRevenue = analytics.revenue.trend[analytics.revenue.trend.length - 1]?.amount || 0;
+              const lastExpenses = analytics.spend.trend[analytics.spend.trend.length - 1]?.amount || 0;
+              const avgGrowth = 0.03;
+              const today = new Date();
+
+              const generateForecast = (months: number) => {
+                return Array.from({ length: months }, (_, i) => {
+                  const date = new Date(today);
+                  date.setMonth(date.getMonth() + i + 1);
+                  const growthFactor = Math.pow(1 + avgGrowth, i + 1);
+                  const projectedRevenue = lastRevenue * growthFactor;
+                  const projectedExpenses = lastExpenses * (1 + (avgGrowth * 0.5) * (i + 1));
+                  return {
+                    month: date.toISOString().slice(0, 7),
+                    revenue: Math.round(projectedRevenue),
+                    expenses: Math.round(projectedExpenses),
+                    profit: Math.round(projectedRevenue - projectedExpenses),
+                    isHistorical: false,
+                  };
+                });
+              };
+
+              const currentMonth = historicalData.length > 0 
+                ? { ...historicalData[historicalData.length - 1], isHistorical: true, isPartial: true }
+                : { month: today.toISOString().slice(0, 7), revenue: 0, expenses: 0, profit: 0, isHistorical: true };
+
+              return {
+                historicalData: historicalData.slice(0, -1),
+                currentMonth,
+                forecast30Days: generateForecast(1),
+                forecast90Days: generateForecast(3),
+                forecast6Months: generateForecast(6),
+              };
+            })()}
+          />
+
+          <ActionPlanModule 
+            title="Forecasting Action Plan"
+            description="Strategic planning for future growth"
+            items={[
+              {
+                id: "1",
+                summary: "Monitor Revenue Growth",
+                metricRef: "revenue_trend",
+                severity: "high",
+                recommendedAction: "Track whether actual revenue meets or exceeds projections",
+                impact: "+15% accuracy",
+              },
+              {
+                id: "2", 
+                summary: "Control Expense Growth",
+                metricRef: "expense_trend",
+                severity: "medium",
+                recommendedAction: "Keep expense growth below revenue growth rate",
+                impact: "Extend runway",
+              },
+              {
+                id: "3",
+                summary: "Build Cash Reserves",
+                metricRef: "runway",
+                severity: "high",
+                recommendedAction: "Target 6+ months runway based on current projections",
+                impact: "Financial stability",
+              },
+            ]}
+          />
         </>
       )}
     </div>
