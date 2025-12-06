@@ -420,49 +420,25 @@ export default function Analytics() {
             }}
           />
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Scenario Analysis</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analytics?.forecasting?.scenarioAnalysis || []}>
-                    <CartesianGrid {...chartStyles.cartesianGrid} />
-                    <XAxis dataKey="scenario" {...chartStyles.xAxis} />
-                    <YAxis {...chartStyles.yAxis} />
-                    <Tooltip {...chartStyles.tooltip} />
-                    <Legend {...chartStyles.legend} />
-                    <Bar dataKey="revenue" fill={CHART_COLORS[0]} name="Revenue" {...barStyles} />
-                    <Bar dataKey="expenses" fill={CHART_COLORS[3]} name="Expenses" {...barStyles} />
-                    <Bar dataKey="profit" fill={CHART_COLORS[1]} name="Profit" {...barStyles} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Cash Runway</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Runway</p>
-                    <p className="text-2xl font-bold">{analytics?.forecasting?.cashRunway?.months || 0} mo</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Burn Rate</p>
-                    <p className="text-2xl font-bold">${((analytics?.forecasting?.cashRunway?.burnRate || 0) / 1000).toFixed(0)}k</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Cash</p>
-                    <p className="text-2xl font-bold">${((analytics?.forecasting?.cashRunway?.currentCash || 0) / 1000).toFixed(0)}k</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Scenario Analysis</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analytics?.forecasting?.scenarioAnalysis || []}>
+                  <CartesianGrid {...chartStyles.cartesianGrid} />
+                  <XAxis dataKey="scenario" {...chartStyles.xAxis} />
+                  <YAxis {...chartStyles.yAxis} />
+                  <Tooltip {...chartStyles.tooltip} />
+                  <Legend {...chartStyles.legend} />
+                  <Bar dataKey="revenue" fill={CHART_COLORS[0]} name="Revenue" {...barStyles} />
+                  <Bar dataKey="expenses" fill={CHART_COLORS[3]} name="Expenses" {...barStyles} />
+                  <Bar dataKey="profit" fill={CHART_COLORS[1]} name="Profit" {...barStyles} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
           <ActionPlanModule 
             title="Forecasting Action Plan"
