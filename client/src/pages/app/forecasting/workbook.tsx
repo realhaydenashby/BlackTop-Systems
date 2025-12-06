@@ -569,8 +569,8 @@ export default function Workbook() {
               <p className="text-sm text-muted-foreground">
                 This workbook lets you create "what-if" scenarios by adjusting projected revenue and expenses. 
                 Changes automatically recalculate derived fields like Gross Margin, Total OpEx, Net Cash, and Runway. 
-                Use the Scenario Comparison section above to compare Base, Conservative, and Aggressive growth plans side-by-side.
-                The Monte Carlo simulation provides probabilistic runway forecasts with confidence intervals.
+                Use the charts above to visualize your Revenue, Expenses, and Profit/Loss projections.
+                The Scenario Comparison section helps compare Base, Conservative, and Aggressive growth plans side-by-side.
               </p>
             </div>
           </div>
