@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
-import { CHART_COLORS, chartStyles, lineStyles, barStyles } from "@/lib/chartTheme";
+import { CHART_COLORS, chartStyles, lineStyles, barStyles, areaStyles } from "@/lib/chartTheme";
 import { ActionPlanModule, type ActionPlanItem } from "@/components/ActionPlanModule";
 import { demoDataService } from "@/services/demoDataService";
 import { ForecastCharts } from "@/components/ForecastCharts";
