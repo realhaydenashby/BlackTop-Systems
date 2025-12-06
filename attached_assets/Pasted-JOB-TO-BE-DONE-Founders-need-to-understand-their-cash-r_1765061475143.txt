@@ -1,0 +1,300 @@
+JOB TO BE DONE
+
+Founders need to understand their cash reality and what to do next month, without building a financial model, without talking to sales, and in under 5 minutes.
+
+They don’t want:
+	•	templates
+	•	dashboards
+	•	spreadsheets
+	•	FP&A theory
+
+They want:
+	•	clarity
+	•	direction
+	•	fast
+
+Parallel = board-ready modeling
+BlackTop = operator-ready decisions
+
+⸻
+
+CORE JOB STATEMENT
+
+“Give me my financial truth, tell me what changed, why it matters, and what to do about it — without me modeling anything.”
+
+⸻
+
+PAINS
+	1.	Setup & modeling is slow and cognitively heavy
+Even with Parallel, you spend hours getting a trustworthy model.
+	2.	Pricing & sales friction
+Opaque pricing and demos deter experimentation.
+	3.	Classic SaaS bias
+Non-SaaS models (e-commerce, agencies, healthcare, hardware) feel manual.
+	4.	Wrappers are a trap
+Most “AI finance” tools are just text wrappers over data. Fragile, ephemeral, easy to copy.
+	5.	Founders don’t know which inputs matter
+They don’t know what to type into templates.
+
+⸻
+
+DESIRED OUTCOME
+
+“I log in, my finances are already modeled, the system tells me what’s wrong, gives me 3 actions, and I either approve them or ignore them.”
+
+⸻
+
+POSSIBLE SOLUTIONS (AT A HIGH LEVEL)
+
+1) Auto-ingestion → baseline model
+	•	Connect bank, payroll, invoices, subscriptions
+	•	Build the model automatically from source systems
+	•	Ask only for deltas (yes/no approvals)
+
+“No setup. Just connect.”
+
+⸻
+
+2) Model validation & auto-correction
+
+Flag unrealistic assumptions:
+	•	ad spend ramp
+	•	payroll drift
+	•	CAC rising
+	•	seasonality
+
+System says:
+
+“These numbers don’t make sense. Here’s why. Approve correction?”
+
+⸻
+
+3) Unit economics as default
+
+For non-SaaS:
+	•	contribution margin per unit/order
+	•	inventory cycle
+	•	capex
+	•	working capital
+	•	payback period
+
+Dashboard starts with:
+	•	gross margin per unit
+	•	cash cycle
+	•	payback
+	•	contribution margin
+
+Not MRR.
+
+⸻
+
+4) Vertical wedge (one, not many)
+
+Pick one to dominate:
+	•	e-commerce
+or
+	•	agencies
+or
+	•	home services
+or
+	•	healthcare
+or
+	•	MSPs
+
+Each gets:
+	•	language
+	•	templates
+	•	KPI defaults
+	•	workflows
+	•	examples
+
+Founders think:
+
+“This was built for me, not my board.”
+
+⸻
+
+5) Initiative, not queries
+
+Platform interrupts founder with truth:
+	•	“Payroll is up 18%”
+	•	“AWS cost +23%, here’s likely causes”
+	•	“Marketing slipped +22%, here’s impact”
+	•	“Your payback period extended by 45 days”
+
+Wrappers wait for questions.
+Platforms generate questions.
+
+Initiative = moat.
+
+⸻
+
+6) Touch money, not just charts
+
+Long-term:
+	•	ACH
+	•	payroll
+	•	vendor payments
+	•	budget caps
+	•	card controls
+	•	renewal/negotiation flow
+
+Wrappers summarize.
+Platforms execute.
+
+If you own spend, you’re unkillable.
+
+⸻
+
+HOW MIGHT WE ACCOMPLISH THIS?
+
+a) Model-from-data engine
+
+Ingest → Normalize → Model → Validate → Ask for approvals
+
+Work:
+	•	parse PDFs
+	•	bank statements
+	•	APIs
+	•	email forwarding
+	•	category mapping
+	•	vendor knowledge graph
+
+Output:
+	•	baseline model
+	•	flagged assumptions
+	•	3–5 recommended actions
+
+⸻
+
+b) 5-minute “holy crap” moment
+
+Requirement:
+
+Solo founder should get 1 number they didn’t know before — in minutes — without talking to a person.
+
+Examples:
+	•	actual runway vs assumed
+	•	inventory cash cycle
+	•	payroll drift
+	•	top vendor cost increase
+
+That is the moment that sells.
+
+⸻
+
+c) Persistent financial fingerprint
+
+Maintain state:
+	•	vendors
+	•	seasonality
+	•	payback
+	•	debt schedule
+	•	margins
+	•	working capital
+	•	churn
+
+Wrappers are stateless.
+Platforms remember.
+
+⸻
+
+d) Workflows, not UI
+
+You’re not a prettier spreadsheet.
+You are a system of behavior:
+	•	budgets issued
+	•	vendor caps created
+	•	hiring guardrails
+	•	alerts on drift
+	•	suggested cuts
+	•	renewal reminders
+
+Users act inside the system.
+
+That creates lock-in.
+
+⸻
+
+e) Vertical-first GTM
+
+Pick a segment where:
+	•	CAC obvious
+	•	contribution margin matters
+	•	working capital is pain
+
+E-commerce is perfect.
+
+You solve:
+	•	traffic → conversion → AOV
+	•	returns
+	•	shipping
+	•	inventory
+	•	lead times
+	•	margin erosion
+	•	payback
+
+No SaaS competitor touches this fluently.
+
+⸻
+
+JTBD SUMMARY
+
+Job to be done
+
+Know what’s happening financially and what to do next, instantly, without models.
+
+Possible solutions
+	•	auto-ingested baseline model
+	•	model validation & correction
+	•	unit economics dashboards
+	•	5-minute insight moment
+	•	vertical-first
+
+How might we accomplish
+	•	ingest → normalize → model → validate → approve
+	•	persistent fingerprint
+	•	workflows & decisions
+	•	eventually touch spend
+
+⸻
+
+STRATEGIC LINE
+
+Parallel = board decks
+BlackTop = operator truth
+
+Parallel = FP&A
+BlackTop = Operating finance
+
+Parallel asks you to model
+BlackTop models for you
+
+Parallel answers when asked
+BlackTop tells you before you ask
+
+⸻
+
+LITMUS TEST FOR NOT BEING A WRAPPER
+
+If founders say:
+
+“It told me what was happening before I even asked.”
+
+You win.
+
+If they say:
+
+“I asked it questions and it summarized stuff.”
+
+You’re a wrapper.
+
+⸻
+
+FINISH LINE
+
+Remove the concept of modeling entirely.
+Be the place where messy financial reality becomes structured decisions.
+Deliver direction in under 5 minutes.
+
+That’s the product. That’s the wedge.

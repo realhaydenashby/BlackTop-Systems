@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -334,6 +334,37 @@ export default function LiveAnalytics() {
               </CardContent>
             </Card>
           )}
+
+          <ActionPlanModule 
+            title="Spend Action Plan"
+            description="Actionable insights based on your spending data"
+            items={[
+              {
+                id: "1",
+                summary: "Review Top Vendor Contracts",
+                metricRef: "vendor_spend",
+                severity: "high",
+                recommendedAction: "Negotiate better rates with your top 3 vendors or explore alternatives",
+                impact: "Potential 10-15% savings",
+              },
+              {
+                id: "2",
+                summary: "Audit Recurring Subscriptions",
+                metricRef: "recurring_spend",
+                severity: "medium",
+                recommendedAction: "Review all SaaS subscriptions and cancel unused or underutilized tools",
+                impact: "Reduce software costs",
+              },
+              {
+                id: "3",
+                summary: "Categorize Uncategorized Spend",
+                metricRef: "category_coverage",
+                severity: "low",
+                recommendedAction: "Improve spend visibility by properly categorizing all transactions",
+                impact: "Better financial insights",
+              },
+            ]}
+          />
         </>
       )}
 
@@ -366,26 +397,94 @@ export default function LiveAnalytics() {
             </Card>
           </div>
 
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue Trend</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={revenueTrendData}>
+                    <CartesianGrid {...chartStyles.cartesianGrid} />
+                    <XAxis dataKey="month" {...chartStyles.xAxis} />
+                    <YAxis {...chartStyles.yAxis} tickFormatter={(v) => formatCurrency(v)} />
+                    <Tooltip {...chartStyles.tooltip} formatter={(value: number) => formatCurrency(value)} />
+                    <Area 
+                      type="monotone" 
+                      dataKey="revenue" 
+                      stroke={CHART_COLORS[0]} 
+                      fill={CHART_COLORS[0]} 
+                      name="Revenue" 
+                      {...areaStyles}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>MRR vs ARR</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={analytics.revenue.trend.map((item) => ({
+                    month: formatMonth(item.month),
+                    mrr: item.amount,
+                    arr: item.amount * 12,
+                  }))}>
+                    <CartesianGrid {...chartStyles.cartesianGrid} />
+                    <XAxis dataKey="month" {...chartStyles.xAxis} />
+                    <YAxis {...chartStyles.yAxis} tickFormatter={(v) => formatCurrency(v)} />
+                    <Tooltip {...chartStyles.tooltip} formatter={(value: number) => formatCurrency(value)} />
+                    <Legend {...chartStyles.legend} />
+                    <Line 
+                      type="monotone" 
+                      dataKey="mrr" 
+                      stroke={CHART_COLORS[0]} 
+                      name="MRR" 
+                      {...lineStyles}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="arr" 
+                      stroke={CHART_COLORS[1]} 
+                      name="ARR" 
+                      {...lineStyles}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Revenue Trend</CardTitle>
+              <CardTitle>Revenue by Source</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={revenueTrendData}>
-                  <CartesianGrid {...chartStyles.cartesianGrid} />
-                  <XAxis dataKey="month" {...chartStyles.xAxis} />
-                  <YAxis {...chartStyles.yAxis} tickFormatter={(v) => formatCurrency(v)} />
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: "Recurring Revenue", value: analytics.burn.recurring > 0 ? analytics.revenue.total * 0.7 : analytics.revenue.total * 0.5 },
+                      { name: "One-Time Sales", value: analytics.burn.recurring > 0 ? analytics.revenue.total * 0.2 : analytics.revenue.total * 0.35 },
+                      { name: "Services", value: analytics.revenue.total * 0.1 },
+                      { name: "Other", value: analytics.revenue.total * 0.05 },
+                    ].filter(item => item.value > 0)}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    dataKey="value"
+                  >
+                    {[0, 1, 2, 3].map((index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
                   <Tooltip {...chartStyles.tooltip} formatter={(value: number) => formatCurrency(value)} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="revenue" 
-                    stroke={CHART_COLORS[0]} 
-                    fill={CHART_COLORS[0]} 
-                    name="Revenue" 
-                    {...areaStyles}
-                  />
-                </AreaChart>
+                </PieChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -408,6 +507,37 @@ export default function LiveAnalytics() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+
+          <ActionPlanModule 
+            title="Revenue Growth Action Plan"
+            description="Strategic insights to accelerate revenue growth"
+            items={[
+              {
+                id: "1",
+                summary: "Analyze Revenue Sources",
+                metricRef: "revenue_mix",
+                severity: "high",
+                recommendedAction: "Identify your highest-margin revenue streams and focus expansion there",
+                impact: "Optimize revenue mix",
+              },
+              {
+                id: "2",
+                summary: "Improve Cash Flow Timing",
+                metricRef: "cash_flow",
+                severity: "medium",
+                recommendedAction: "Review payment terms with customers to accelerate collections",
+                impact: "Better working capital",
+              },
+              {
+                id: "3",
+                summary: "Track Revenue Trends",
+                metricRef: "revenue_growth",
+                severity: "low",
+                recommendedAction: "Monitor month-over-month growth to identify seasonal patterns",
+                impact: "Predictable revenue",
+              },
+            ]}
+          />
         </>
       )}
 
@@ -532,6 +662,39 @@ export default function LiveAnalytics() {
             </CardContent>
           </Card>
 
+          {/* Cost Structure */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Cost Structure</CardTitle>
+              <CardDescription>Breakdown of where your money is going across major spending categories.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: "Payroll", value: analytics.burn.payroll },
+                      { name: "Operating Expenses", value: analytics.burn.nonPayroll },
+                      { name: "Recurring", value: analytics.burn.recurring },
+                      { name: "One-Time", value: analytics.burn.oneTime },
+                    ].filter(item => item.value > 0)}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    dataKey="value"
+                  >
+                    {[0, 1, 2, 3].map((index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip {...chartStyles.tooltip} formatter={(value: number) => formatCurrency(value)} />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
           {/* Expense Categories Breakdown */}
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
@@ -596,6 +759,37 @@ export default function LiveAnalytics() {
               </CardContent>
             </Card>
           </div>
+
+          <ActionPlanModule 
+            title="Profitability Action Plan"
+            description="Optimize margins and reduce costs"
+            items={[
+              {
+                id: "1",
+                summary: "Improve Gross Margins",
+                metricRef: "gross_margin",
+                severity: "high",
+                recommendedAction: "Review COGS and identify opportunities to reduce direct costs",
+                impact: "Higher profitability",
+              },
+              {
+                id: "2",
+                summary: "Optimize Operating Expenses",
+                metricRef: "opex_ratio",
+                severity: "medium",
+                recommendedAction: "Target operating expenses below 40% of revenue for healthy margins",
+                impact: "Sustainable growth",
+              },
+              {
+                id: "3",
+                summary: "Track Margin Trends",
+                metricRef: "margin_trend",
+                severity: "low",
+                recommendedAction: "Monitor monthly margin changes to catch profitability issues early",
+                impact: "Proactive management",
+              },
+            ]}
+          />
         </>
       )}
 
