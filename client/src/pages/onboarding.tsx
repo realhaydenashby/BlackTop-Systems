@@ -283,10 +283,10 @@ export default function Onboarding() {
                 <CreditCard className="h-8 w-8 text-primary" />
               </div>
               <CardTitle className="text-2xl" data-testid="text-plan-title">
-                Choose Your Plan
+                Start Your 7-Day Free Trial
               </CardTitle>
               <CardDescription className="text-base">
-                Select a plan to unlock your financial superpowers. You can change this later.
+                Try any plan free for 7 days. No credit card required. Upgrade anytime.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -352,7 +352,7 @@ export default function Onboarding() {
                 onClick={() => handleSelectPlan("lite")}
                 data-testid="button-start-trial"
               >
-                Start with Lite (14-day free trial)
+                Start with Lite (7-day free trial)
               </Button>
             </CardContent>
           </Card>

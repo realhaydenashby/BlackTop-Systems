@@ -46,6 +46,8 @@ export const users = pgTable("users", {
   subscriptionTier: varchar("subscription_tier", { length: 20 }), // lite, core, growth - null means no subscription
   stripeCustomerId: varchar("stripe_customer_id"), // Stripe customer ID
   stripeSubscriptionId: varchar("stripe_subscription_id"), // Stripe subscription ID
+  trialStartDate: timestamp("trial_start_date"), // When trial started
+  trialEndsAt: timestamp("trial_ends_at"), // When trial expires (7 days after start)
   companyName: varchar("company_name", { length: 255 }),
   companyIndustry: varchar("company_industry", { length: 100 }),
   companyStage: varchar("company_stage", { length: 50 }), // seed, series-a, series-b, growth, profitable

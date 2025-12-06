@@ -5673,12 +5673,19 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     try {
       const user = req.user as User;
 
+      // Set 7-day trial period
+      const now = new Date();
+      const trialEndsAt = new Date(now);
+      trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+
       const updated = await storage.updateUser(user.id, {
         hasCompletedOnboarding: true,
         isLiveMode: true,
+        trialStartDate: now,
+        trialEndsAt: trialEndsAt,
       });
 
-      console.log(`[ONBOARDING] Completed for user ${user.id} (${user.email})`);
+      console.log(`[ONBOARDING] Completed for user ${user.id} (${user.email}) - Trial ends ${trialEndsAt.toISOString()}`);
 
       res.json({ success: true, user: updated });
     } catch (error: any) {
