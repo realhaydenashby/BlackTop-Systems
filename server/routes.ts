@@ -5267,6 +5267,25 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
 
       console.log(`[WAITLIST] New signup: ${email} (${role})`);
 
+      // Send emails asynchronously (don't block the response)
+      const { sendWaitlistWelcomeEmail, sendWaitlistAdminNotification } = await import("./services/emailService");
+      
+      // Send welcome email to user
+      sendWaitlistWelcomeEmail(entry.email, entry.name).catch(err => {
+        console.error("[WAITLIST] Failed to send welcome email:", err.message);
+      });
+      
+      // Send notification to admins
+      sendWaitlistAdminNotification({
+        email: entry.email,
+        name: entry.name,
+        role: entry.role || undefined,
+        company: entry.company,
+        painPoint: entry.painPoint,
+      }).catch(err => {
+        console.error("[WAITLIST] Failed to send admin notification:", err.message);
+      });
+
       res.status(201).json({ 
         success: true,
         message: "Successfully joined the waitlist",

@@ -287,6 +287,76 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Testimonials Section */}
+      <section className="px-6 py-24">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="text-4xl font-bold mb-4">Founders Love the Simplicity</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Zero learning curve. Zero overhead. Just connect and go.
+            </p>
+          </motion.div>
+
+          <motion.div 
+            className="grid md:grid-cols-2 gap-6"
+            variants={staggerContainer}
+            initial="initial"
+            whileInView="animate"
+            viewport={{ once: true }}
+          >
+            {[
+              {
+                quote: "Connected our bank in 2 minutes. Now I see our runway forecast without touching a spreadsheet.",
+                author: "Sarah M.",
+                role: "Founder",
+                company: "Seed-stage SaaS"
+              },
+              {
+                quote: "No training, no setup calls, no CFO fees. Just connected Plaid and instantly had our burn rate and 12-month forecast.",
+                author: "James K.",
+                role: "CEO",
+                company: "Series A Startup"
+              },
+              {
+                quote: "I used to spend 4 hours a month updating our financial model. BlackTop does it automatically.",
+                author: "Maria L.",
+                role: "Co-founder",
+                company: "B2B Platform"
+              },
+              {
+                quote: "Finally, forecasting that updates itself. Zero overhead, zero learning curve.",
+                author: "Alex T.",
+                role: "Founder",
+                company: "Developer Tools"
+              }
+            ].map((testimonial, idx) => (
+              <motion.div key={idx} variants={fadeInUp}>
+                <Card className="h-full" data-testid={`card-testimonial-${idx}`}>
+                  <CardContent className="pt-6">
+                    <p className="text-lg mb-6 leading-relaxed">"{testimonial.quote}"</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                        {testimonial.author.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-semibold">{testimonial.author}</p>
+                        <p className="text-sm text-muted-foreground">{testimonial.role}, {testimonial.company}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
       {/* CTA Section - Blue with geometric gradient and fade-out */}
       <section className="px-6 py-24 section-blue-cta-fade-out">
         <motion.div 
