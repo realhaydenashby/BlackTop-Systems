@@ -23,6 +23,10 @@ The application operates in distinct Demo and Live modes.
 - **Insights Engine:** Generates 3-5 actionable insights per sync, including runway warnings, vendor spend spikes, and recurring subscription creep.
 - **Transaction Normalization:** AI-powered vendor name normalization, automatic category classification, and recurring transaction detection.
 - **Scenario Modeling Workbook:** A spreadsheet-style interface for 12-month financial projections, allowing for scenario comparison (Conservative/Base/Aggressive) with editable parameters and dynamic calculations.
+- **Proactive Insight Banner:** Single most important financial change surfaced immediately upon dashboard login ("holy crap moment").
+- **Actionable Action Plans:** Interactive approve/dismiss/snooze buttons on AI recommendations with database persistence for user decisions.
+- **Business Type System:** Vertical-specific KPIs and unit economics for SaaS, Agency/Services, E-commerce, Marketplace, Hardware, Healthcare, Fintech with customized health indicators per type.
+- **Initiative Engine:** Change detection system that compares current vs previous sync data and surfaces financial deltas proactively (runway changes, burn spikes, revenue shifts, cash changes).
 - **AI Copilot with Tool-Calling:** Utilizes OpenAI function calling for interactive scenario modeling, with tools for adding hires, expenses, running what-if scenarios, and analyzing spend.
 - **Shareable Reports:** Generates investor-ready HTML reports with key financial metrics accessible via UUID-based public links.
 - **Notification System:** Multi-channel alerts (email, Slack, SMS) for proactive monitoring, including threshold warnings and weekly digests.

@@ -67,6 +67,8 @@ import type {
   InsertAIContextNote,
   AIModelPerformance,
   InsertAIModelPerformance,
+  ActionDecision,
+  InsertActionDecision,
 } from "@shared/schema";
 import {
   users,
@@ -104,6 +106,7 @@ import {
   aiAuditLogs,
   aiContextNotes,
   aiModelPerformance,
+  actionDecisions,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -319,6 +322,11 @@ export interface IStorage {
   // AI Enhancement - Model Performance
   upsertAIModelPerformance(perf: InsertAIModelPerformance): Promise<AIModelPerformance>;
   getAIModelPerformance(filters?: { provider?: string; taskType?: string }): Promise<AIModelPerformance[]>;
+
+  // Action Decisions
+  createActionDecision(decision: InsertActionDecision): Promise<ActionDecision>;
+  getActionDecisions(organizationId: string, status?: string, limit?: number): Promise<ActionDecision[]>;
+  updateActionDecision(id: string, data: Partial<InsertActionDecision>): Promise<ActionDecision | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1484,6 +1492,35 @@ export class DatabaseStorage implements IStorage {
       where: conditions.length > 0 ? and(...conditions) : undefined,
       orderBy: [desc(aiModelPerformance.periodStart)],
     });
+  }
+
+  // Action Decisions
+  async createActionDecision(decision: InsertActionDecision): Promise<ActionDecision> {
+    const [created] = await db.insert(actionDecisions).values(decision).returning();
+    return created;
+  }
+
+  async getActionDecisions(organizationId: string, status?: string, limit?: number): Promise<ActionDecision[]> {
+    const conditions: any[] = [eq(actionDecisions.organizationId, organizationId)];
+    
+    if (status) {
+      conditions.push(eq(actionDecisions.status, status as any));
+    }
+
+    return await db.query.actionDecisions.findMany({
+      where: and(...conditions),
+      orderBy: [desc(actionDecisions.createdAt)],
+      limit: limit || 50,
+    });
+  }
+
+  async updateActionDecision(id: string, data: Partial<InsertActionDecision>): Promise<ActionDecision | undefined> {
+    const [updated] = await db
+      .update(actionDecisions)
+      .set(data)
+      .where(eq(actionDecisions.id, id))
+      .returning();
+    return updated;
   }
 }
 

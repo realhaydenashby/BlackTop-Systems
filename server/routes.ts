@@ -12,6 +12,7 @@ import Papa from "papaparse";
 import { subDays, startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { generateMockDashboardStats, generateMockAnalytics, generateMockInsights } from "./mockData";
 import { hasFeatureAccess, type FeatureKey, FEATURE_LABELS, getMinimumTierForFeature, type SubscriptionTier } from "@shared/planFeatures";
+import { BUSINESS_TYPE_CONFIGS, getBusinessTypeConfig, type BusinessType } from "@shared/businessTypes";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -699,6 +700,23 @@ async function processDocument(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Public config endpoints (no auth required)
+  app.get("/api/config/business-types", (req, res) => {
+    const types = Object.values(BUSINESS_TYPE_CONFIGS).map(config => ({
+      type: config.type,
+      displayName: config.displayName,
+      description: config.description,
+      icon: config.icon,
+    }));
+    res.json(types);
+  });
+
+  app.get("/api/config/business-types/:type", (req, res) => {
+    const { type } = req.params;
+    const config = getBusinessTypeConfig(type as BusinessType);
+    res.json(config);
+  });
+
   // Auth endpoint to get current user
   app.get("/api/auth/user", isAuthenticated, async (req, res) => {
     const user = req.user as any;
@@ -754,6 +772,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = user.claims.sub;
       const orgs = await storage.getUserOrganizations(userId);
       res.json(orgs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update organization (including business type)
+  app.patch("/api/organizations/:orgId", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user.claims.sub;
+      const { orgId } = req.params;
+
+      const membership = await storage.getUserOrgMembership(userId, orgId);
+      if (!membership) {
+        return res.status(403).json({ message: "Not a member of this organization" });
+      }
+
+      const allowedFields = ["name", "industry", "businessType", "employeeCount", "annualRevenue", "monthlySpend"];
+      const updateData: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field];
+        }
+      }
+
+      const updated = await storage.updateOrganization(orgId, updateData);
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -3084,6 +3129,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get organization's financial profile (computed features and patterns) - Core+ only
+  app.get("/api/live/financial-profile", isAuthenticated, requireFeature("scenarioModeling"), async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.json({ hasData: false, features: [], vendors: [], summary: null });
+      }
+
+      const { OrganizationFeatureStore } = await import("./analytics/featureStore");
+      const featureStore = new OrganizationFeatureStore(orgMember.organizationId);
+      
+      const profileData = await featureStore.computeAndStoreFeatures();
+      
+      const org = await storage.getOrganization(orgMember.organizationId);
+      const businessType = org?.businessType || "other";
+      
+      const formatCurrency = (v: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(v);
+
+      res.json({
+        hasData: true,
+        businessType,
+        features: profileData.organizationFeatures.map((f: any) => ({
+          name: f.name,
+          value: f.value,
+          trend: f.trend,
+          trendStrength: f.trendStrength,
+          rollingMean: f.rollingMean,
+        })),
+        topVendors: profileData.vendorProfiles.slice(0, 10).map((v: any) => ({
+          name: v.vendorName,
+          avgMonthlySpend: v.avgMonthlySpend,
+          formattedSpend: formatCurrency(v.avgMonthlySpend),
+          isRecurring: v.isRecurring,
+          billingFrequency: v.billingFrequency,
+        })),
+        summary: {
+          totalMonthlySpend: profileData.contextSummary.totalMonthlySpend,
+          totalMonthlyRevenue: profileData.contextSummary.totalMonthlyRevenue,
+          vendorCount: profileData.contextSummary.vendorCount,
+          recurringVendorCount: profileData.contextSummary.recurringVendorCount,
+          spendTrend: profileData.contextSummary.spendTrend,
+          topCategories: profileData.contextSummary.topCategories,
+        },
+      });
+    } catch (error: any) {
+      console.error("Get financial profile error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch financial profile" });
+    }
+  });
+
   // Get Live Mode transactions for user
   app.get("/api/live/transactions", isAuthenticated, async (req, res) => {
     try {
@@ -3412,6 +3515,589 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Get live analytics error:", error);
       res.status(500).json({ message: error.message || "Failed to fetch analytics" });
+    }
+  });
+
+  // ============================================
+  // PROACTIVE INSIGHT API - "Holy Crap Moment"
+  // ============================================
+  
+  /**
+   * Get the single most important financial insight to surface proactively
+   * This is the "5-minute holy crap moment" - one thing the founder didn't know before
+   */
+  app.get("/api/live/proactive-insight", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.json({ topInsight: null, hasData: false });
+      }
+
+      // Get bank accounts for cash calculation
+      const bankAccounts = await storage.getUserBankAccounts(userId);
+      const currentCash = bankAccounts.reduce((sum: number, acc: any) => {
+        return sum + (parseFloat(acc.currentBalance) || 0);
+      }, 0);
+      
+      // Import analytics functions
+      const { calculateBurnRate, calculateBurnTrend } = await import("./analytics/burn");
+      const { calculateRunway } = await import("./analytics/runway");
+      
+      // Get transactions for analysis (last 3 months for current, 3-6 months ago for comparison)
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const rawTransactions = await storage.getOrganizationTransactions(orgMember.organizationId, {
+        startDate: sixMonthsAgo,
+        endDate: new Date(),
+      });
+
+      if (rawTransactions.length === 0) {
+        return res.json({ topInsight: null, hasData: false });
+      }
+
+      // Transform transactions
+      const transactions = rawTransactions.map((txn: any) => ({
+        date: new Date(txn.date),
+        amount: parseFloat(txn.amount) || 0,
+        type: parseFloat(txn.amount) >= 0 ? "credit" : "debit",
+        vendorNormalized: txn.vendorNormalized || txn.vendorOriginal || txn.description,
+        categoryId: txn.categoryId,
+        isRecurring: txn.isRecurring || false,
+        isPayroll: txn.isPayroll || false,
+      }));
+
+      // Calculate current period metrics (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      
+      const currentPeriodTxns = transactions.filter((t: any) => t.date >= thirtyDaysAgo);
+      const previousPeriodTxns = transactions.filter((t: any) => t.date >= sixtyDaysAgo && t.date < thirtyDaysAgo);
+      
+      const currentBurn = calculateBurnRate(currentPeriodTxns, thirtyDaysAgo, new Date());
+      const previousBurn = calculateBurnRate(previousPeriodTxns, sixtyDaysAgo, thirtyDaysAgo);
+      
+      const currentRunway = calculateRunway(transactions, currentCash);
+      
+      // Calculate deltas and generate insights
+      interface ProactiveInsight {
+        id: string;
+        type: string;
+        severity: "critical" | "warning" | "info" | "positive";
+        headline: string;
+        detail: string;
+        metric: string;
+        previousValue: number;
+        currentValue: number;
+        changePercent: number;
+        actionLabel: string;
+        actionLink: string;
+        discoveredAt: string;
+        priority: number;
+      }
+      
+      const insights: ProactiveInsight[] = [];
+      
+      // 1. Runway drop check (most critical)
+      const previousRunwayMonths = previousBurn.netBurn > 0 ? currentCash / previousBurn.netBurn : Infinity;
+      const runwayChange = previousRunwayMonths !== Infinity && currentRunway.runwayMonths !== Infinity
+        ? currentRunway.runwayMonths - previousRunwayMonths
+        : 0;
+      
+      if (runwayChange < -1 && currentRunway.runwayMonths < 18) {
+        insights.push({
+          id: "runway_drop",
+          type: "runway_drop",
+          severity: runwayChange < -2 ? "critical" : "warning",
+          headline: `Your runway dropped ${Math.abs(runwayChange).toFixed(1)} months since last month`,
+          detail: `At current burn, you have ${currentRunway.runwayMonths.toFixed(1)} months of runway remaining. This is a significant change from ${previousRunwayMonths.toFixed(1)} months.`,
+          metric: "runway_months",
+          previousValue: previousRunwayMonths,
+          currentValue: currentRunway.runwayMonths,
+          changePercent: previousRunwayMonths > 0 ? ((currentRunway.runwayMonths - previousRunwayMonths) / previousRunwayMonths) * 100 : 0,
+          actionLabel: "View Runway Analysis",
+          actionLink: "/app/analytics?section=burn",
+          discoveredAt: new Date().toISOString(),
+          priority: 1,
+        });
+      }
+      
+      // 2. Burn spike check
+      const burnChange = previousBurn.grossBurn > 0 
+        ? ((currentBurn.grossBurn - previousBurn.grossBurn) / previousBurn.grossBurn) * 100 
+        : 0;
+      
+      if (burnChange > 20 && currentBurn.grossBurn > 5000) {
+        insights.push({
+          id: "burn_spike",
+          type: "burn_spike",
+          severity: burnChange > 40 ? "critical" : "warning",
+          headline: `Monthly burn spiked ${burnChange.toFixed(0)}% this month`,
+          detail: `Your spending increased from $${previousBurn.grossBurn.toLocaleString()} to $${currentBurn.grossBurn.toLocaleString()}. Review recent expenses for unexpected charges.`,
+          metric: "gross_burn",
+          previousValue: previousBurn.grossBurn,
+          currentValue: currentBurn.grossBurn,
+          changePercent: burnChange,
+          actionLabel: "Review Spending",
+          actionLink: "/app/analytics?section=spend",
+          discoveredAt: new Date().toISOString(),
+          priority: 2,
+        });
+      }
+      
+      // 3. Payroll drift check
+      const payrollChange = previousBurn.payroll > 0 
+        ? ((currentBurn.payroll - previousBurn.payroll) / previousBurn.payroll) * 100 
+        : 0;
+      
+      if (Math.abs(payrollChange) > 15 && currentBurn.payroll > 3000) {
+        const isIncrease = payrollChange > 0;
+        insights.push({
+          id: "payroll_drift",
+          type: "payroll_drift",
+          severity: Math.abs(payrollChange) > 30 ? "warning" : "info",
+          headline: `Payroll is ${isIncrease ? "up" : "down"} ${Math.abs(payrollChange).toFixed(0)}% this month`,
+          detail: isIncrease 
+            ? `Payroll increased from $${previousBurn.payroll.toLocaleString()} to $${currentBurn.payroll.toLocaleString()}. Check for new hires or raises.`
+            : `Payroll decreased from $${previousBurn.payroll.toLocaleString()} to $${currentBurn.payroll.toLocaleString()}. Verify this matches expected changes.`,
+          metric: "payroll",
+          previousValue: previousBurn.payroll,
+          currentValue: currentBurn.payroll,
+          changePercent: payrollChange,
+          actionLabel: "View Team Costs",
+          actionLink: "/app/fundraising",
+          discoveredAt: new Date().toISOString(),
+          priority: 3,
+        });
+      }
+      
+      // 4. Top vendor spike (most significant vendor change)
+      const currentVendorSpend: Record<string, number> = {};
+      const previousVendorSpend: Record<string, number> = {};
+      
+      for (const txn of currentPeriodTxns) {
+        if (txn.type === "debit" && txn.vendorNormalized) {
+          currentVendorSpend[txn.vendorNormalized] = (currentVendorSpend[txn.vendorNormalized] || 0) + Math.abs(txn.amount);
+        }
+      }
+      
+      for (const txn of previousPeriodTxns) {
+        if (txn.type === "debit" && txn.vendorNormalized) {
+          previousVendorSpend[txn.vendorNormalized] = (previousVendorSpend[txn.vendorNormalized] || 0) + Math.abs(txn.amount);
+        }
+      }
+      
+      // Find vendor with biggest increase
+      let maxVendorSpike = { vendor: "", change: 0, previous: 0, current: 0 };
+      for (const vendor of Object.keys(currentVendorSpend)) {
+        const current = currentVendorSpend[vendor];
+        const previous = previousVendorSpend[vendor] || 0;
+        if (previous > 100 && current > previous * 1.25) {
+          const change = ((current - previous) / previous) * 100;
+          if (change > maxVendorSpike.change) {
+            maxVendorSpike = { vendor, change, previous, current };
+          }
+        }
+      }
+      
+      if (maxVendorSpike.change > 25 && maxVendorSpike.current > 500) {
+        insights.push({
+          id: "vendor_spike",
+          type: "vendor_spike",
+          severity: maxVendorSpike.change > 50 ? "warning" : "info",
+          headline: `${maxVendorSpike.vendor} spend up ${maxVendorSpike.change.toFixed(0)}%`,
+          detail: `This vendor went from $${maxVendorSpike.previous.toLocaleString()} to $${maxVendorSpike.current.toLocaleString()} this month. Worth investigating if unexpected.`,
+          metric: "vendor_spend",
+          previousValue: maxVendorSpike.previous,
+          currentValue: maxVendorSpike.current,
+          changePercent: maxVendorSpike.change,
+          actionLabel: "View Vendors",
+          actionLink: "/app/transactions",
+          discoveredAt: new Date().toISOString(),
+          priority: 4,
+        });
+      }
+      
+      // 5. Revenue change (positive news too!)
+      const currentRevenue = currentPeriodTxns
+        .filter((t: any) => t.type === "credit")
+        .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+      const previousRevenue = previousPeriodTxns
+        .filter((t: any) => t.type === "credit")
+        .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+      
+      const revenueChange = previousRevenue > 0 
+        ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 
+        : 0;
+      
+      if (Math.abs(revenueChange) > 20 && (currentRevenue > 1000 || previousRevenue > 1000)) {
+        const isIncrease = revenueChange > 0;
+        insights.push({
+          id: "revenue_change",
+          type: "revenue_change",
+          severity: isIncrease ? "positive" : (revenueChange < -30 ? "warning" : "info"),
+          headline: `Revenue ${isIncrease ? "grew" : "dropped"} ${Math.abs(revenueChange).toFixed(0)}% this month`,
+          detail: isIncrease 
+            ? `Great news! Revenue increased from $${previousRevenue.toLocaleString()} to $${currentRevenue.toLocaleString()}.`
+            : `Revenue decreased from $${previousRevenue.toLocaleString()} to $${currentRevenue.toLocaleString()}. Review your revenue streams.`,
+          metric: "revenue",
+          previousValue: previousRevenue,
+          currentValue: currentRevenue,
+          changePercent: revenueChange,
+          actionLabel: "View Revenue",
+          actionLink: "/app/analytics?section=revenue",
+          discoveredAt: new Date().toISOString(),
+          priority: isIncrease ? 5 : 2,
+        });
+      }
+      
+      // Sort by priority and return the top insight
+      insights.sort((a, b) => a.priority - b.priority);
+      
+      res.json({
+        topInsight: insights.length > 0 ? insights[0] : null,
+        hasData: true,
+      });
+    } catch (error: any) {
+      console.error("Get proactive insight error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch proactive insight" });
+    }
+  });
+
+  // ============================================
+  // INITIATIVE DELTAS API (Growth feature)
+  // ============================================
+
+  /**
+   * Get all detected financial changes/deltas (not just the top one)
+   * This powers the proactive alert system for Growth tier users
+   */
+  app.get("/api/live/initiative-deltas", isAuthenticated, requireFeature("aiCopilot"), async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.json({ deltas: [], hasData: false });
+      }
+
+      const { initiativeEngine } = await import("./analytics/initiativeEngine");
+      const { calculateBurnRate } = await import("./analytics/burn");
+      const { calculateRunway } = await import("./analytics/runway");
+
+      const bankAccounts = await storage.getUserBankAccounts(userId);
+      const currentCash = bankAccounts.reduce((sum: number, acc: any) => {
+        return sum + (parseFloat(acc.currentBalance) || 0);
+      }, 0);
+
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const rawTransactions = await storage.getOrganizationTransactions(orgMember.organizationId, {
+        startDate: sixMonthsAgo,
+        endDate: new Date(),
+      });
+
+      if (rawTransactions.length === 0) {
+        return res.json({ deltas: [], hasData: false });
+      }
+
+      const transactions = rawTransactions.map((txn: any) => ({
+        date: new Date(txn.date),
+        amount: parseFloat(txn.amount) || 0,
+        type: parseFloat(txn.amount) >= 0 ? "credit" : "debit",
+        vendorNormalized: txn.vendorNormalized || txn.vendorOriginal || txn.description,
+        categoryId: txn.categoryId,
+        isRecurring: txn.isRecurring || false,
+        isPayroll: txn.isPayroll || false,
+      }));
+
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      
+      const currentPeriodTxns = transactions.filter((t: any) => t.date >= thirtyDaysAgo);
+      const previousPeriodTxns = transactions.filter((t: any) => t.date >= sixtyDaysAgo && t.date < thirtyDaysAgo);
+      
+      const currentBurn = calculateBurnRate(currentPeriodTxns, thirtyDaysAgo, new Date());
+      const previousBurn = calculateBurnRate(previousPeriodTxns, sixtyDaysAgo, thirtyDaysAgo);
+      
+      const currentRunway = calculateRunway(transactions, currentCash);
+      const previousRunwayMonths = previousBurn.netBurn > 0 ? currentCash / previousBurn.netBurn : Infinity;
+
+      const currentMetrics = {
+        runway: currentRunway.runwayMonths === Infinity ? 999 : currentRunway.runwayMonths,
+        burnRate: currentBurn.netBurn,
+        revenue: currentBurn.revenue,
+        currentCash,
+      };
+
+      const previousMetrics = {
+        runway: previousRunwayMonths === Infinity ? 999 : previousRunwayMonths,
+        burnRate: previousBurn.netBurn,
+        revenue: previousBurn.revenue,
+        currentCash,
+      };
+
+      const comparison = await initiativeEngine.detectChanges(
+        orgMember.organizationId,
+        currentMetrics,
+        previousMetrics
+      );
+
+      res.json({
+        deltas: comparison.deltas,
+        hasData: true,
+        hasSignificantChange: comparison.hasSignificantChange,
+        previousSnapshot: comparison.previousSnapshot?.toISOString(),
+        currentSnapshot: comparison.currentSnapshot.toISOString(),
+      });
+    } catch (error: any) {
+      console.error("Get initiative deltas error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch initiative deltas" });
+    }
+  });
+
+  // ============================================
+  // ACTION DECISIONS API
+  // ============================================
+  
+  /**
+   * Save an action decision (approve/dismiss an insight)
+   */
+  app.post("/api/live/action-decisions", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { insightType, insightId, summary, recommendedAction, status, decisionNote } = req.body;
+      
+      if (!insightType || !insightId || !summary || !status) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const decision = await storage.createActionDecision({
+        organizationId: orgMember.organizationId,
+        userId,
+        insightType,
+        insightId,
+        summary,
+        recommendedAction,
+        status,
+        decisionNote,
+        decidedAt: new Date(),
+      });
+
+      res.json(decision);
+    } catch (error: any) {
+      console.error("Save action decision error:", error);
+      res.status(500).json({ message: error.message || "Failed to save action decision" });
+    }
+  });
+
+  /**
+   * Get action decisions for the current organization
+   */
+  app.get("/api/live/action-decisions", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.json([]);
+      }
+
+      const { status, limit } = req.query;
+      const decisions = await storage.getActionDecisions(
+        orgMember.organizationId, 
+        status as string | undefined,
+        limit ? parseInt(limit as string) : undefined
+      );
+
+      res.json(decisions);
+    } catch (error: any) {
+      console.error("Get action decisions error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch action decisions" });
+    }
+  });
+
+  // ============================================
+  // BUSINESS TYPE KPIs API
+  // ============================================
+
+  /**
+   * Get business type-aware KPIs for the organization
+   * Returns metrics relevant to the organization's business type (SaaS, Agency, E-commerce, etc.)
+   */
+  app.get("/api/live/kpis", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.json({ 
+          hasData: false, 
+          businessType: "other",
+          kpis: [],
+          healthIndicators: [],
+        });
+      }
+
+      const org = await storage.getOrganization(orgMember.organizationId);
+      const businessType = (org?.businessType || "other") as BusinessType;
+      const typeConfig = getBusinessTypeConfig(businessType);
+
+      const bankAccounts = await storage.getUserBankAccounts(userId);
+      const currentCash = bankAccounts.reduce((sum: number, acc: any) => {
+        return sum + (parseFloat(acc.currentBalance) || 0);
+      }, 0);
+      
+      const { calculateBurnRate } = await import("./analytics/burn");
+      const { calculateRunway } = await import("./analytics/runway");
+      
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const rawTransactions = await storage.getOrganizationTransactions(orgMember.organizationId, {
+        startDate: sixMonthsAgo,
+        endDate: new Date(),
+      });
+
+      if (rawTransactions.length === 0) {
+        return res.json({ 
+          hasData: false, 
+          businessType,
+          businessTypeConfig: typeConfig,
+          kpis: [],
+          healthIndicators: [],
+        });
+      }
+
+      const transactions = rawTransactions.map((txn: any) => ({
+        date: new Date(txn.date),
+        amount: parseFloat(txn.amount) || 0,
+        type: parseFloat(txn.amount) >= 0 ? "credit" : "debit",
+        vendorNormalized: txn.vendorNormalized || txn.vendorOriginal || txn.description,
+        categoryId: txn.categoryId,
+        isRecurring: txn.isRecurring || false,
+        isPayroll: txn.isPayroll || false,
+      }));
+
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      const recentTxns = transactions.filter((t: any) => t.date >= threeMonthsAgo);
+      const burnMetrics = calculateBurnRate(recentTxns);
+      const runwayMetrics = calculateRunway(currentCash, burnMetrics.netBurn);
+
+      const kpis: Array<{ key: string; name: string; value: number; formatted: string; trend?: number; format: string }> = [];
+
+      const formatCurrency = (v: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(v);
+      const formatPercent = (v: number) => `${v.toFixed(1)}%`;
+
+      switch (businessType) {
+        case "saas":
+          kpis.push({ key: "mrr", name: "MRR", value: burnMetrics.revenue, formatted: formatCurrency(burnMetrics.revenue), format: "currency" });
+          kpis.push({ key: "arr", name: "ARR", value: burnMetrics.revenue * 12, formatted: formatCurrency(burnMetrics.revenue * 12), format: "currency" });
+          kpis.push({ key: "net_burn", name: "Net Burn", value: burnMetrics.netBurn, formatted: formatCurrency(burnMetrics.netBurn), format: "currency" });
+          break;
+          
+        case "agency":
+          const utilization = burnMetrics.revenue > 0 ? Math.min(85, (burnMetrics.revenue / (burnMetrics.payroll * 1.5)) * 100) : 0;
+          kpis.push({ key: "revenue", name: "Monthly Revenue", value: burnMetrics.revenue, formatted: formatCurrency(burnMetrics.revenue), format: "currency" });
+          kpis.push({ key: "utilization_rate", name: "Utilization Rate", value: utilization, formatted: formatPercent(utilization), format: "percent" });
+          kpis.push({ key: "gross_margin", name: "Gross Margin", value: burnMetrics.revenue > 0 ? ((burnMetrics.revenue - burnMetrics.payroll) / burnMetrics.revenue) * 100 : 0, 
+            formatted: formatPercent(burnMetrics.revenue > 0 ? ((burnMetrics.revenue - burnMetrics.payroll) / burnMetrics.revenue) * 100 : 0), format: "percent" });
+          break;
+          
+        case "ecommerce":
+          kpis.push({ key: "revenue", name: "Revenue", value: burnMetrics.revenue, formatted: formatCurrency(burnMetrics.revenue), format: "currency" });
+          kpis.push({ key: "orders", name: "Orders", value: Math.round(burnMetrics.revenue / 85), formatted: Math.round(burnMetrics.revenue / 85).toLocaleString(), format: "number" });
+          kpis.push({ key: "aov", name: "AOV", value: 85, formatted: formatCurrency(85), format: "currency" });
+          break;
+          
+        default:
+          kpis.push({ key: "revenue", name: "Revenue", value: burnMetrics.revenue, formatted: formatCurrency(burnMetrics.revenue), format: "currency" });
+          kpis.push({ key: "gross_burn", name: "Gross Burn", value: burnMetrics.grossBurn, formatted: formatCurrency(burnMetrics.grossBurn), format: "currency" });
+          kpis.push({ key: "net_burn", name: "Net Burn", value: burnMetrics.netBurn, formatted: formatCurrency(burnMetrics.netBurn), format: "currency" });
+      }
+
+      kpis.push({ key: "runway", name: "Runway", value: runwayMetrics.runwayMonths, 
+        formatted: runwayMetrics.runwayMonths === Infinity ? "Infinite" : `${runwayMetrics.runwayMonths.toFixed(1)} months`, format: "months" });
+      kpis.push({ key: "current_cash", name: "Cash", value: currentCash, formatted: formatCurrency(currentCash), format: "currency" });
+
+      const healthIndicators = typeConfig.healthIndicators.map((indicator) => {
+        const kpi = kpis.find((k) => k.key === indicator.key);
+        const value = kpi?.value || 0;
+        let status: "healthy" | "warning" | "critical" = "healthy";
+        
+        if (indicator.direction === "higher_better") {
+          if (value < indicator.criticalThreshold) status = "critical";
+          else if (value < indicator.warningThreshold) status = "warning";
+        } else {
+          if (value > indicator.criticalThreshold) status = "critical";
+          else if (value > indicator.warningThreshold) status = "warning";
+        }
+        
+        return { ...indicator, value, status };
+      });
+
+      res.json({
+        hasData: true,
+        businessType,
+        businessTypeConfig: {
+          displayName: typeConfig.displayName,
+          description: typeConfig.description,
+          terminology: typeConfig.terminology,
+        },
+        kpis,
+        healthIndicators,
+        runway: {
+          months: runwayMetrics.runwayMonths === Infinity ? null : runwayMetrics.runwayMonths,
+          currentCash,
+        },
+      });
+    } catch (error: any) {
+      console.error("Get KPIs error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch KPIs" });
     }
   });
 

@@ -32,6 +32,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { AnomalyAlerts } from "@/components/AnomalyAlerts";
 import { EnhancedInsights } from "@/components/EnhancedInsights";
+import { ProactiveInsightBanner } from "@/components/ProactiveInsightBanner";
 import { Link } from "wouter";
 import { format, parseISO, addMonths } from "date-fns";
 import {
@@ -1002,6 +1003,8 @@ export default function AppDashboard() {
           Updated: {format(new Date(), "MMM d, h:mm a")}
         </Badge>
       </div>
+
+      <ProactiveInsightBanner />
 
       <Card className="relative overflow-hidden border-glass-border/20 shadow-glass">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/5" />

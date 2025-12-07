@@ -1,6 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, AlertTriangle, Info, CheckCircle2, Check, X, Clock } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
 
 export interface ActionPlanItem {
   id: string;
@@ -15,6 +21,8 @@ interface ActionPlanModuleProps {
   title?: string;
   description?: string;
   items: ActionPlanItem[];
+  insightType?: string;
+  interactive?: boolean;
 }
 
 const severityConfig = {
@@ -43,8 +51,63 @@ const severityConfig = {
 export function ActionPlanModule({ 
   title = "AI-Generated Action Plan", 
   description = "Actionable insights based on your data",
-  items 
+  items,
+  insightType = "action_plan",
+  interactive = true
 }: ActionPlanModuleProps) {
+  const [decisions, setDecisions] = useState<Record<string, "approved" | "dismissed">>({});
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { canAccess } = usePlanAccess();
+  
+  const canUseInteractive = canAccess("aiInsights") && interactive;
+
+  const decisionMutation = useMutation({
+    mutationFn: async ({ itemId, status, summary, recommendedAction }: { 
+      itemId: string; 
+      status: "approved" | "dismissed";
+      summary: string;
+      recommendedAction: string;
+    }) => {
+      return apiRequest("/api/live/action-decisions", {
+        method: "POST",
+        body: JSON.stringify({
+          insightType,
+          insightId: itemId,
+          summary,
+          recommendedAction,
+          status,
+        }),
+      });
+    },
+    onSuccess: (_, variables) => {
+      setDecisions(prev => ({ ...prev, [variables.itemId]: variables.status }));
+      queryClient.invalidateQueries({ queryKey: ["/api/live/action-decisions"] });
+      toast({
+        title: variables.status === "approved" ? "Action approved" : "Action dismissed",
+        description: variables.status === "approved" 
+          ? "This action has been added to your workflow queue."
+          : "This insight has been dismissed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save decision. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDecision = (item: ActionPlanItem, status: "approved" | "dismissed") => {
+    decisionMutation.mutate({
+      itemId: item.id,
+      status,
+      summary: item.summary,
+      recommendedAction: item.recommendedAction,
+    });
+  };
+
   return (
     <Card data-testid="action-plan-module">
       <CardHeader>
@@ -55,9 +118,15 @@ export function ActionPlanModule({
         {items.map((item) => {
           const config = severityConfig[item.severity];
           const Icon = config.icon;
+          const decision = decisions[item.id];
+          const isDecided = !!decision;
 
           return (
-            <Card key={item.id} data-testid={`action-item-${item.id}`}>
+            <Card 
+              key={item.id} 
+              data-testid={`action-item-${item.id}`}
+              className={isDecided ? "opacity-60" : ""}
+            >
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3 flex-1">
@@ -70,6 +139,18 @@ export function ActionPlanModule({
                         <span className="text-xs text-muted-foreground">
                           {item.metricRef}
                         </span>
+                        {isDecided && (
+                          <Badge 
+                            variant={decision === "approved" ? "default" : "secondary"}
+                            className="ml-auto"
+                          >
+                            {decision === "approved" ? (
+                              <><Check className="h-3 w-3 mr-1" /> Approved</>
+                            ) : (
+                              <><X className="h-3 w-3 mr-1" /> Dismissed</>
+                            )}
+                          </Badge>
+                        )}
                       </div>
                       <p className="font-medium text-foreground" data-testid={`text-summary-${item.id}`}>
                         {item.summary}
@@ -88,11 +169,37 @@ export function ActionPlanModule({
                     </p>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Impact:</span>
-                    <span className="text-sm font-medium text-accent" data-testid={`text-impact-${item.id}`}>
-                      {item.impact}
-                    </span>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Impact:</span>
+                      <span className="text-sm font-medium text-accent" data-testid={`text-impact-${item.id}`}>
+                        {item.impact}
+                      </span>
+                    </div>
+                    
+                    {canUseInteractive && !isDecided && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDecision(item, "dismissed")}
+                          disabled={decisionMutation.isPending}
+                          data-testid={`button-dismiss-${item.id}`}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Dismiss
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleDecision(item, "approved")}
+                          disabled={decisionMutation.isPending}
+                          data-testid={`button-approve-${item.id}`}
+                        >
+                          <Check className="h-4 w-4 mr-1" />
+                          Approve
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>

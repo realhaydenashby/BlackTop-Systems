@@ -84,11 +84,24 @@ export const waitlist = pgTable("waitlist", {
 
 export const userRoleEnum = pgEnum("user_role", ["founder", "ops", "accountant", "cfo"]);
 
+// Business Type Enum - for vertical-specific KPIs and unit economics
+export const businessTypeEnum = pgEnum("business_type", [
+  "saas",           // SaaS/Subscription - MRR, ARR, churn, LTV, CAC
+  "agency",         // Agency/Services - utilization, hourly margin, client concentration
+  "ecommerce",      // E-commerce - AOV, ROAS, inventory turnover, CAC payback
+  "marketplace",    // Marketplace - GMV, take rate, buyer/seller metrics
+  "hardware",       // Hardware/Manufacturing - COGS, inventory, lead times
+  "healthcare",     // Healthcare - patient metrics, reimbursement rates
+  "fintech",        // Fintech - transaction volume, default rates
+  "other"           // Other - general business metrics
+]);
+
 // Organization - the tenant entity
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name", { length: 255 }).notNull(),
   industry: varchar("industry", { length: 100 }),
+  businessType: businessTypeEnum("business_type").default("other"),
   employeeCount: varchar("employee_count", { length: 50 }),
   annualRevenue: varchar("annual_revenue", { length: 50 }),
   monthlySpend: varchar("monthly_spend", { length: 50 }),
@@ -851,6 +864,37 @@ export const aiContextNotes = pgTable("ai_context_notes", {
   index("idx_ai_context_user").on(table.userId),
   index("idx_ai_context_type").on(table.feedbackType),
 ]);
+
+// Action Decisions - Track user decisions on actionable insights
+export const actionDecisionStatusEnum = pgEnum("action_decision_status", [
+  "pending", "approved", "dismissed", "completed", "snoozed"
+]);
+
+export const actionDecisions = pgTable("action_decisions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  insightType: varchar("insight_type", { length: 100 }).notNull(),
+  insightId: varchar("insight_id", { length: 255 }).notNull(),
+  summary: text("summary").notNull(),
+  recommendedAction: text("recommended_action"),
+  status: actionDecisionStatusEnum("status").default("pending"),
+  decisionNote: text("decision_note"),
+  snoozeUntil: timestamp("snooze_until"),
+  decidedAt: timestamp("decided_at"),
+  completedAt: timestamp("completed_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_action_decisions_org").on(table.organizationId),
+  index("idx_action_decisions_user").on(table.userId),
+  index("idx_action_decisions_status").on(table.status),
+  index("idx_action_decisions_insight").on(table.insightType, table.insightId),
+]);
+
+export type ActionDecision = typeof actionDecisions.$inferSelect;
+export type InsertActionDecision = typeof actionDecisions.$inferInsert;
+export const insertActionDecisionSchema = createInsertSchema(actionDecisions).omit({ id: true, createdAt: true });
 
 // AI Model Performance - Track model performance over time
 export const aiModelPerformance = pgTable("ai_model_performance", {
