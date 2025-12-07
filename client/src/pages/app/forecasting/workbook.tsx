@@ -553,7 +553,7 @@ export default function Workbook() {
 
       <ForecastCharts rows={rows} />
 
-      {planAccess.hasFeature("scenarioModeling") && (
+      {canAccess("scenarioModeling") && (
         <ModelValidationAlert
           inputs={{
             startingCash: companyState?.cash_balance || 500000,
