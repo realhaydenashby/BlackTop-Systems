@@ -918,6 +918,78 @@ export const aiModelPerformance = pgTable("ai_model_performance", {
   index("idx_ai_perf_period").on(table.periodStart),
 ]);
 
+// Workflow Engine - Automated financial guardrails and alerts (Growth tier)
+export const workflowTriggerTypeEnum = pgEnum("workflow_trigger_type", [
+  "budget_exceeded",     // Budget cap crossed
+  "burn_rate_spike",     // Burn rate increased significantly  
+  "runway_warning",      // Runway below threshold
+  "vendor_spike",        // Vendor spend increased
+  "revenue_drop",        // Revenue decreased
+  "hiring_guardrail",    // Headcount cost exceeds threshold
+  "cash_low",            // Cash balance below threshold
+  "recurring_creep",     // Recurring subscriptions growing
+  "custom"               // Custom trigger condition
+]);
+
+export const workflowActionTypeEnum = pgEnum("workflow_action_type", [
+  "email_alert",         // Send email notification
+  "slack_message",       // Send Slack message
+  "sms_alert",           // Send SMS notification
+  "create_insight",      // Generate an insight
+  "create_action_plan",  // Generate an action plan
+  "log_audit",           // Log to audit trail
+  "webhook"              // Call external webhook
+]);
+
+export const workflowStatusEnum = pgEnum("workflow_status", ["active", "paused", "disabled"]);
+
+export const workflows = pgTable("workflows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  triggerType: workflowTriggerTypeEnum("trigger_type").notNull(),
+  triggerConfig: jsonb("trigger_config").notNull().default({}), // Threshold values, comparison operators, etc.
+  actions: jsonb("actions").notNull().default([]), // Array of action configs
+  status: workflowStatusEnum("status").default("active"),
+  priority: integer("priority").default(50), // 1-100, higher = more important
+  lastTriggeredAt: timestamp("last_triggered_at"),
+  triggerCount: integer("trigger_count").default(0),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_workflows_org").on(table.organizationId),
+  index("idx_workflows_status").on(table.status),
+  index("idx_workflows_trigger").on(table.triggerType),
+]);
+
+// Workflow Executions - Log of workflow runs
+export const workflowExecutions = pgTable("workflow_executions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workflowId: varchar("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  triggeredValue: numeric("triggered_value", { precision: 15, scale: 2 }), // The value that triggered the workflow
+  thresholdValue: numeric("threshold_value", { precision: 15, scale: 2 }), // The threshold that was crossed
+  triggerContext: jsonb("trigger_context").default({}), // Additional context about what triggered
+  actionsExecuted: jsonb("actions_executed").default([]), // Results of each action
+  status: varchar("status", { length: 50 }).default("completed"), // completed, failed, partial
+  errorMessage: text("error_message"),
+  executedAt: timestamp("executed_at").defaultNow(),
+}, (table) => [
+  index("idx_wf_exec_workflow").on(table.workflowId),
+  index("idx_wf_exec_org").on(table.organizationId),
+  index("idx_wf_exec_date").on(table.executedAt),
+]);
+
+export type Workflow = typeof workflows.$inferSelect;
+export type InsertWorkflow = typeof workflows.$inferInsert;
+export const insertWorkflowSchema = createInsertSchema(workflows).omit({ id: true, createdAt: true, updatedAt: true, triggerCount: true, lastTriggeredAt: true });
+
+export type WorkflowExecution = typeof workflowExecutions.$inferSelect;
+export type InsertWorkflowExecution = typeof workflowExecutions.$inferInsert;
+export const insertWorkflowExecutionSchema = createInsertSchema(workflowExecutions).omit({ id: true, executedAt: true });
+
 // Types for new AI tables
 export type MetricSnapshot = typeof metricSnapshots.$inferSelect;
 export type InsertMetricSnapshot = typeof metricSnapshots.$inferInsert;

@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ScenarioComparison } from "@/components/scenario-comparison";
 import { ForecastCharts } from "@/components/ForecastCharts";
+import { ModelValidationAlert } from "@/components/ModelValidationAlert";
 import { usePlanAccess } from "@/hooks/usePlanAccess";
 import { FeatureGate } from "@/components/UpgradePrompt";
 
@@ -551,6 +552,21 @@ export default function Workbook() {
       </Card>
 
       <ForecastCharts rows={rows} />
+
+      {planAccess.hasFeature("scenarioModeling") && (
+        <ModelValidationAlert
+          inputs={{
+            startingCash: companyState?.cash_balance || 500000,
+            monthlyRevenueGrowth: 0.05,
+            monthlyExpenseGrowth: 0.02,
+            revenueVolatility: 0.15,
+            expenseVolatility: 0.08,
+          }}
+          onCorrection={(field, suggestedValue) => {
+            console.log(`Correction suggested for ${field}: ${suggestedValue}`);
+          }}
+        />
+      )}
 
       <ScenarioComparison
         currentCash={companyState?.cash_balance || 500000}

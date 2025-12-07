@@ -3187,6 +3187,243 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Validate scenario model inputs - Core+ tier (scenario modeling)
+  app.post("/api/live/validate-model", isAuthenticated, requireFeature("scenarioModeling"), async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found. Connect financial accounts first." });
+      }
+
+      const { createModelValidator } = await import("./analytics/modelValidation");
+      const validator = createModelValidator(orgMember.organizationId);
+      
+      const result = await validator.validateScenarioInputs(req.body);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Validate model error:", error);
+      res.status(500).json({ message: error.message || "Failed to validate model inputs" });
+    }
+  });
+
+  // ========== WORKFLOW ENGINE ENDPOINTS (Growth tier only) ==========
+
+  // Get all workflows for organization
+  app.get("/api/live/workflows", isAuthenticated, requireFeature("workflowEngine"), async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.json([]);
+      }
+
+      const { createWorkflowEngine } = await import("./analytics/workflowEngine");
+      const engine = createWorkflowEngine(orgMember.organizationId);
+      const workflows = await engine.getWorkflows();
+
+      res.json(workflows);
+    } catch (error: any) {
+      console.error("Get workflows error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch workflows" });
+    }
+  });
+
+  // Create a new workflow
+  app.post("/api/live/workflows", isAuthenticated, requireFeature("workflowEngine"), async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found. Connect financial accounts first." });
+      }
+
+      const { createWorkflowEngine } = await import("./analytics/workflowEngine");
+      const engine = createWorkflowEngine(orgMember.organizationId);
+      const workflow = await engine.createWorkflow({
+        ...req.body,
+        createdBy: userId,
+      });
+
+      res.status(201).json(workflow);
+    } catch (error: any) {
+      console.error("Create workflow error:", error);
+      res.status(500).json({ message: error.message || "Failed to create workflow" });
+    }
+  });
+
+  // Update a workflow
+  app.patch("/api/live/workflows/:id", isAuthenticated, requireFeature("workflowEngine"), async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found." });
+      }
+
+      const { createWorkflowEngine } = await import("./analytics/workflowEngine");
+      const engine = createWorkflowEngine(orgMember.organizationId);
+      const workflow = await engine.updateWorkflow(req.params.id, req.body);
+
+      if (!workflow) {
+        return res.status(404).json({ message: "Workflow not found" });
+      }
+
+      res.json(workflow);
+    } catch (error: any) {
+      console.error("Update workflow error:", error);
+      res.status(500).json({ message: error.message || "Failed to update workflow" });
+    }
+  });
+
+  // Delete a workflow
+  app.delete("/api/live/workflows/:id", isAuthenticated, requireFeature("workflowEngine"), async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found." });
+      }
+
+      const { createWorkflowEngine } = await import("./analytics/workflowEngine");
+      const engine = createWorkflowEngine(orgMember.organizationId);
+      await engine.deleteWorkflow(req.params.id);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete workflow error:", error);
+      res.status(500).json({ message: error.message || "Failed to delete workflow" });
+    }
+  });
+
+  // Evaluate all active workflows (can be called manually or by scheduler)
+  app.post("/api/live/workflows/evaluate", isAuthenticated, requireFeature("workflowEngine"), async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found." });
+      }
+
+      const { createWorkflowEngine } = await import("./analytics/workflowEngine");
+      const engine = createWorkflowEngine(orgMember.organizationId);
+      const results = await engine.evaluateAllWorkflows();
+
+      res.json({
+        evaluated: results.length,
+        triggered: results.filter(r => r.triggered).length,
+        results,
+      });
+    } catch (error: any) {
+      console.error("Evaluate workflows error:", error);
+      res.status(500).json({ message: error.message || "Failed to evaluate workflows" });
+    }
+  });
+
+  // Get workflow execution history
+  app.get("/api/live/workflows/executions", isAuthenticated, requireFeature("workflowEngine"), async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.json([]);
+      }
+
+      const { workflowId, limit } = req.query;
+      
+      const { createWorkflowEngine } = await import("./analytics/workflowEngine");
+      const engine = createWorkflowEngine(orgMember.organizationId);
+      const executions = await engine.getWorkflowExecutions(
+        workflowId as string | undefined,
+        limit ? parseInt(limit as string) : 50
+      );
+
+      res.json(executions);
+    } catch (error: any) {
+      console.error("Get workflow executions error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch workflow executions" });
+    }
+  });
+
+  // ========== END WORKFLOW ENGINE ENDPOINTS ==========
+
+  // Get organization's financial fingerprint (persistent patterns & drift analysis) - Growth tier
+  app.get("/api/live/financial-fingerprint", isAuthenticated, requireFeature("workflowEngine"), async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+      
+      const orgMember = await storage.getOrganizationMember(userId);
+      
+      if (!orgMember) {
+        return res.status(400).json({ message: "No organization found. Connect financial accounts first." });
+      }
+
+      const { createFinancialFingerprintEngine } = await import("./analytics/financialFingerprint");
+      const engine = createFinancialFingerprintEngine(orgMember.organizationId);
+      const fingerprint = await engine.computeFingerprint();
+
+      res.json(fingerprint);
+    } catch (error: any) {
+      console.error("Get financial fingerprint error:", error);
+      res.status(500).json({ message: error.message || "Failed to compute financial fingerprint" });
+    }
+  });
+
   // Get Live Mode transactions for user
   app.get("/api/live/transactions", isAuthenticated, async (req, res) => {
     try {

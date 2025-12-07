@@ -62,6 +62,34 @@ The platform uses an **algorithm-first, AI-augmented** approach where determinis
 - `ai_audit_logs`: Full audit trail of AI decisions (provider, model, confidence, validation)
 - `ai_context_notes`: Human feedback for AI learning (corrections, approvals, rejections)
 - `ai_model_performance`: Track model performance over time (latency, error rate, consensus rate)
+- `workflows`: Automated financial guardrails and alerts with triggers and actions
+- `workflow_executions`: Log of workflow runs with trigger context and action results
+
+#### Workflow Engine (`server/analytics/workflowEngine.ts`)
+Growth-tier automation system for proactive financial monitoring:
+- **Trigger Types:** Budget exceeded, burn rate spike, runway warning, vendor spike, revenue drop, cash low, recurring creep, hiring guardrail
+- **Action Types:** Email alerts, Slack messages, SMS alerts, create insights, create action plans, audit logging, webhooks
+- **Evaluation:** Can be triggered manually or by scheduler to check all active workflows
+- **Execution Logging:** Full audit trail of triggered workflows with values and contexts
+
+#### Model Validation (`server/analytics/modelValidation.ts`)
+Core+ tier validation for scenario modeling inputs:
+- Validates growth rates, volatility parameters, and starting cash against historical baselines
+- Flags unrealistic planned hires (salary ranges, hiring velocity)
+- Computes confidence scores based on validation issues
+- Provides suggested corrections with historical context
+- Auto-validates on workbook mount and re-validates on input changes (debounced 500ms)
+- Queues validation when inputs change during pending requests
+
+#### Financial Fingerprint Engine (`server/analytics/financialFingerprint.ts`)
+Growth-tier persistent pattern learning and drift detection:
+- **Spending Profile:** Volatility, category concentration, recurring spend ratio, trends
+- **Revenue Profile:** Growth rate, concentration risk, predictability
+- **Vendor Fingerprint:** Active vendors, churn, price increases, dependency concentration
+- **Behavioral Patterns:** Subscription-heavy, end-of-month spending, category growth spikes
+- **Seasonal Indices:** Month-by-month spend/revenue patterns
+- **Drift Analysis:** Metric changes compared to historical baselines
+- **Risk Indicators:** Volatility warnings, concentration risks, vendor inflation
 
 ### Plan-Based Feature Gating
 A three-tier pricing model (Lite, Core, Growth) gates features on both the frontend (using `usePlanAccess` hook and `FeatureGate` components) and backend (using `requireFeature` middleware) to control access to advanced functionalities like the AI Copilot, scenario modeling, and shareable reports.
