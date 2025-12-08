@@ -256,9 +256,23 @@ Return a JSON array:
 
     try {
       const parsed = JSON.parse(response.content);
-      const aiInsights: GeneratedInsight[] = (parsed.insights || parsed || []).map((i: any) => ({
-        title: i.title,
-        description: i.description,
+      
+      // Handle various response formats from AI
+      let insightsArray: any[] = [];
+      if (Array.isArray(parsed)) {
+        insightsArray = parsed;
+      } else if (parsed && Array.isArray(parsed.insights)) {
+        insightsArray = parsed.insights;
+      } else if (parsed && typeof parsed === 'object') {
+        // If it's a single insight object, wrap in array
+        if (parsed.title && parsed.description) {
+          insightsArray = [parsed];
+        }
+      }
+      
+      const aiInsights: GeneratedInsight[] = insightsArray.map((i: any) => ({
+        title: i.title || "Insight",
+        description: i.description || "",
         severity: i.severity || "info",
         category: i.category || "general",
         recommendation: i.recommendation || "",
