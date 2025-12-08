@@ -23,7 +23,6 @@ const PLAID_TO_STARTUP_CATEGORY: Record<string, string> = {
   "SUBSCRIPTIONS": "Software & SaaS",
   
   // Infrastructure
-  "SERVICE_COMPUTER_AND_DATA_SERVICES": "Infrastructure",
   "UTILITIES": "Infrastructure",
   "CLOUD_COMPUTING": "Infrastructure",
   
