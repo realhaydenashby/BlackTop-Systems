@@ -38,6 +38,11 @@ function requireFeature(feature: FeatureKey): RequestHandler {
         return res.status(401).json({ message: "User not found" });
       }
       
+      // Admins have access to all features
+      if (dbUser.isAdmin) {
+        return next();
+      }
+      
       const tier = dbUser.subscriptionTier as SubscriptionTier;
       
       if (!hasFeatureAccess(tier, feature)) {
