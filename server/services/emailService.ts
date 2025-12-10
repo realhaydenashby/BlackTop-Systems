@@ -85,36 +85,147 @@ export async function sendEmail(to: string, subject: string, htmlBody: string): 
 
 const ADMIN_EMAILS = ["ashby.hayden8@gmail.com", "williamsyring@gmail.com"];
 
+const EMAIL_STYLES = `
+  body { 
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+    line-height: 1.6; 
+    color: #e5e5e5; 
+    background-color: #0a0a0a;
+    max-width: 600px; 
+    margin: 0 auto; 
+    padding: 40px 20px; 
+  }
+  .container {
+    background: #171717;
+    border-radius: 12px;
+    padding: 32px;
+    border: 1px solid #262626;
+  }
+  .logo { 
+    font-size: 20px; 
+    font-weight: 700; 
+    color: #ffffff;
+    letter-spacing: -0.5px;
+    margin-bottom: 24px;
+  }
+  .header { 
+    font-size: 28px; 
+    font-weight: 600; 
+    color: #ffffff;
+    margin-bottom: 16px; 
+    line-height: 1.3;
+  }
+  .subtext {
+    color: #a3a3a3;
+    font-size: 16px;
+    margin-bottom: 24px;
+  }
+  .content { 
+    background: #262626; 
+    padding: 24px; 
+    border-radius: 8px; 
+    margin: 24px 0;
+    border: 1px solid #404040;
+  }
+  .content p {
+    margin: 0 0 12px 0;
+    color: #d4d4d4;
+  }
+  .content p:last-child {
+    margin-bottom: 0;
+  }
+  .cta { 
+    display: inline-block; 
+    background: #ffffff; 
+    color: #0a0a0a; 
+    padding: 14px 28px; 
+    border-radius: 8px; 
+    text-decoration: none; 
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .footer { 
+    font-size: 13px; 
+    color: #737373; 
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid #262626;
+  }
+  a { color: #e5e5e5; }
+`;
+
 export async function sendWaitlistWelcomeEmail(email: string, name: string): Promise<boolean> {
-  const subject = "Welcome to the BlackTop Waitlist!";
+  const subject = "You're on the BlackTop waitlist";
   
   const htmlBody = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1a1a1a; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { font-size: 24px; font-weight: 600; margin-bottom: 20px; }
-        .content { background: #f8f9fa; padding: 24px; border-radius: 8px; margin: 20px 0; }
-        .footer { font-size: 14px; color: #666; margin-top: 30px; }
-      </style>
+      <style>${EMAIL_STYLES}</style>
     </head>
     <body>
-      <div class="header">Welcome to BlackTop, ${name}!</div>
-      
-      <p>You're on the list.</p>
-      
-      <div class="content">
-        <p><strong>BlackTop gives tech startups instant financial clarity</strong> — runway forecasts, burn tracking, and AI-powered insights — without the spreadsheets, consultants, or learning curve.</p>
+      <div class="container">
+        <div class="logo">BlackTop</div>
         
-        <p>Just connect your bank or accounting software and we handle the rest. Zero setup time, zero overhead.</p>
+        <div class="header">Welcome, ${name}</div>
+        
+        <p class="subtext">You're on the list. We'll notify you when it's your turn.</p>
+        
+        <div class="content">
+          <p><strong style="color: #ffffff;">BlackTop is a financial autopilot for startups.</strong></p>
+          <p>Connect your bank or accounting software and get instant clarity on runway, burn rate, and what actually matters — without spreadsheets or consultants.</p>
+        </div>
+        
+        <p style="margin: 24px 0;">
+          <a href="https://blacktop.systems/dashboard" class="cta">Explore the Demo</a>
+        </p>
+        
+        <div class="footer">
+          <p>Questions? Reply to this email.</p>
+          <p style="margin-top: 8px;">— The BlackTop Team</p>
+        </div>
       </div>
-      
-      <p>We'll reach out soon with early access. In the meantime, feel free to explore our <a href="https://blacktop.systems/dashboard">demo dashboard</a> to see what's coming.</p>
-      
-      <div class="footer">
-        <p>— The BlackTop Team</p>
+    </body>
+    </html>
+  `;
+  
+  return sendEmail(email, subject, htmlBody);
+}
+
+export async function sendApprovalEmail(email: string, name: string): Promise<boolean> {
+  const subject = "You're in — BlackTop access granted";
+  
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>${EMAIL_STYLES}</style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="logo">BlackTop</div>
+        
+        <div class="header">You're approved, ${name}</div>
+        
+        <p class="subtext">Your account is ready. Log in now to connect your financial data and get instant clarity on your startup's finances.</p>
+        
+        <div class="content">
+          <p><strong style="color: #ffffff;">What happens next:</strong></p>
+          <p>1. Connect your bank accounts or QuickBooks in 60 seconds</p>
+          <p>2. See your burn rate, runway, and cash flow instantly</p>
+          <p>3. Get AI-powered insights on what to watch</p>
+        </div>
+        
+        <p style="margin: 24px 0;">
+          <a href="https://blacktop.systems/api/login" class="cta">Log In to BlackTop</a>
+        </p>
+        
+        <div class="footer">
+          <p>Need help? Reply to this email and we'll get you sorted.</p>
+          <p style="margin-top: 8px;">— The BlackTop Team</p>
+        </div>
       </div>
     </body>
     </html>
@@ -137,40 +248,26 @@ export async function sendWaitlistAdminNotification(entry: {
     <html>
     <head>
       <meta charset="utf-8">
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1a1a1a; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { font-size: 20px; font-weight: 600; margin-bottom: 20px; }
-        .details { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 16px 0; }
-        .label { font-weight: 600; color: #666; font-size: 12px; text-transform: uppercase; }
-        .value { font-size: 16px; margin-bottom: 12px; }
-        .cta { display: inline-block; background: #1a1a1a; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin-top: 16px; }
-      </style>
+      <style>${EMAIL_STYLES}</style>
     </head>
     <body>
-      <div class="header">New Waitlist Signup</div>
-      
-      <div class="details">
-        <div class="label">Name</div>
-        <div class="value">${entry.name}</div>
+      <div class="container">
+        <div class="logo">BlackTop Admin</div>
         
-        <div class="label">Email</div>
-        <div class="value">${entry.email}</div>
+        <div class="header">New Signup</div>
         
-        <div class="label">Role</div>
-        <div class="value">${entry.role || 'Not specified'}</div>
+        <div class="content">
+          <p><strong style="color: #ffffff;">Name:</strong> ${entry.name}</p>
+          <p><strong style="color: #ffffff;">Email:</strong> ${entry.email}</p>
+          <p><strong style="color: #ffffff;">Role:</strong> ${entry.role || 'Not specified'}</p>
+          ${entry.company ? `<p><strong style="color: #ffffff;">Company:</strong> ${entry.company}</p>` : ''}
+          ${entry.painPoint ? `<p><strong style="color: #ffffff;">Pain Point:</strong> ${entry.painPoint}</p>` : ''}
+        </div>
         
-        ${entry.company ? `
-        <div class="label">Company</div>
-        <div class="value">${entry.company}</div>
-        ` : ''}
-        
-        ${entry.painPoint ? `
-        <div class="label">Pain Point</div>
-        <div class="value">${entry.painPoint}</div>
-        ` : ''}
+        <p style="margin: 24px 0;">
+          <a href="https://blacktop.systems/admin/waitlist" class="cta">Approve in Admin Panel</a>
+        </p>
       </div>
-      
-      <a href="https://blacktop.systems/admin/waitlist" class="cta">View in Admin Panel</a>
     </body>
     </html>
   `;

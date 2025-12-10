@@ -19,7 +19,9 @@ import {
   RotateCcw,
   Download,
   Loader2,
-  Info
+  Info,
+  Building2,
+  Sparkles
 } from "lucide-react";
 import { format, subMonths, addMonths } from "date-fns";
 import {
@@ -32,6 +34,12 @@ import { ForecastCharts } from "@/components/ForecastCharts";
 import { ModelValidationAlert } from "@/components/ModelValidationAlert";
 import { usePlanAccess } from "@/hooks/usePlanAccess";
 import { FeatureGate } from "@/components/UpgradePrompt";
+import { Link } from "wouter";
+
+interface ConnectionStatus {
+  hasActiveConnection: boolean;
+  connections: Array<{ provider: string; status: string; accountCount: number }>;
+}
 
 interface CompanyState {
   company_name: string;
@@ -240,24 +248,87 @@ function EditableCell({
   );
 }
 
+function WorkbookEmptyState() {
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <Card className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent" />
+        <CardContent className="pt-8 pb-8 relative">
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted">
+              <Calculator className="h-4 w-4" />
+              <span className="text-sm font-medium">Modeling Workbook</span>
+            </div>
+            
+            <h1 className="text-3xl font-bold tracking-tight">
+              Connect Your Financial Data
+            </h1>
+            
+            <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+              Link your bank accounts or accounting software to unlock 12-month financial projections, 
+              scenario modeling, and runway forecasting.
+            </p>
+            
+            <div className="flex items-center justify-center gap-4 pt-4">
+              <Link href="/app/connect">
+                <Button size="lg" className="h-12 px-8" data-testid="button-connect-workbook">
+                  <Building2 className="h-5 w-5 mr-2" />
+                  Connect Accounts
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border-dashed">
+          <CardContent className="pt-6 text-center">
+            <TrendingUp className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
+            <h3 className="font-semibold mb-1">12-Month Projections</h3>
+            <p className="text-sm text-muted-foreground">
+              Automatic revenue and expense forecasts based on your actual data
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-dashed">
+          <CardContent className="pt-6 text-center">
+            <Calculator className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
+            <h3 className="font-semibold mb-1">Scenario Modeling</h3>
+            <p className="text-sm text-muted-foreground">
+              Model hiring plans, expense changes, and growth assumptions
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-dashed">
+          <CardContent className="pt-6 text-center">
+            <Sparkles className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
+            <h3 className="font-semibold mb-1">Interactive Editing</h3>
+            <p className="text-sm text-muted-foreground">
+              Click any cell to adjust assumptions and see instant impact
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export default function Workbook() {
   const { canAccess } = usePlanAccess();
   const hasWorkbookAccess = canAccess("scenarioModeling");
   
+  const { data: connectionStatus, isLoading: isLoadingConnection } = useQuery<ConnectionStatus>({
+    queryKey: ["/api/live/connections/status"],
+  });
+  
   const { data: companyState, isLoading } = useQuery<CompanyState>({
     queryKey: ["/api/live/company-state"],
+    enabled: connectionStatus?.hasActiveConnection === true,
   });
 
-  const [rows, setRows] = useState<MonthRow[]>(() => generateDefaultData());
+  const [rows, setRows] = useState<MonthRow[]>([]);
   const [initialCash, setInitialCash] = useState(500000);
-
-  useEffect(() => {
-    if (companyState) {
-      const newRows = generateDataFromCompanyState(companyState);
-      setRows(newRows);
-      setInitialCash(companyState.cash_balance || 500000);
-    }
-  }, [companyState]);
 
   const recalculateDerived = useCallback((updatedRows: MonthRow[]): MonthRow[] => {
     let runningCash = initialCash;
@@ -302,12 +373,36 @@ export default function Workbook() {
     }
   }, [companyState]);
 
+  useEffect(() => {
+    if (companyState) {
+      const newRows = generateDataFromCompanyState(companyState);
+      setRows(newRows);
+      setInitialCash(companyState.cash_balance || 500000);
+    }
+  }, [companyState]);
+  
   const historicalRows = rows.filter((r) => r.isActual);
   const projectedRows = rows.filter((r) => !r.isActual);
   
   const totalProjectedRevenue = projectedRows.reduce((sum, r) => sum + r.revenue, 0);
   const totalProjectedBurn = projectedRows.reduce((sum, r) => sum + r.totalOpex - r.grossMargin, 0);
   const averageRunway = projectedRows[0]?.runway;
+  
+  if (isLoadingConnection) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  
+  if (!connectionStatus?.hasActiveConnection) {
+    return (
+      <FeatureGate feature="scenarioModeling" hasAccess={hasWorkbookAccess}>
+        <WorkbookEmptyState />
+      </FeatureGate>
+    );
+  }
 
   return (
     <FeatureGate feature="scenarioModeling" hasAccess={hasWorkbookAccess}>

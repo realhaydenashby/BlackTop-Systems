@@ -6313,6 +6313,16 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
 
       console.log(`[WAITLIST] Approved: ${entry.email} by ${adminUser.email} - User created/updated`);
 
+      // Send approval email to user
+      try {
+        const { sendApprovalEmail } = await import("./services/emailService");
+        await sendApprovalEmail(entry.email, entry.name);
+        console.log(`[WAITLIST] Sent approval email to: ${entry.email}`);
+      } catch (emailError: any) {
+        console.error(`[WAITLIST] Failed to send approval email:`, emailError.message);
+        // Don't fail the approval if email fails
+      }
+
       res.json({ success: true, entry: updated, user: approvedUser });
     } catch (error: any) {
       console.error("Admin waitlist approve error:", error);
@@ -6579,11 +6589,11 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
   app.post("/api/onboarding/company-info", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as User;
-      const { companyName, companyIndustry, companyStage, companyRevenueRange } = req.body;
+      const { companyName, businessType, companyStage, companyRevenueRange } = req.body;
 
       const updated = await storage.updateUser(user.id, {
         companyName,
-        companyIndustry,
+        businessType,
         companyStage,
         companyRevenueRange,
         hasCompanyInfo: true,

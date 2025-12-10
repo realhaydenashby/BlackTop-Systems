@@ -49,7 +49,7 @@ export const users = pgTable("users", {
   trialStartDate: timestamp("trial_start_date"), // When trial started
   trialEndsAt: timestamp("trial_ends_at"), // When trial expires (7 days after start)
   companyName: varchar("company_name", { length: 255 }),
-  companyIndustry: varchar("company_industry", { length: 100 }),
+  businessType: varchar("business_type", { length: 50 }), // saas, agency, ecommerce, marketplace, hardware, healthcare, fintech, other
   companyStage: varchar("company_stage", { length: 50 }), // seed, series-a, series-b, growth, profitable
   companyRevenueRange: varchar("company_revenue_range", { length: 50 }), // pre-revenue, 0-100k, 100k-1m, 1m-10m, 10m+
   yodleeUserSession: varchar("yodlee_user_session"), // Cached Yodlee user session

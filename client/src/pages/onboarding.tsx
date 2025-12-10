@@ -17,7 +17,7 @@ import { Progress } from "@/components/ui/progress";
 
 const companyInfoSchema = z.object({
   companyName: z.string().min(1, "Company name is required"),
-  companyIndustry: z.string().min(1, "Industry is required"),
+  businessType: z.string().min(1, "Business type is required"),
   companyStage: z.string().min(1, "Company stage is required"),
   companyRevenueRange: z.string().min(1, "Revenue range is required"),
 });
@@ -34,7 +34,7 @@ interface User {
   hasCompanyInfo: boolean;
   hasConnectedBank: boolean;
   companyName: string | null;
-  companyIndustry: string | null;
+  businessType: string | null;
   companyStage: string | null;
   companyRevenueRange: string | null;
 }
@@ -70,7 +70,7 @@ export default function Onboarding() {
     resolver: zodResolver(companyInfoSchema),
     defaultValues: {
       companyName: user?.companyName || "",
-      companyIndustry: user?.companyIndustry || "",
+      businessType: user?.businessType || "",
       companyStage: user?.companyStage || "",
       companyRevenueRange: user?.companyRevenueRange || "",
     },
@@ -390,27 +390,30 @@ export default function Onboarding() {
 
                   <FormField
                     control={form.control}
-                    name="companyIndustry"
+                    name="businessType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Industry</FormLabel>
+                        <FormLabel>Business Type</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-industry">
-                              <SelectValue placeholder="Select industry" />
+                            <SelectTrigger data-testid="select-business-type">
+                              <SelectValue placeholder="Select your business model" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="saas">SaaS / Software</SelectItem>
-                            <SelectItem value="fintech">Fintech</SelectItem>
-                            <SelectItem value="ecommerce">E-commerce</SelectItem>
-                            <SelectItem value="healthcare">Healthcare</SelectItem>
+                            <SelectItem value="saas">SaaS / Subscription</SelectItem>
+                            <SelectItem value="agency">Agency / Services</SelectItem>
+                            <SelectItem value="ecommerce">E-commerce / Retail</SelectItem>
                             <SelectItem value="marketplace">Marketplace</SelectItem>
-                            <SelectItem value="consumer">Consumer</SelectItem>
-                            <SelectItem value="enterprise">Enterprise</SelectItem>
+                            <SelectItem value="hardware">Hardware / IoT</SelectItem>
+                            <SelectItem value="healthcare">Healthcare / Biotech</SelectItem>
+                            <SelectItem value="fintech">Fintech</SelectItem>
                             <SelectItem value="other">Other</SelectItem>
                           </SelectContent>
                         </Select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          This helps us show you relevant metrics for your industry
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}
