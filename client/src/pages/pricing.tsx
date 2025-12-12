@@ -116,7 +116,7 @@ export default function Pricing() {
                         <span className="text-muted-foreground text-lg">/{plan.period}</span>
                       </>
                     ) : (
-                      <span className="text-3xl font-bold text-primary" data-testid={`text-price-${plan.tier}`}>
+                      <span className="text-3xl font-bold text-primary whitespace-nowrap" data-testid={`text-price-${plan.tier}`}>
                         Contact Sales
                       </span>
                     )}
