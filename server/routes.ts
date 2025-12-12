@@ -1561,6 +1561,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SaaS Metrics - Unit Economics (CAC, LTV, MRR, ARR)
+  app.get("/api/saas-metrics", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user.claims?.sub || user.id;
+      const { days = "30" } = req.query;
+      const periodDays = parseInt(days as string);
+
+      const orgs = await storage.getUserOrganizations(userId);
+      if (orgs.length === 0) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+      const organizationId = orgs[0].id;
+
+      const { saasMetricsService } = await import("./services/saasMetricsService");
+      const unitEconomics = await saasMetricsService.computeUnitEconomics(
+        parseInt(organizationId),
+        periodDays
+      );
+
+      res.json(unitEconomics);
+    } catch (error: any) {
+      console.error("SaaS metrics error:", error);
+      res.status(500).json({ message: error.message || "Failed to compute SaaS metrics" });
+    }
+  });
+
+  // SaaS Metrics - MRR/ARR only (lightweight)
+  app.get("/api/saas-metrics/mrr", isAuthenticated, async (req, res) => {
+    try {
+      const { stripeSubscriptionService } = await import("./services/stripeSubscriptionService");
+      const mrrData = await stripeSubscriptionService.computeMRR();
+      const arr = mrrData.mrr * 12;
+
+      res.json({
+        mrr: mrrData.mrr,
+        arr: Math.round(arr * 100) / 100,
+        currency: mrrData.currency,
+        activeSubscriptions: mrrData.subscriptionCount,
+      });
+    } catch (error: any) {
+      console.error("MRR calculation error:", error);
+      res.status(500).json({ message: error.message || "Failed to compute MRR" });
+    }
+  });
+
+  // SaaS Metrics - Churn metrics only
+  app.get("/api/saas-metrics/churn", isAuthenticated, async (req, res) => {
+    try {
+      const { days = "30" } = req.query;
+      const periodDays = parseInt(days as string);
+
+      const { stripeSubscriptionService } = await import("./services/stripeSubscriptionService");
+      const churnMetrics = await stripeSubscriptionService.computeChurnRate(periodDays);
+
+      res.json(churnMetrics);
+    } catch (error: any) {
+      console.error("Churn calculation error:", error);
+      res.status(500).json({ message: error.message || "Failed to compute churn" });
+    }
+  });
+
+  // SaaS Metrics - CAC breakdown
+  app.get("/api/saas-metrics/cac", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user.claims?.sub || user.id;
+      const { days = "30" } = req.query;
+      const periodDays = parseInt(days as string);
+
+      const orgs = await storage.getUserOrganizations(userId);
+      if (orgs.length === 0) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+      const organizationId = orgs[0].id;
+
+      const { saasMetricsService } = await import("./services/saasMetricsService");
+      const cacResult = await saasMetricsService.computeCAC(
+        parseInt(organizationId),
+        periodDays
+      );
+
+      res.json(cacResult);
+    } catch (error: any) {
+      console.error("CAC calculation error:", error);
+      res.status(500).json({ message: error.message || "Failed to compute CAC" });
+    }
+  });
+
+  // SaaS Metrics - LTV calculation
+  app.get("/api/saas-metrics/ltv", isAuthenticated, async (req, res) => {
+    try {
+      const { days = "30" } = req.query;
+      const periodDays = parseInt(days as string);
+
+      const { saasMetricsService } = await import("./services/saasMetricsService");
+      const ltvMetrics = await saasMetricsService.computeLTV(periodDays);
+
+      res.json(ltvMetrics);
+    } catch (error: any) {
+      console.error("LTV calculation error:", error);
+      res.status(500).json({ message: error.message || "Failed to compute LTV" });
+    }
+  });
+
   // Action Plans
   app.get("/api/action-plans", isAuthenticated, async (req, res) => {
     try {

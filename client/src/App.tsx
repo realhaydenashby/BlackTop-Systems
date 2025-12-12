@@ -39,6 +39,7 @@ import UploadPage from "@/pages/upload";
 import Workbook from "@/pages/app/forecasting/workbook";
 import Copilot from "@/pages/app/copilot";
 import LiveAnalytics from "@/pages/app/analytics";
+import SaaSMetrics from "@/pages/app/saas-metrics";
 import LiveFundraising from "@/pages/app/fundraising";
 import InvestorUpdates from "@/pages/app/investor-updates";
 import BoardPackets from "@/pages/app/board-packets";
@@ -286,6 +287,7 @@ function LiveModeRouter() {
         <Route path="/app/connect" component={() => <ProtectedRoute component={Connect} skipOnboardingCheck />} />
         <Route path="/app/analytics" component={() => <ProtectedRoute component={LiveAnalytics} />} />
         <Route path="/app/analytics/:section" component={() => <ProtectedRoute component={LiveAnalytics} />} />
+        <Route path="/app/saas-metrics" component={() => <ProtectedRoute component={SaaSMetrics} />} />
         <Route path="/app/fundraising" component={() => <ProtectedRoute component={LiveFundraising} />} />
         <Route path="/app/fundraising/:section" component={() => <ProtectedRoute component={LiveFundraising} />} />
         <Route path="/app/forecasting/workbook" component={() => <ProtectedRoute component={Workbook} />} />

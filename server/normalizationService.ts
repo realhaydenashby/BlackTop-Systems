@@ -14,6 +14,102 @@ interface ClassifiedCategory {
   method: 'ai' | 'rules' | 'fallback';
 }
 
+// CAC spend classification for unit economics
+export type CACSpendType = 
+  | 'marketing_paid_ads'      // Google Ads, Meta Ads, LinkedIn Ads, etc.
+  | 'marketing_content'       // Content agencies, freelance writers, SEO
+  | 'marketing_tools'         // Marketing automation, email platforms
+  | 'marketing_events'        // Conferences, sponsorships, trade shows
+  | 'marketing_other'         // Other marketing spend
+  | 'sales_tools'             // CRM, sales automation, prospecting tools
+  | 'sales_commissions'       // Sales rep commissions, bonuses
+  | 'sales_travel'            // Sales travel, client entertainment
+  | 'sales_other'             // Other sales spend
+  | 'not_cac';                // Not customer acquisition spend
+
+export interface CACClassification {
+  spendType: CACSpendType;
+  isCACSpend: boolean;
+  category: 'marketing' | 'sales' | 'none';
+  subcategory: string;
+  confidence: number;
+  reasoning?: string;
+  method: 'ai' | 'rules' | 'fallback';
+  requiresReview: boolean; // True if confidence < 0.8
+}
+
+// Known CAC vendor mappings for high-confidence rule-based classification
+const CAC_VENDOR_MAPPINGS: Record<string, { type: CACSpendType; confidence: number }> = {
+  // Paid Advertising Platforms
+  'google ads': { type: 'marketing_paid_ads', confidence: 0.98 },
+  'facebook ads': { type: 'marketing_paid_ads', confidence: 0.98 },
+  'meta ads': { type: 'marketing_paid_ads', confidence: 0.98 },
+  'linkedin ads': { type: 'marketing_paid_ads', confidence: 0.98 },
+  'twitter ads': { type: 'marketing_paid_ads', confidence: 0.98 },
+  'tiktok ads': { type: 'marketing_paid_ads', confidence: 0.98 },
+  'bing ads': { type: 'marketing_paid_ads', confidence: 0.98 },
+  'reddit ads': { type: 'marketing_paid_ads', confidence: 0.95 },
+  'pinterest ads': { type: 'marketing_paid_ads', confidence: 0.95 },
+  'snapchat ads': { type: 'marketing_paid_ads', confidence: 0.95 },
+  'adroll': { type: 'marketing_paid_ads', confidence: 0.95 },
+  'taboola': { type: 'marketing_paid_ads', confidence: 0.95 },
+  'outbrain': { type: 'marketing_paid_ads', confidence: 0.95 },
+  'criteo': { type: 'marketing_paid_ads', confidence: 0.95 },
+  
+  // Marketing Tools & Platforms
+  'hubspot': { type: 'marketing_tools', confidence: 0.9 },
+  'mailchimp': { type: 'marketing_tools', confidence: 0.95 },
+  'klaviyo': { type: 'marketing_tools', confidence: 0.95 },
+  'constant contact': { type: 'marketing_tools', confidence: 0.95 },
+  'sendgrid': { type: 'marketing_tools', confidence: 0.9 },
+  'marketo': { type: 'marketing_tools', confidence: 0.95 },
+  'pardot': { type: 'marketing_tools', confidence: 0.95 },
+  'activecampaign': { type: 'marketing_tools', confidence: 0.95 },
+  'convertkit': { type: 'marketing_tools', confidence: 0.95 },
+  'drip': { type: 'marketing_tools', confidence: 0.95 },
+  'buffer': { type: 'marketing_tools', confidence: 0.9 },
+  'hootsuite': { type: 'marketing_tools', confidence: 0.9 },
+  'sprout social': { type: 'marketing_tools', confidence: 0.9 },
+  'later': { type: 'marketing_tools', confidence: 0.9 },
+  'canva': { type: 'marketing_tools', confidence: 0.85 },
+  
+  // SEO & Content Tools
+  'ahrefs': { type: 'marketing_content', confidence: 0.95 },
+  'semrush': { type: 'marketing_content', confidence: 0.95 },
+  'moz': { type: 'marketing_content', confidence: 0.95 },
+  'surfer seo': { type: 'marketing_content', confidence: 0.95 },
+  'clearscope': { type: 'marketing_content', confidence: 0.95 },
+  'jasper': { type: 'marketing_content', confidence: 0.9 },
+  'copy.ai': { type: 'marketing_content', confidence: 0.9 },
+  'grammarly': { type: 'marketing_content', confidence: 0.8 },
+  
+  // Sales Tools & CRMs
+  'salesforce': { type: 'sales_tools', confidence: 0.95 },
+  'pipedrive': { type: 'sales_tools', confidence: 0.95 },
+  'close': { type: 'sales_tools', confidence: 0.9 },
+  'outreach': { type: 'sales_tools', confidence: 0.95 },
+  'salesloft': { type: 'sales_tools', confidence: 0.95 },
+  'apollo': { type: 'sales_tools', confidence: 0.95 },
+  'zoominfo': { type: 'sales_tools', confidence: 0.95 },
+  'linkedin sales': { type: 'sales_tools', confidence: 0.95 },
+  'gong': { type: 'sales_tools', confidence: 0.95 },
+  'chorus': { type: 'sales_tools', confidence: 0.95 },
+  'drift': { type: 'sales_tools', confidence: 0.9 },
+  'intercom': { type: 'sales_tools', confidence: 0.85 },
+  'zendesk': { type: 'sales_tools', confidence: 0.8 },
+  'calendly': { type: 'sales_tools', confidence: 0.85 },
+  'docusign': { type: 'sales_tools', confidence: 0.85 },
+  'pandadoc': { type: 'sales_tools', confidence: 0.9 },
+  'proposify': { type: 'sales_tools', confidence: 0.9 },
+  'clearbit': { type: 'sales_tools', confidence: 0.95 },
+  'leadfeeder': { type: 'sales_tools', confidence: 0.95 },
+  
+  // Events & Conferences
+  'eventbrite': { type: 'marketing_events', confidence: 0.85 },
+  'hopin': { type: 'marketing_events', confidence: 0.85 },
+  'bizzabo': { type: 'marketing_events', confidence: 0.9 },
+};
+
 // Comprehensive vendor name mappings for rule-based normalization
 const VENDOR_MAPPINGS: Record<string, string> = {
   // Cloud & Infrastructure
@@ -521,6 +617,309 @@ Category:`;
 
     const lowerVendor = vendorName.toLowerCase();
     return subscriptionKeywords.some((keyword) => lowerVendor.includes(keyword));
+  }
+
+  /**
+   * Classify a transaction for CAC (Customer Acquisition Cost) calculation
+   * Returns detailed classification of marketing vs sales spend with subcategories
+   * Used for unit economics calculation in SaaS metrics
+   */
+  async classifyCACSpend(
+    vendorName: string,
+    description: string,
+    amount: number
+  ): Promise<CACClassification> {
+    const text = `${vendorName} ${description}`.toLowerCase();
+    
+    // First, try rule-based classification using known CAC vendors
+    for (const [pattern, config] of Object.entries(CAC_VENDOR_MAPPINGS)) {
+      if (text.includes(pattern)) {
+        const category = config.type.startsWith('marketing') ? 'marketing' : 'sales';
+        const subcategory = this.getSubcategoryLabel(config.type);
+        
+        return {
+          spendType: config.type,
+          isCACSpend: true,
+          category,
+          subcategory,
+          confidence: config.confidence,
+          method: 'rules',
+          requiresReview: config.confidence < 0.8,
+        };
+      }
+    }
+    
+    // Check for pattern-based CAC classification
+    const patternResult = this.patternBasedCACClassification(text, amount);
+    if (patternResult && patternResult.confidence >= 0.7) {
+      return {
+        ...patternResult,
+        method: 'rules',
+        requiresReview: patternResult.confidence < 0.8,
+      };
+    }
+    
+    // Use AI for uncertain cases
+    const aiResult = await this.aiClassifyCACSpend(vendorName, description, amount);
+    return aiResult;
+  }
+
+  /**
+   * Pattern-based CAC classification for common spend patterns
+   */
+  private patternBasedCACClassification(
+    text: string,
+    amount: number
+  ): Omit<CACClassification, 'method' | 'requiresReview'> | null {
+    // Paid advertising patterns
+    const paidAdsPatterns = [
+      'advertising', 'ad spend', 'ppc', 'cpc', 'cpm', 'display ads',
+      'search ads', 'social ads', 'retargeting', 'remarketing',
+      'sponsored', 'promotion', 'boost', 'paid media',
+    ];
+    if (paidAdsPatterns.some(p => text.includes(p))) {
+      return {
+        spendType: 'marketing_paid_ads',
+        isCACSpend: true,
+        category: 'marketing',
+        subcategory: 'Paid Advertising',
+        confidence: 0.85,
+      };
+    }
+    
+    // Content & SEO patterns
+    const contentPatterns = [
+      'content', 'seo', 'copywriting', 'blog', 'article', 'writer',
+      'video production', 'podcast', 'webinar', 'ebook', 'whitepaper',
+      'infographic', 'creative agency', 'design agency',
+    ];
+    if (contentPatterns.some(p => text.includes(p))) {
+      return {
+        spendType: 'marketing_content',
+        isCACSpend: true,
+        category: 'marketing',
+        subcategory: 'Content & SEO',
+        confidence: 0.75,
+      };
+    }
+    
+    // Events patterns
+    const eventPatterns = [
+      'conference', 'trade show', 'expo', 'summit', 'sponsorship',
+      'event', 'booth', 'exhibition', 'networking', 'meetup',
+    ];
+    if (eventPatterns.some(p => text.includes(p))) {
+      return {
+        spendType: 'marketing_events',
+        isCACSpend: true,
+        category: 'marketing',
+        subcategory: 'Events & Conferences',
+        confidence: 0.75,
+      };
+    }
+    
+    // Sales commission patterns (often larger amounts)
+    const commissionPatterns = [
+      'commission', 'bonus', 'spiff', 'incentive', 'sales payout',
+    ];
+    if (commissionPatterns.some(p => text.includes(p)) && amount > 500) {
+      return {
+        spendType: 'sales_commissions',
+        isCACSpend: true,
+        category: 'sales',
+        subcategory: 'Sales Commissions',
+        confidence: 0.8,
+      };
+    }
+    
+    // Sales travel patterns
+    const salesTravelPatterns = [
+      'client dinner', 'prospect meeting', 'sales trip', 'client lunch',
+      'business development', 'bd trip',
+    ];
+    if (salesTravelPatterns.some(p => text.includes(p))) {
+      return {
+        spendType: 'sales_travel',
+        isCACSpend: true,
+        category: 'sales',
+        subcategory: 'Sales Travel & Entertainment',
+        confidence: 0.7,
+      };
+    }
+    
+    return null;
+  }
+
+  /**
+   * AI-powered CAC spend classification for uncertain transactions
+   */
+  private async aiClassifyCACSpend(
+    vendorName: string,
+    description: string,
+    amount: number
+  ): Promise<CACClassification> {
+    const prompt = `Classify this business transaction for Customer Acquisition Cost (CAC) analysis.
+Determine if this is a marketing or sales expense used to acquire new customers.
+
+Vendor: ${vendorName}
+Description: ${description}
+Amount: $${Math.abs(amount).toFixed(2)}
+
+Classify into ONE of these categories:
+1. marketing_paid_ads - Paid advertising (Google Ads, Meta Ads, LinkedIn Ads, display, PPC)
+2. marketing_content - Content marketing, SEO, copywriting, video production
+3. marketing_tools - Marketing automation, email platforms, analytics tools
+4. marketing_events - Conferences, trade shows, sponsorships
+5. marketing_other - Other marketing spend
+6. sales_tools - CRM, sales automation, prospecting tools
+7. sales_commissions - Sales rep commissions and bonuses
+8. sales_travel - Sales travel, client entertainment
+9. sales_other - Other sales spend
+10. not_cac - NOT customer acquisition spend (operations, R&D, G&A, etc.)
+
+Return JSON with format: {"type": "category_name", "confidence": 0.0-1.0, "reasoning": "brief explanation"}
+
+JSON:`;
+
+    try {
+      const result = await callAIWithFallback({
+        prompt,
+        maxTokens: 150,
+        temperature: 0.2,
+        retryCount: 2,
+      });
+
+      // Parse AI response
+      const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        const spendType = parsed.type as CACSpendType;
+        const confidence = Math.min(1, Math.max(0, parsed.confidence || 0.6));
+        
+        // Validate the spend type
+        const validTypes: CACSpendType[] = [
+          'marketing_paid_ads', 'marketing_content', 'marketing_tools',
+          'marketing_events', 'marketing_other', 'sales_tools',
+          'sales_commissions', 'sales_travel', 'sales_other', 'not_cac'
+        ];
+        
+        if (validTypes.includes(spendType)) {
+          const category = spendType === 'not_cac' ? 'none' 
+            : spendType.startsWith('marketing') ? 'marketing' : 'sales';
+          
+          return {
+            spendType,
+            isCACSpend: spendType !== 'not_cac',
+            category,
+            subcategory: this.getSubcategoryLabel(spendType),
+            confidence,
+            reasoning: parsed.reasoning,
+            method: 'ai',
+            requiresReview: confidence < 0.8,
+          };
+        }
+      }
+      
+      // AI didn't return valid JSON, fall back
+      return this.fallbackCACClassification(vendorName, description);
+    } catch (error) {
+      console.error('[CAC Classification] AI error:', error);
+      return this.fallbackCACClassification(vendorName, description);
+    }
+  }
+
+  /**
+   * Fallback CAC classification when AI fails
+   */
+  private fallbackCACClassification(vendorName: string, description: string): CACClassification {
+    const text = `${vendorName} ${description}`.toLowerCase();
+    
+    // Simple keyword-based fallback
+    if (text.includes('marketing') || text.includes('ads') || text.includes('advertising')) {
+      return {
+        spendType: 'marketing_other',
+        isCACSpend: true,
+        category: 'marketing',
+        subcategory: 'Marketing (Unclassified)',
+        confidence: 0.5,
+        method: 'fallback',
+        requiresReview: true,
+      };
+    }
+    
+    if (text.includes('sales') || text.includes('crm') || text.includes('commission')) {
+      return {
+        spendType: 'sales_other',
+        isCACSpend: true,
+        category: 'sales',
+        subcategory: 'Sales (Unclassified)',
+        confidence: 0.5,
+        method: 'fallback',
+        requiresReview: true,
+      };
+    }
+    
+    // Default: not CAC spend
+    return {
+      spendType: 'not_cac',
+      isCACSpend: false,
+      category: 'none',
+      subcategory: 'Not Customer Acquisition',
+      confidence: 0.6,
+      method: 'fallback',
+      requiresReview: true,
+    };
+  }
+
+  /**
+   * Get human-readable subcategory label from spend type
+   */
+  private getSubcategoryLabel(spendType: CACSpendType): string {
+    const labels: Record<CACSpendType, string> = {
+      'marketing_paid_ads': 'Paid Advertising',
+      'marketing_content': 'Content & SEO',
+      'marketing_tools': 'Marketing Tools',
+      'marketing_events': 'Events & Conferences',
+      'marketing_other': 'Other Marketing',
+      'sales_tools': 'Sales Tools & CRM',
+      'sales_commissions': 'Sales Commissions',
+      'sales_travel': 'Sales Travel & Entertainment',
+      'sales_other': 'Other Sales',
+      'not_cac': 'Not Customer Acquisition',
+    };
+    return labels[spendType] || 'Unknown';
+  }
+
+  /**
+   * Batch classify multiple transactions for CAC
+   * More efficient for processing many transactions at once
+   */
+  async batchClassifyCACSpend(
+    transactions: Array<{ id: string; vendorName: string; description: string; amount: number }>
+  ): Promise<Map<string, CACClassification>> {
+    const results = new Map<string, CACClassification>();
+    
+    // Process in parallel with concurrency limit
+    const batchSize = 10;
+    for (let i = 0; i < transactions.length; i += batchSize) {
+      const batch = transactions.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(async (txn) => {
+          const classification = await this.classifyCACSpend(
+            txn.vendorName,
+            txn.description,
+            txn.amount
+          );
+          return { id: txn.id, classification };
+        })
+      );
+      
+      for (const { id, classification } of batchResults) {
+        results.set(id, classification);
+      }
+    }
+    
+    return results;
   }
 }
 
