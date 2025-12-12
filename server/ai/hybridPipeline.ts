@@ -3,6 +3,7 @@ import { FinancialMetricsEngine, createMetricsEngine, FinancialMetrics } from ".
 import { AnomalyDetector, createAnomalyDetector, AnomalyResult } from "../analytics/anomalyDetector";
 import { ForecastEngine, createForecastEngine, ForecastResult, ScenarioAssumptions } from "../analytics/forecastEngine";
 import { OrganizationFeatureStore, createFeatureStore, FeatureSet } from "../analytics/featureStore";
+import { saasMetricsService, UnitEconomics } from "../services/saasMetricsService";
 import { storage } from "../storage";
 import type { InsertAIContextNote } from "@shared/schema";
 
@@ -93,13 +94,25 @@ export class HybridAIPipeline {
     };
   }
 
+  private async getSaaSMetrics(): Promise<UnitEconomics | null> {
+    try {
+      const orgIdNum = parseInt(this.organizationId, 10);
+      if (isNaN(orgIdNum)) return null;
+      return await saasMetricsService.computeUnitEconomics(orgIdNum);
+    } catch (error) {
+      console.warn("[HybridPipeline] Failed to fetch SaaS metrics:", error);
+      return null;
+    }
+  }
+
   async generateInsights(): Promise<InsightGenerationResult> {
-    const [metrics, anomalies] = await Promise.all([
+    const [metrics, anomalies, saasMetrics] = await Promise.all([
       this.metricsEngine.computeAllMetrics(),
       this.anomalyDetector.analyzeTransactionAnomalies(),
+      this.getSaaSMetrics(),
     ]);
 
-    const algorithmInsights = this.generateAlgorithmInsights(metrics, anomalies);
+    const algorithmInsights = this.generateAlgorithmInsights(metrics, anomalies, saasMetrics);
 
     if (algorithmInsights.length >= 3 && algorithmInsights.every((i) => i.confidence > 0.8)) {
       return {
@@ -111,7 +124,7 @@ export class HybridAIPipeline {
 
     try {
       const orgContext = await this.featureStore.getContextForAI();
-      const aiResult = await this.callAIForInsights(metrics, anomalies, algorithmInsights, orgContext);
+      const aiResult = await this.callAIForInsights(metrics, anomalies, algorithmInsights, orgContext, saasMetrics);
 
       const hybridInsights = this.mergeInsights(algorithmInsights, aiResult.insights);
 
@@ -131,8 +144,75 @@ export class HybridAIPipeline {
     }
   }
 
-  private generateAlgorithmInsights(metrics: FinancialMetrics, anomalies: AnomalyResult[]): GeneratedInsight[] {
+  private generateAlgorithmInsights(
+    metrics: FinancialMetrics, 
+    anomalies: AnomalyResult[],
+    saasMetrics?: UnitEconomics | null
+  ): GeneratedInsight[] {
     const insights: GeneratedInsight[] = [];
+
+    // SaaS-specific insights (if available)
+    if (saasMetrics) {
+      // LTV:CAC ratio warning
+      if (saasMetrics.ltvToCacRatio > 0 && saasMetrics.ltvToCacRatio < 3) {
+        const severity = saasMetrics.ltvToCacRatio < 1 ? "critical" : saasMetrics.ltvToCacRatio < 2 ? "warning" : "info";
+        insights.push({
+          title: "LTV:CAC Ratio Below Target",
+          description: `Your LTV:CAC ratio is ${saasMetrics.ltvToCacRatio.toFixed(1)}x, ${severity === "critical" ? "significantly " : ""}below the healthy 3x benchmark. This means ${severity === "critical" ? "you're losing money on customer acquisition" : "acquisition efficiency needs improvement"}.`,
+          severity,
+          category: "unit_economics",
+          metricValue: saasMetrics.ltvToCacRatio,
+          recommendation: saasMetrics.ltvToCacRatio < 1 
+            ? "Immediately review CAC spend efficiency or increase pricing/upsells to improve LTV."
+            : "Focus on reducing CAC through organic channels or improving customer retention to boost LTV.",
+          confidence: saasMetrics.dataQuality.cacConfidence,
+          source: "algorithm",
+        });
+      }
+
+      // High churn warning
+      const monthlyChurn = saasMetrics.ltvMetrics.monthlyChurnRate;
+      if (monthlyChurn > 5) {
+        insights.push({
+          title: "High Customer Churn Rate",
+          description: `Monthly customer churn is ${monthlyChurn.toFixed(1)}%, which is ${monthlyChurn > 10 ? "critically high" : "above the 5% warning threshold"}. This translates to ${(monthlyChurn * 12).toFixed(0)}% annual churn.`,
+          severity: monthlyChurn > 10 ? "critical" : "warning",
+          category: "retention",
+          metricValue: monthlyChurn,
+          recommendation: "Investigate churn causes through exit surveys and implement retention strategies like onboarding improvements or feature adoption campaigns.",
+          confidence: saasMetrics.dataQuality.hasStripeData ? 0.9 : 0.6,
+          source: "algorithm",
+        });
+      }
+
+      // Long payback period
+      if (saasMetrics.paybackPeriodMonths > 18) {
+        insights.push({
+          title: "Extended CAC Payback Period",
+          description: `It takes ${saasMetrics.paybackPeriodMonths.toFixed(1)} months to recover customer acquisition costs, which exceeds the recommended 12-month payback period for SaaS.`,
+          severity: saasMetrics.paybackPeriodMonths > 24 ? "critical" : "warning",
+          category: "unit_economics",
+          metricValue: saasMetrics.paybackPeriodMonths,
+          recommendation: "Consider improving ARPU through pricing optimization or reducing CAC through more efficient marketing channels.",
+          confidence: saasMetrics.dataQuality.cacConfidence * 0.9,
+          source: "algorithm",
+        });
+      }
+
+      // MRR growth concern (if declining)
+      if (saasMetrics.saasMetrics.mrr > 0 && saasMetrics.healthScore === "critical") {
+        insights.push({
+          title: "SaaS Health Score: Critical",
+          description: `Your SaaS unit economics are in critical condition. ${saasMetrics.healthReason}`,
+          severity: "critical",
+          category: "unit_economics",
+          metricValue: saasMetrics.ltvToCacRatio,
+          recommendation: "Prioritize unit economics improvement before scaling acquisition spend.",
+          confidence: 0.85,
+          source: "algorithm",
+        });
+      }
+    }
 
     if (metrics.runway.value < 6 && metrics.burnRate.value > 0) {
       insights.push({
@@ -208,8 +288,24 @@ export class HybridAIPipeline {
     metrics: FinancialMetrics,
     anomalies: AnomalyResult[],
     algorithmInsights: GeneratedInsight[],
-    orgContext: string
+    orgContext: string,
+    saasMetrics?: UnitEconomics | null
   ): Promise<{ insights: GeneratedInsight[]; confidence: number }> {
+    // Build SaaS metrics context if available
+    const saasContext = saasMetrics ? `
+## SaaS Unit Economics:
+- MRR: $${saasMetrics.saasMetrics.mrr.toLocaleString()}
+- ARR: $${saasMetrics.saasMetrics.arr.toLocaleString()}
+- CAC (Customer Acquisition Cost): $${saasMetrics.cac.toLocaleString()}
+- LTV (Customer Lifetime Value): $${saasMetrics.ltv.toLocaleString()}
+- LTV:CAC Ratio: ${saasMetrics.ltvToCacRatio.toFixed(2)}x ${saasMetrics.ltvToCacRatio >= 3 ? '(Healthy)' : saasMetrics.ltvToCacRatio >= 2 ? '(Below target)' : '(Critical)'}
+- CAC Payback Period: ${saasMetrics.paybackPeriodMonths.toFixed(1)} months
+- Monthly Churn Rate: ${saasMetrics.ltvMetrics.monthlyChurnRate.toFixed(1)}%
+- ARPU: $${saasMetrics.saasMetrics.arpu.toLocaleString()}
+- Active Customers: ${saasMetrics.saasMetrics.activeCustomers}
+- Health Score: ${saasMetrics.healthScore.toUpperCase()}${saasMetrics.healthReason !== 'All key metrics are within healthy ranges' ? ` (${saasMetrics.healthReason})` : ''}
+` : '';
+
     const prompt = `You are a financial analyst AI. Based on the following data, generate 2-4 additional actionable insights that complement the algorithm-generated insights.
 
 ${orgContext}
@@ -223,13 +319,13 @@ ${algorithmInsights.map((i) => `- ${i.title}: ${i.description}`).join("\n")}
 - Revenue Growth: ${metrics.revenueGrowth.value.toFixed(1)}%
 - Expense Growth: ${metrics.expenseGrowth.value.toFixed(1)}%
 - Gross Margin: ${metrics.grossMargin.value.toFixed(1)}%
-
+${saasContext}
 ## Detected Anomalies:
 ${anomalies.slice(0, 5).map((a) => `- ${a.title}: ${a.description}`).join("\n") || "None detected"}
 
 Generate insights that are NOT duplicates of the algorithm-generated ones. Focus on:
-1. Hidden patterns or correlations
-2. Strategic recommendations
+1. Hidden patterns or correlations between metrics${saasMetrics ? ' (especially SaaS unit economics relationships)' : ''}
+2. Strategic recommendations${saasMetrics ? ' for improving LTV:CAC ratio or reducing churn' : ''}
 3. Future risks not captured by current metrics
 
 Return a JSON array:
