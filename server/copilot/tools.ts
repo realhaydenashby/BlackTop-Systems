@@ -1,4 +1,5 @@
 import { storage } from "../storage";
+import { saasMetricsService } from "../services/saasMetricsService";
 import OpenAI from "openai";
 
 const openaiClient = new OpenAI({
@@ -277,6 +278,123 @@ async function addPlannedHire(
   const newRunway = newMonthlyBurn > 0 ? currentCash / newMonthlyBurn : Infinity;
   const runwayImpact = currentRunway - newRunway;
 
+  // Calculate ROI projections for sales/marketing hires
+  const roleLower = role.toLowerCase();
+  const isSalesMarketingHire = 
+    roleLower.includes('sales') || 
+    roleLower.includes('marketing') || 
+    roleLower.includes('growth') || 
+    roleLower.includes('demand gen') ||
+    roleLower.includes('sdr') ||
+    roleLower.includes('bdr') ||
+    roleLower.includes('account executive') ||
+    roleLower.includes('ae') ||
+    roleLower.includes('customer success');
+
+  let roiProjection: {
+    isSalesMarketingHire: boolean;
+    currentCAC: number | null;
+    currentLTV: number | null;
+    ltvToCacRatio: number | null;
+    expectedNewCustomersPerMonth: number | null;
+    expectedAnnualRevenueGenerated: number | null;
+    estimatedPaybackMonths: number | null;
+    annualROI: number | null;
+    roiAssessment: string | null;
+    dataSource: string;
+  } | null = null;
+
+  if (isSalesMarketingHire) {
+    try {
+      const orgIdNum = parseInt(organizationId, 10);
+      if (!isNaN(orgIdNum)) {
+        const economics = await saasMetricsService.computeUnitEconomics(orgIdNum);
+        
+        const currentCAC = economics.cac;
+        const currentLTV = economics.ltv;
+        const ltvToCacRatio = economics.ltvToCacRatio;
+        const arpu = economics.saasMetrics.arpu;
+        
+        // Estimate ROI based on role type
+        // Sales roles typically have quota of 4-8x their OTE
+        // Marketing roles contribute to pipeline indirectly
+        const isSalesRole = roleLower.includes('sales') || 
+                           roleLower.includes('ae') || 
+                           roleLower.includes('account executive') ||
+                           roleLower.includes('sdr') ||
+                           roleLower.includes('bdr');
+        
+        // Sales hire quota assumption: 5x their fully loaded cost as revenue target
+        // Marketing hire: contribution to pipeline is more indirect, estimate 2-3x cost in LTV
+        const expectedAnnualRevenue = isSalesRole 
+          ? fullyLoadedAnnual * 5  // Sales quotas typically 5x OTE
+          : fullyLoadedAnnual * 2.5; // Marketing ROI is typically lower but broader
+        
+        // Estimate new customers this hire could bring
+        const expectedNewCustomersPerMonth = arpu > 0 
+          ? (expectedAnnualRevenue / 12) / arpu 
+          : null;
+        
+        // Calculate ROI: (Revenue Generated - Cost) / Cost
+        const annualROI = expectedAnnualRevenue > 0 
+          ? ((expectedAnnualRevenue - fullyLoadedAnnual) / fullyLoadedAnnual) * 100 
+          : null;
+        
+        // Payback: How long until this hire pays for themselves
+        const monthlyRevenueContribution = expectedAnnualRevenue / 12;
+        const estimatedPaybackMonths = monthlyRevenueContribution > monthlyBurn
+          ? fullyLoadedAnnual / (monthlyRevenueContribution - monthlyBurn)
+          : null;
+        
+        // ROI assessment based on metrics
+        let roiAssessment: string;
+        if (ltvToCacRatio >= 3 && (annualROI ?? 0) > 200) {
+          roiAssessment = "Strong ROI potential - healthy unit economics support scaling this role";
+        } else if (ltvToCacRatio >= 2 && (annualROI ?? 0) > 100) {
+          roiAssessment = "Moderate ROI potential - consider optimizing CAC efficiency first";
+        } else if (ltvToCacRatio >= 1) {
+          roiAssessment = "Cautious ROI outlook - unit economics need improvement before scaling";
+        } else if (ltvToCacRatio > 0) {
+          roiAssessment = "High risk - LTV:CAC ratio suggests acquisition is currently unprofitable";
+        } else {
+          roiAssessment = "Unable to assess - insufficient data for CAC/LTV calculations";
+        }
+        
+        roiProjection = {
+          isSalesMarketingHire: true,
+          currentCAC: Math.round(currentCAC * 100) / 100,
+          currentLTV: Math.round(currentLTV * 100) / 100,
+          ltvToCacRatio: Math.round(ltvToCacRatio * 100) / 100,
+          expectedNewCustomersPerMonth: expectedNewCustomersPerMonth !== null 
+            ? Math.round(expectedNewCustomersPerMonth * 10) / 10 
+            : null,
+          expectedAnnualRevenueGenerated: Math.round(expectedAnnualRevenue),
+          estimatedPaybackMonths: estimatedPaybackMonths !== null 
+            ? Math.round(estimatedPaybackMonths * 10) / 10 
+            : null,
+          annualROI: annualROI !== null ? Math.round(annualROI) : null,
+          roiAssessment,
+          dataSource: economics.dataQuality.isUsingManualOverrides ? 'manual' : 
+                      (economics.dataQuality.hasStripeData ? 'stripe' : 'bank_data'),
+        };
+      }
+    } catch (error) {
+      console.warn("[CopilotTools] Failed to compute ROI projection:", error);
+      roiProjection = {
+        isSalesMarketingHire: true,
+        currentCAC: null,
+        currentLTV: null,
+        ltvToCacRatio: null,
+        expectedNewCustomersPerMonth: null,
+        expectedAnnualRevenueGenerated: null,
+        estimatedPaybackMonths: null,
+        annualROI: null,
+        roiAssessment: "Unable to calculate - SaaS metrics unavailable",
+        dataSource: 'unavailable',
+      };
+    }
+  }
+
   return {
     success: true,
     message: `Added planned hire: ${role}`,
@@ -291,6 +409,7 @@ async function addPlannedHire(
       currentRunway: currentRunway === Infinity ? null : currentRunway,
       newRunway: newRunway === Infinity ? null : newRunway,
       runwayReduction: runwayImpact === Infinity ? null : runwayImpact,
+      ...(roiProjection && { roiProjection }),
     },
   };
 }
