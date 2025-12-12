@@ -66,6 +66,7 @@ const mainPlans = [
       "Everything in Core, plus:",
       "AI Copilot chat interface",
       "Investor-ready board packets",
+      "Fundraising suite",
       "Hiring ROI Projections (CAC/LTV impact)",
       "Unlimited team members",
       "Automated monthly board packets",
