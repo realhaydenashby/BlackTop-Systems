@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,8 @@ import {
   Loader2,
   Clock,
   AlertTriangle,
+  Calculator,
+  TrendingUp,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +44,14 @@ interface UserData {
   trialEndsAt: string | null;
 }
 
+interface ManualMetricsSettings {
+  manualCac: number | null;
+  manualLtv: number | null;
+  manualArpu: number | null;
+  manualChurnRate: number | null;
+  useManualOverrides: boolean;
+}
+
 export default function AppSettings() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -55,6 +65,14 @@ export default function AppSettings() {
     weeklyDigest: true,
   });
 
+  const [manualMetrics, setManualMetrics] = useState<ManualMetricsSettings>({
+    manualCac: null,
+    manualLtv: null,
+    manualArpu: null,
+    manualChurnRate: null,
+    useManualOverrides: false,
+  });
+
   const { data: userData } = useQuery<UserData>({
     queryKey: ["/api/auth/user"],
   });
@@ -64,6 +82,39 @@ export default function AppSettings() {
     status: string;
   }>({
     queryKey: ["/api/stripe/subscription"],
+  });
+
+  const { data: manualMetricsData, isLoading: isLoadingManualMetrics } = useQuery<ManualMetricsSettings>({
+    queryKey: ["/api/saas-metrics/manual-settings"],
+  });
+
+  // Sync manual metrics state with fetched data using useEffect
+  useEffect(() => {
+    if (manualMetricsData) {
+      setManualMetrics(manualMetricsData);
+    }
+  }, [manualMetricsData]);
+
+  const saveManualMetricsMutation = useMutation({
+    mutationFn: async (settings: ManualMetricsSettings) => {
+      const response = await apiRequest("POST", "/api/saas-metrics/manual-settings", settings);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saas-metrics/manual-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/saas-metrics"] });
+      toast({
+        title: "Settings Saved",
+        description: "Your manual SaaS metrics settings have been updated.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save settings.",
+        variant: "destructive",
+      });
+    },
   });
 
   // Calculate trial status
@@ -241,6 +292,175 @@ export default function AppSettings() {
             </p>
           </div>
           <Button data-testid="button-save-company">Save Changes</Button>
+        </CardContent>
+      </Card>
+
+      <Card className="hover:shadow-glow transition-all duration-base">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-primary/10">
+              <Calculator className="h-4 w-4 text-primary" />
+            </div>
+            SaaS Metrics Settings
+          </CardTitle>
+          <CardDescription>
+            Configure manual CAC, LTV, and other unit economics if you don't have Stripe connected
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between gap-4 p-4 bg-glass/30 border border-glass-border/30 rounded-xl">
+            <div className="flex-1">
+              <Label className="text-base font-medium">Use Manual Overrides</Label>
+              <p className="text-sm text-muted-foreground">
+                Enable to use manually entered values instead of computed metrics
+              </p>
+            </div>
+            <Switch
+              checked={manualMetrics.useManualOverrides}
+              onCheckedChange={(checked) =>
+                setManualMetrics((m) => ({ ...m, useManualOverrides: checked }))
+              }
+              data-testid="switch-manual-overrides"
+            />
+          </div>
+
+          {manualMetrics.useManualOverrides && (
+            <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+              <TrendingUp className="h-3 w-3" />
+              Manual source active
+            </Badge>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Customer Acquisition Cost (CAC)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g., 500"
+                  className="pl-7"
+                  value={manualMetrics.manualCac ?? ""}
+                  onChange={(e) =>
+                    setManualMetrics((m) => ({
+                      ...m,
+                      manualCac: e.target.value ? parseFloat(e.target.value) : null,
+                    }))
+                  }
+                  disabled={!manualMetrics.useManualOverrides}
+                  data-testid="input-manual-cac"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Average cost to acquire one customer
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Lifetime Value (LTV)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g., 2500"
+                  className="pl-7"
+                  value={manualMetrics.manualLtv ?? ""}
+                  onChange={(e) =>
+                    setManualMetrics((m) => ({
+                      ...m,
+                      manualLtv: e.target.value ? parseFloat(e.target.value) : null,
+                    }))
+                  }
+                  disabled={!manualMetrics.useManualOverrides}
+                  data-testid="input-manual-ltv"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Average total revenue per customer
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Avg Revenue Per User (ARPU)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g., 100"
+                  className="pl-7"
+                  value={manualMetrics.manualArpu ?? ""}
+                  onChange={(e) =>
+                    setManualMetrics((m) => ({
+                      ...m,
+                      manualArpu: e.target.value ? parseFloat(e.target.value) : null,
+                    }))
+                  }
+                  disabled={!manualMetrics.useManualOverrides}
+                  data-testid="input-manual-arpu"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Monthly revenue per customer
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Monthly Churn Rate (%)</Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  placeholder="e.g., 3.5"
+                  value={manualMetrics.manualChurnRate ?? ""}
+                  onChange={(e) =>
+                    setManualMetrics((m) => ({
+                      ...m,
+                      manualChurnRate: e.target.value ? parseFloat(e.target.value) : null,
+                    }))
+                  }
+                  disabled={!manualMetrics.useManualOverrides}
+                  data-testid="input-manual-churn"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Percentage of customers lost per month
+              </p>
+            </div>
+          </div>
+
+          {manualMetrics.useManualOverrides && manualMetrics.manualCac && manualMetrics.manualLtv && (
+            <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">
+              <p className="text-sm font-medium">Calculated LTV:CAC Ratio</p>
+              <p className="text-2xl font-bold text-primary">
+                {(manualMetrics.manualLtv / manualMetrics.manualCac).toFixed(2)}x
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {manualMetrics.manualLtv / manualMetrics.manualCac >= 3
+                  ? "Healthy ratio (3x+ recommended)"
+                  : "Consider improving acquisition efficiency"}
+              </p>
+            </div>
+          )}
+
+          <Button
+            onClick={() => saveManualMetricsMutation.mutate(manualMetrics)}
+            disabled={saveManualMetricsMutation.isPending || isLoadingManualMetrics}
+            data-testid="button-save-manual-metrics"
+          >
+            {saveManualMetricsMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : null}
+            Save Metrics Settings
+          </Button>
         </CardContent>
       </Card>
 

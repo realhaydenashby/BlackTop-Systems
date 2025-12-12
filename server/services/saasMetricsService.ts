@@ -214,33 +214,70 @@ export class SaaSMetricsService {
     `);
     const hasBankData = Number(hasBankDataResult.rows[0]?.count || 0) > 0;
     
-    const manualOverridesResult = await db.execute(sql`
-      SELECT * FROM user_settings 
-      WHERE user_id = ${organizationId} 
-        AND setting_key IN ('manual_cac', 'manual_ltv')
+    // Fetch manual override settings from organizations table
+    const orgIdStr = String(organizationId);
+    const orgResult = await db.execute(sql`
+      SELECT manual_cac, manual_ltv, manual_arpu, manual_churn_rate, use_manual_overrides
+      FROM organizations 
+      WHERE id = ${orgIdStr}
     `);
-    const hasManualOverrides = (manualOverridesResult.rows?.length || 0) > 0;
+    
+    const orgRow = orgResult.rows[0];
+    const useManualOverrides = orgRow?.use_manual_overrides === true;
+    const manualCac = orgRow?.manual_cac ? parseFloat(String(orgRow.manual_cac)) : null;
+    const manualLtv = orgRow?.manual_ltv ? parseFloat(String(orgRow.manual_ltv)) : null;
+    const manualArpu = orgRow?.manual_arpu ? parseFloat(String(orgRow.manual_arpu)) : null;
+    const manualChurnRate = orgRow?.manual_churn_rate ? parseFloat(String(orgRow.manual_churn_rate)) : null;
     
     let saasMetrics: SaaSMetrics;
-    if (hasStripeData) {
+    if (hasStripeData && !useManualOverrides) {
       saasMetrics = await stripeSubscriptionService.computeAllMetrics(periodDays);
     } else {
       saasMetrics = this.getEmptySaaSMetrics();
+      // Apply manual overrides if enabled
+      if (useManualOverrides) {
+        if (manualArpu !== null) {
+          saasMetrics.arpu = manualArpu;
+        }
+        if (manualChurnRate !== null) {
+          saasMetrics.churnMetrics.customerChurnRate = manualChurnRate;
+        }
+      }
     }
     
     let cac = 0;
     let cacBreakdown: CACBreakdown = this.getEmptyCACBreakdown();
     let cacConfidence = 0;
     
-    if (hasBankData) {
+    // Use manual CAC if overrides are enabled and manual CAC is set
+    if (useManualOverrides && manualCac !== null) {
+      cac = manualCac;
+      cacConfidence = 1.0; // Manual values have 100% confidence
+    } else if (hasBankData) {
       const cacResult = await this.computeCAC(organizationId, periodDays);
       cac = cacResult.cac;
       cacBreakdown = cacResult.breakdown;
       cacConfidence = cacResult.confidence;
     }
     
-    const ltvMetrics = await this.computeLTV(periodDays);
+    // Always compute base LTV from Stripe/default sources first
+    let ltvMetrics = await this.computeLTV(periodDays);
     let ltv = ltvMetrics.ltv;
+    
+    // Override with manual LTV if enabled and set
+    if (useManualOverrides && manualLtv !== null) {
+      ltv = manualLtv;
+      // Calculate lifespan from manual churn rate if available
+      const monthlyChurnRate = manualChurnRate !== null ? manualChurnRate / 100 : 0.05;
+      const averageLifespan = monthlyChurnRate > 0 ? 1 / monthlyChurnRate : 60;
+      ltvMetrics = {
+        ltv: manualLtv,
+        ltvToCacRatio: 0,
+        averageCustomerLifespanMonths: Math.round(averageLifespan * 10) / 10,
+        arpu: manualArpu || (manualLtv / averageLifespan),
+        monthlyChurnRate: manualChurnRate !== null ? manualChurnRate : 5,
+      };
+    }
     
     let ltvToCacRatio = 0;
     if (cac > 0) {
@@ -249,8 +286,9 @@ export class SaaSMetricsService {
     }
     
     let paybackPeriodMonths = 0;
-    if (saasMetrics.arpu > 0 && cac > 0) {
-      paybackPeriodMonths = cac / saasMetrics.arpu;
+    const arpu = useManualOverrides && manualArpu !== null ? manualArpu : saasMetrics.arpu;
+    if (arpu > 0 && cac > 0) {
+      paybackPeriodMonths = cac / arpu;
     }
     
     const { healthScore, healthReason } = this.computeHealthScore(ltvToCacRatio, paybackPeriodMonths, saasMetrics.churnMetrics);
@@ -268,8 +306,8 @@ export class SaaSMetricsService {
       dataQuality: {
         hasStripeData,
         hasBankData,
-        cacConfidence,
-        isUsingManualOverrides: hasManualOverrides,
+        cacConfidence: useManualOverrides ? 1.0 : cacConfidence,
+        isUsingManualOverrides: useManualOverrides,
       },
       computedAt: new Date(),
     };

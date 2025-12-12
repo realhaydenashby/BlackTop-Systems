@@ -1896,6 +1896,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get manual SaaS metrics settings for organization
+  app.get("/api/saas-metrics/manual-settings", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user.claims?.sub || user.id;
+
+      const orgs = await storage.getUserOrganizations(userId);
+      if (orgs.length === 0) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+      const organizationId = orgs[0].id;
+
+      const result = await db.execute(sql`
+        SELECT manual_cac, manual_ltv, manual_arpu, manual_churn_rate, use_manual_overrides
+        FROM organizations 
+        WHERE id = ${organizationId}
+      `);
+
+      const row = result.rows[0];
+      res.json({
+        manualCac: row?.manual_cac ? parseFloat(String(row.manual_cac)) : null,
+        manualLtv: row?.manual_ltv ? parseFloat(String(row.manual_ltv)) : null,
+        manualArpu: row?.manual_arpu ? parseFloat(String(row.manual_arpu)) : null,
+        manualChurnRate: row?.manual_churn_rate ? parseFloat(String(row.manual_churn_rate)) : null,
+        useManualOverrides: row?.use_manual_overrides === true,
+      });
+    } catch (error: any) {
+      console.error("Get manual settings error:", error);
+      res.status(500).json({ message: error.message || "Failed to get manual settings" });
+    }
+  });
+
+  // Update manual SaaS metrics settings for organization
+  app.post("/api/saas-metrics/manual-settings", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user.claims?.sub || user.id;
+
+      const orgs = await storage.getUserOrganizations(userId);
+      if (orgs.length === 0) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+      const organizationId = orgs[0].id;
+
+      const { manualCac, manualLtv, manualArpu, manualChurnRate, useManualOverrides } = req.body;
+
+      // Validate inputs
+      if (manualCac !== null && manualCac !== undefined && (isNaN(manualCac) || manualCac < 0)) {
+        return res.status(400).json({ message: "CAC must be a non-negative number" });
+      }
+      if (manualLtv !== null && manualLtv !== undefined && (isNaN(manualLtv) || manualLtv < 0)) {
+        return res.status(400).json({ message: "LTV must be a non-negative number" });
+      }
+      if (manualArpu !== null && manualArpu !== undefined && (isNaN(manualArpu) || manualArpu < 0)) {
+        return res.status(400).json({ message: "ARPU must be a non-negative number" });
+      }
+      if (manualChurnRate !== null && manualChurnRate !== undefined && (isNaN(manualChurnRate) || manualChurnRate < 0 || manualChurnRate > 100)) {
+        return res.status(400).json({ message: "Churn rate must be between 0 and 100" });
+      }
+
+      await db.execute(sql`
+        UPDATE organizations 
+        SET 
+          manual_cac = ${manualCac ?? null},
+          manual_ltv = ${manualLtv ?? null},
+          manual_arpu = ${manualArpu ?? null},
+          manual_churn_rate = ${manualChurnRate ?? null},
+          use_manual_overrides = ${useManualOverrides === true},
+          updated_at = NOW()
+        WHERE id = ${organizationId}
+      `);
+
+      res.json({ 
+        success: true, 
+        message: "Manual metrics settings updated",
+        settings: {
+          manualCac,
+          manualLtv,
+          manualArpu,
+          manualChurnRate,
+          useManualOverrides,
+        }
+      });
+    } catch (error: any) {
+      console.error("Update manual settings error:", error);
+      res.status(500).json({ message: error.message || "Failed to update manual settings" });
+    }
+  });
+
   // Action Plans
   app.get("/api/action-plans", isAuthenticated, async (req, res) => {
     try {

@@ -111,6 +111,12 @@ export const organizations = pgTable("organizations", {
   status: varchar("status", { length: 50 }).default("active"),
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
+  // Manual CAC/LTV overrides for non-Stripe users
+  manualCac: numeric("manual_cac", { precision: 12, scale: 2 }),
+  manualLtv: numeric("manual_ltv", { precision: 12, scale: 2 }),
+  manualArpu: numeric("manual_arpu", { precision: 12, scale: 2 }),
+  manualChurnRate: numeric("manual_churn_rate", { precision: 5, scale: 2 }), // Monthly churn rate as percentage
+  useManualOverrides: boolean("use_manual_overrides").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
