@@ -21,6 +21,7 @@ const mainPlans = [
       "Email support",
     ],
     omitted: [
+      "SaaS Metrics (CAC, LTV, MRR)",
       "AI Copilot chat",
       "Scenario modeling",
       "Hiring & raise planning",
@@ -39,6 +40,9 @@ const mainPlans = [
     icon: Users,
     features: [
       "Everything in Lite, plus:",
+      "SaaS Metrics Dashboard (CAC, LTV, MRR)",
+      "Spend Classification Review Queue",
+      "Manual CAC/LTV metric overrides",
       "AI Copilot chat interface",
       "Scenario modeling workbook",
       "Hiring planning with runway impact",
@@ -63,6 +67,7 @@ const mainPlans = [
     icon: Building2,
     features: [
       "Everything in Core, plus:",
+      "Hiring ROI Projections (CAC/LTV impact)",
       "Unlimited team members",
       "Custom KPIs & dashboards",
       "Multi-entity consolidation",

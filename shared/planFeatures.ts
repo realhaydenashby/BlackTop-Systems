@@ -21,7 +21,11 @@ export type FeatureKey =
   | "aiInvestorUpdates"
   | "automatedBoardPackets"
   | "dedicatedOnboarding"
-  | "prioritySlackSupport";
+  | "prioritySlackSupport"
+  | "saasMetricsDashboard"
+  | "spendReviewQueue"
+  | "manualMetricOverrides"
+  | "hiringRoiProjections";
 
 export interface PlanConfig {
   name: string;
@@ -66,6 +70,9 @@ export const PLAN_CONFIGS: Record<Exclude<SubscriptionTier, null>, PlanConfig> =
       "shareableReports",
       "anomalyDetection",
       "departmentBudgets",
+      "saasMetricsDashboard",
+      "spendReviewQueue",
+      "manualMetricOverrides",
     ],
   },
   growth: {
@@ -88,6 +95,10 @@ export const PLAN_CONFIGS: Record<Exclude<SubscriptionTier, null>, PlanConfig> =
       "shareableReports",
       "anomalyDetection",
       "departmentBudgets",
+      "saasMetricsDashboard",
+      "spendReviewQueue",
+      "manualMetricOverrides",
+      "hiringRoiProjections",
       "customKpis",
       "multiEntity",
       "apiAccess",
@@ -121,6 +132,10 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
   automatedBoardPackets: "Automated Monthly Board Packets",
   dedicatedOnboarding: "Dedicated Onboarding Session",
   prioritySlackSupport: "Priority Slack Support",
+  saasMetricsDashboard: "SaaS Metrics Dashboard (CAC, LTV, MRR)",
+  spendReviewQueue: "Spend Classification Review Queue",
+  manualMetricOverrides: "Manual CAC/LTV Metric Overrides",
+  hiringRoiProjections: "Hiring ROI Projections (CAC/LTV Impact)",
 };
 
 export function hasFeatureAccess(tier: SubscriptionTier, feature: FeatureKey): boolean {

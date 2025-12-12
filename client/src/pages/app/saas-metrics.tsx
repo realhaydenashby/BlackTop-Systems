@@ -26,6 +26,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Link } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart as RechartsPie, Pie, Cell, Legend } from "recharts";
 import { CHART_COLORS } from "@/lib/chartTheme";
+import { FeatureGate } from "@/components/UpgradePrompt";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
 
 interface UnitEconomics {
   saasMetrics: {
@@ -491,7 +493,7 @@ function DataQualityBanner({ dataQuality }: { dataQuality: UnitEconomics['dataQu
   );
 }
 
-export default function SaaSMetricsPage() {
+function SaaSMetricsContent() {
   const [timeRange, setTimeRange] = useState("30");
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -896,5 +898,28 @@ export default function SaaSMetricsPage() {
         Last updated: {new Date(metrics.computedAt).toLocaleString()}
       </div>
     </div>
+  );
+}
+
+export default function SaaSMetricsPage() {
+  const { canAccess, isLoading } = usePlanAccess();
+  
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <FeatureGate 
+      feature="saasMetricsDashboard" 
+      hasAccess={canAccess("saasMetricsDashboard")}
+    >
+      <SaaSMetricsContent />
+    </FeatureGate>
   );
 }
