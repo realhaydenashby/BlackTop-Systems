@@ -1666,6 +1666,236 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // CAC Classification Review Queue - Get pending reviews (<80% confidence)
+  app.get("/api/saas-metrics/cac/review-queue", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user.claims?.sub || user.id;
+      const { days = "30", limit = "50" } = req.query;
+      const periodDays = parseInt(days as string);
+      const maxLimit = Math.min(parseInt(limit as string), 100);
+
+      const orgs = await storage.getUserOrganizations(userId);
+      if (orgs.length === 0) {
+        return res.json({ pendingReviews: [], totalCount: 0 });
+      }
+      const organizationId = orgs[0].id;
+
+      const { saasMetricsService } = await import("./services/saasMetricsService");
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - periodDays * 24 * 60 * 60 * 1000);
+      
+      const { classifications } = await saasMetricsService.getCACSpendFromTransactions(
+        parseInt(organizationId),
+        startDate,
+        endDate
+      );
+
+      // Filter to only low-confidence CAC classifications that need review
+      const pendingReviews = classifications
+        .filter(c => c.requiresReview && c.isCACSpend)
+        .slice(0, maxLimit)
+        .map((c) => ({
+          id: String(c.transactionId),
+          transactionId: c.transactionId,
+          vendor: c.vendor,
+          description: c.description,
+          amount: Math.abs(c.amount),
+          isRefund: c.amount > 0,
+          date: c.date,
+          spendType: c.spendType,
+          category: c.category,
+          subcategory: c.subcategory,
+          confidence: c.confidence,
+          reasoning: c.reasoning,
+          method: c.method,
+        }));
+
+      res.json({
+        pendingReviews,
+        totalCount: classifications.filter(c => c.requiresReview && c.isCACSpend).length,
+        reviewThreshold: 0.8,
+      });
+    } catch (error: any) {
+      console.error("Review queue error:", error);
+      res.status(500).json({ message: error.message || "Failed to get review queue" });
+    }
+  });
+
+  // CAC Classification Review - Submit correction for a transaction
+  app.post("/api/saas-metrics/cac/review", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user.claims?.sub || user.id;
+      const { transactionId, vendor, description, amount, date, isRefund, originalClassification, correctedClassification, note } = req.body;
+
+      if (!transactionId || !correctedClassification) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const orgs = await storage.getUserOrganizations(userId);
+      if (orgs.length === 0) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+      const organizationId = orgs[0].id;
+
+      // Include full transaction context in both original and corrected for complete audit trail
+      const transactionContext = {
+        vendor,
+        description,
+        amount,
+        date,
+        isRefund: isRefund || false,
+      };
+      const enrichedOriginal = {
+        ...originalClassification,
+        ...transactionContext,
+      };
+      const enrichedCorrected = {
+        ...correctedClassification,
+        ...transactionContext,
+      };
+
+      // Store the correction in ai_context_notes for learning
+      const feedbackNote = {
+        organizationId,
+        userId,
+        feedbackType: "correction" as const,
+        originalOutput: JSON.stringify(enrichedOriginal),
+        correctedOutput: JSON.stringify(enrichedCorrected),
+        note: note || null,
+        entityType: "cac_classification",
+        entityId: String(transactionId),
+        isUsedForTraining: false,
+      };
+
+      await db.execute(sql`
+        INSERT INTO ai_context_notes (
+          organization_id, user_id, feedback_type, original_output, 
+          corrected_output, note, entity_type, entity_id, is_used_for_training
+        ) VALUES (
+          ${feedbackNote.organizationId}, ${feedbackNote.userId}, ${feedbackNote.feedbackType},
+          ${feedbackNote.originalOutput}, ${feedbackNote.correctedOutput}, ${feedbackNote.note},
+          ${feedbackNote.entityType}, ${feedbackNote.entityId}, ${feedbackNote.isUsedForTraining}
+        )
+      `);
+
+      res.json({ 
+        success: true, 
+        message: "Classification correction saved",
+        willImproveAI: true,
+      });
+    } catch (error: any) {
+      console.error("Review submission error:", error);
+      res.status(500).json({ message: error.message || "Failed to save correction" });
+    }
+  });
+
+  // Get CAC classification corrections for learning loop
+  app.get("/api/saas-metrics/cac/corrections", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user.claims?.sub || user.id;
+
+      const orgs = await storage.getUserOrganizations(userId);
+      if (orgs.length === 0) {
+        return res.json({ corrections: [] });
+      }
+      const organizationId = orgs[0].id;
+
+      const result = await db.execute(sql`
+        SELECT id, original_output, corrected_output, note, entity_id, created_at
+        FROM ai_context_notes
+        WHERE organization_id = ${organizationId}
+          AND entity_type = 'cac_classification'
+          AND feedback_type = 'correction'
+        ORDER BY created_at DESC
+        LIMIT 100
+      `);
+
+      res.json({ 
+        corrections: result.rows,
+        totalCount: result.rows.length,
+      });
+    } catch (error: any) {
+      console.error("Corrections fetch error:", error);
+      res.status(500).json({ message: error.message || "Failed to get corrections" });
+    }
+  });
+
+  // SaaS Metrics History - Get historical snapshots for trend analysis
+  const VALID_METRIC_TYPES = ['mrr', 'arr', 'cac', 'ltv', 'ltv_to_cac', 'arpu', 'churn_rate'];
+  
+  app.get("/api/saas-metrics/history/:metricType", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user.claims?.sub || user.id;
+      const { metricType } = req.params;
+      const { limit = "12" } = req.query;
+
+      if (!VALID_METRIC_TYPES.includes(metricType)) {
+        return res.status(400).json({ 
+          message: `Invalid metric type. Valid types: ${VALID_METRIC_TYPES.join(', ')}` 
+        });
+      }
+
+      const orgs = await storage.getUserOrganizations(userId);
+      if (orgs.length === 0) {
+        return res.json({ history: [] });
+      }
+      const organizationId = orgs[0].id;
+
+      const { saasMetricsService } = await import("./services/saasMetricsService");
+      const history = await saasMetricsService.getMetricHistory(
+        parseInt(organizationId),
+        metricType,
+        parseInt(limit as string)
+      );
+
+      res.json({ history, metricType });
+    } catch (error: any) {
+      console.error("Metric history error:", error);
+      res.status(500).json({ message: error.message || "Failed to get metric history" });
+    }
+  });
+
+  // Store SaaS metrics snapshot for audit trail
+  app.post("/api/saas-metrics/snapshot", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = user.claims?.sub || user.id;
+      const { days = "30" } = req.query;
+      const periodDays = parseInt(days as string);
+
+      const orgs = await storage.getUserOrganizations(userId);
+      if (orgs.length === 0) {
+        return res.status(404).json({ message: "No organization found" });
+      }
+      const organizationId = orgs[0].id;
+
+      const { saasMetricsService } = await import("./services/saasMetricsService");
+      const economics = await saasMetricsService.computeUnitEconomics(
+        parseInt(organizationId),
+        periodDays
+      );
+
+      await saasMetricsService.storeMetricSnapshots(
+        parseInt(organizationId),
+        economics,
+        periodDays
+      );
+
+      res.json({ 
+        success: true, 
+        message: "Metrics snapshot stored for audit trail",
+        snapshotAt: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error("Snapshot storage error:", error);
+      res.status(500).json({ message: error.message || "Failed to store snapshot" });
+    }
+  });
+
   // Action Plans
   app.get("/api/action-plans", isAuthenticated, async (req, res) => {
     try {

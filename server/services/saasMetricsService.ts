@@ -48,6 +48,14 @@ interface Transaction {
   category: string;
 }
 
+export interface CACClassificationWithContext extends CACClassification {
+  transactionId: number;
+  vendor: string;
+  description: string;
+  amount: number;
+  date: Date;
+}
+
 const normalizationService = new NormalizationService();
 
 export class SaaSMetricsService {
@@ -56,7 +64,7 @@ export class SaaSMetricsService {
     organizationId: number,
     startDate: Date,
     endDate: Date
-  ): Promise<{ breakdown: CACBreakdown; classifications: CACClassification[] }> {
+  ): Promise<{ breakdown: CACBreakdown; classifications: CACClassificationWithContext[] }> {
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
     
@@ -73,7 +81,7 @@ export class SaaSMetricsService {
     let marketingSpend = 0;
     let salesSpend = 0;
     const byCategory: Record<string, number> = {};
-    const classifications: CACClassification[] = [];
+    const classifications: CACClassificationWithContext[] = [];
     let lowConfidenceCount = 0;
     
     for (const tx of transactions) {
@@ -83,7 +91,14 @@ export class SaaSMetricsService {
         Math.abs(tx.amount)
       );
       
-      classifications.push(classification);
+      classifications.push({
+        ...classification,
+        transactionId: tx.id,
+        vendor: tx.vendor || '',
+        description: tx.description || '',
+        amount: tx.amount,
+        date: tx.date,
+      });
       
       if (classification.isCACSpend) {
         // Bank transactions: negative = spend, positive = refund
@@ -353,6 +368,182 @@ export class SaaSMetricsService {
       transactionCount: 0,
       lowConfidenceCount: 0,
     };
+  }
+
+  /**
+   * Store SaaS metric snapshots for audit trail
+   * Records MRR, ARR, CAC, LTV, and LTV:CAC ratio with source data and confidence scores
+   */
+  async storeMetricSnapshots(
+    organizationId: number,
+    economics: UnitEconomics,
+    periodDays: number = 30
+  ): Promise<void> {
+    const now = new Date();
+    const periodEnd = now;
+    const periodStart = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
+    
+    const orgIdStr = String(organizationId);
+    
+    // Compute source hash for reproducibility tracking
+    const sourceData = {
+      stripeSubscriptionCount: economics.saasMetrics.activeSubscriptions,
+      transactionCount: economics.cacBreakdown.transactionCount,
+      newCustomers: economics.saasMetrics.newCustomersInPeriod,
+      periodDays,
+    };
+    const sourceHash = this.computeHash(JSON.stringify(sourceData));
+    
+    const metricsToStore = [
+      {
+        type: 'monthly_recurring_revenue',
+        value: economics.saasMetrics.mrr,
+        confidence: economics.dataQuality.hasStripeData ? 0.95 : 0.5,
+        metadata: {
+          activeSubscriptions: economics.saasMetrics.activeSubscriptions,
+          activeCustomers: economics.saasMetrics.activeCustomers,
+          currency: economics.saasMetrics.currency,
+          formula: 'SUM(subscription.monthlyAmount) for active subscriptions',
+          sourceHash,
+        },
+      },
+      {
+        type: 'annual_recurring_revenue',
+        value: economics.saasMetrics.arr,
+        confidence: economics.dataQuality.hasStripeData ? 0.95 : 0.5,
+        metadata: {
+          mrr: economics.saasMetrics.mrr,
+          formula: 'MRR × 12',
+          sourceHash,
+        },
+      },
+      {
+        type: 'customer_acquisition_cost',
+        value: economics.cac,
+        confidence: economics.dataQuality.cacConfidence,
+        metadata: {
+          totalCACSpend: economics.cacBreakdown.totalCACSpend,
+          marketingSpend: economics.cacBreakdown.marketingSpend,
+          salesSpend: economics.cacBreakdown.salesSpend,
+          newCustomers: economics.saasMetrics.newCustomersInPeriod,
+          lowConfidenceCount: economics.cacBreakdown.lowConfidenceCount,
+          formula: '(Marketing Spend + Sales Spend) / New Customers',
+          sourceHash,
+        },
+      },
+      {
+        type: 'average_revenue_per_user',
+        value: economics.saasMetrics.arpu,
+        confidence: economics.dataQuality.hasStripeData ? 0.95 : 0.5,
+        metadata: {
+          mrr: economics.saasMetrics.mrr,
+          activeCustomers: economics.saasMetrics.activeCustomers,
+          formula: 'MRR / Active Customers',
+          sourceHash,
+        },
+      },
+      {
+        type: 'ltv_cac_ratio',
+        value: economics.ltvToCacRatio,
+        confidence: Math.min(
+          economics.dataQuality.cacConfidence,
+          economics.dataQuality.hasStripeData ? 0.9 : 0.4
+        ),
+        metadata: {
+          ltv: economics.ltv,
+          cac: economics.cac,
+          paybackPeriodMonths: economics.paybackPeriodMonths,
+          averageLifespanMonths: economics.ltvMetrics.averageCustomerLifespanMonths,
+          monthlyChurnRate: economics.ltvMetrics.monthlyChurnRate,
+          healthScore: economics.healthScore,
+          formula: 'LTV / CAC where LTV = ARPU × (1 / Monthly Churn Rate)',
+          sourceHash,
+        },
+      },
+    ];
+    
+    for (const metric of metricsToStore) {
+      // Get previous value for change calculation
+      const prevResult = await db.execute(sql`
+        SELECT value FROM metric_snapshots 
+        WHERE organization_id = ${orgIdStr}
+          AND metric_type = ${metric.type}
+        ORDER BY computed_at DESC
+        LIMIT 1
+      `);
+      
+      const previousValue = prevResult.rows[0]?.value 
+        ? parseFloat(String(prevResult.rows[0].value)) 
+        : null;
+      
+      let changePercent = null;
+      if (previousValue !== null && previousValue !== 0) {
+        changePercent = ((metric.value - previousValue) / previousValue) * 100;
+      }
+      
+      await db.execute(sql`
+        INSERT INTO metric_snapshots (
+          organization_id, metric_type, value, previous_value, change_percent,
+          period_start, period_end, period_type, confidence, metadata
+        ) VALUES (
+          ${orgIdStr}, ${metric.type}, ${metric.value}, ${previousValue},
+          ${changePercent}, ${periodStart}, ${periodEnd}, 'monthly',
+          ${metric.confidence}, ${JSON.stringify(metric.metadata)}
+        )
+      `);
+    }
+  }
+
+  private computeHash(data: string): string {
+    // Simple hash for reproducibility tracking (not cryptographic)
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) {
+      const char = data.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(16);
+  }
+
+  /**
+   * Get historical metric snapshots for trend analysis
+   */
+  async getMetricHistory(
+    organizationId: number,
+    metricType: string,
+    limit: number = 12
+  ): Promise<Array<{
+    value: number;
+    previousValue: number | null;
+    changePercent: number | null;
+    confidence: number;
+    periodStart: Date;
+    periodEnd: Date;
+    metadata: any;
+    computedAt: Date;
+  }>> {
+    const orgIdStr = String(organizationId);
+    
+    const result = await db.execute(sql`
+      SELECT value, previous_value, change_percent, confidence,
+             period_start, period_end, metadata, computed_at
+      FROM metric_snapshots 
+      WHERE organization_id = ${orgIdStr}
+        AND metric_type = ${metricType}
+      ORDER BY computed_at DESC
+      LIMIT ${limit}
+    `);
+    
+    return result.rows.map((row: any) => ({
+      value: parseFloat(row.value),
+      previousValue: row.previous_value ? parseFloat(row.previous_value) : null,
+      changePercent: row.change_percent ? parseFloat(row.change_percent) : null,
+      confidence: row.confidence ? parseFloat(row.confidence) : 1,
+      periodStart: new Date(row.period_start),
+      periodEnd: new Date(row.period_end),
+      metadata: row.metadata,
+      computedAt: new Date(row.computed_at),
+    }));
   }
 }
 

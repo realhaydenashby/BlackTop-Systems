@@ -188,6 +188,279 @@ function EmptyState() {
   );
 }
 
+interface ReviewItem {
+  id: string;
+  transactionId: number;
+  vendor: string;
+  description: string;
+  amount: number;
+  isRefund?: boolean;
+  date: string;
+  spendType: string;
+  category: 'marketing' | 'sales' | 'none';
+  subcategory: string;
+  confidence: number;
+  reasoning?: string;
+  method: string;
+}
+
+interface ReviewQueueResponse {
+  pendingReviews: ReviewItem[];
+  totalCount: number;
+  reviewThreshold: number;
+}
+
+const CAC_CATEGORY_OPTIONS = [
+  { value: 'marketing_paid_ads', label: 'Paid Ads', category: 'marketing', subcategory: 'paid_ads' },
+  { value: 'marketing_content', label: 'Content Marketing', category: 'marketing', subcategory: 'content' },
+  { value: 'marketing_tools', label: 'Marketing Tools', category: 'marketing', subcategory: 'tools' },
+  { value: 'marketing_events', label: 'Events', category: 'marketing', subcategory: 'events' },
+  { value: 'marketing_other', label: 'Other Marketing', category: 'marketing', subcategory: 'other' },
+  { value: 'sales_tools', label: 'Sales Tools', category: 'sales', subcategory: 'tools' },
+  { value: 'sales_commissions', label: 'Commissions', category: 'sales', subcategory: 'commissions' },
+  { value: 'sales_travel', label: 'Sales Travel', category: 'sales', subcategory: 'travel' },
+  { value: 'sales_other', label: 'Other Sales', category: 'sales', subcategory: 'other' },
+  { value: 'not_cac', label: 'Not CAC Spend', category: 'none', subcategory: 'none' },
+];
+
+function ReviewQueueTab({ timeRange, lowConfidenceCount }: { timeRange: string; lowConfidenceCount: number }) {
+  const { data: reviewData, isLoading, refetch } = useQuery<ReviewQueueResponse>({
+    queryKey: ['/api/saas-metrics/cac/review-queue', timeRange],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <div className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
+      </div>
+    );
+  }
+
+  if (!reviewData || reviewData.pendingReviews.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 flex flex-col items-center text-center">
+          <CheckCircle className="h-10 w-10 text-green-500/50 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">All Caught Up</h3>
+          <p className="text-muted-foreground max-w-md">
+            No transactions need review. All CAC classifications have high confidence.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            Classification Review Queue
+          </CardTitle>
+          <CardDescription>
+            Review and correct low-confidence CAC classifications to improve accuracy. Your corrections help train the AI for better future classifications.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4 mb-4 text-sm">
+            <Badge variant="secondary">
+              {reviewData.totalCount} pending
+            </Badge>
+            <span className="text-muted-foreground">
+              Threshold: {Math.round(reviewData.reviewThreshold * 100)}% confidence
+            </span>
+          </div>
+          
+          <div className="space-y-3">
+            {reviewData.pendingReviews.map((item) => (
+              <ReviewItemCard key={item.id} item={item} onReviewed={refetch} />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ReviewItemCard({ item, onReviewed }: { item: ReviewItem; onReviewed: () => void }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(item.spendType);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleApprove = async () => {
+    setIsSubmitting(true);
+    try {
+      await fetch('/api/saas-metrics/cac/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: item.transactionId,
+          vendor: item.vendor,
+          description: item.description,
+          amount: item.amount,
+          date: item.date,
+          isRefund: item.isRefund || false,
+          originalClassification: {
+            spendType: item.spendType,
+            category: item.category,
+            subcategory: item.subcategory,
+            confidence: item.confidence,
+            method: item.method,
+          },
+          correctedClassification: {
+            spendType: item.spendType,
+            category: item.category,
+            subcategory: item.subcategory,
+            confidence: 1.0,
+            method: 'human_approved',
+            approved: true,
+          },
+          note: 'Approved original classification',
+        }),
+      });
+      onReviewed();
+    } catch (error) {
+      console.error('Failed to approve:', error);
+    }
+    setIsSubmitting(false);
+  };
+
+  const handleCorrect = async () => {
+    if (selectedCategory === item.spendType) return;
+    setIsSubmitting(true);
+    try {
+      const option = CAC_CATEGORY_OPTIONS.find(o => o.value === selectedCategory);
+      await fetch('/api/saas-metrics/cac/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: item.transactionId,
+          vendor: item.vendor,
+          description: item.description,
+          amount: item.amount,
+          date: item.date,
+          isRefund: item.isRefund || false,
+          originalClassification: {
+            spendType: item.spendType,
+            category: item.category,
+            subcategory: item.subcategory,
+            confidence: item.confidence,
+            method: item.method,
+          },
+          correctedClassification: {
+            spendType: selectedCategory,
+            category: option?.category || 'none',
+            subcategory: option?.subcategory || 'unknown',
+            confidence: 1.0,
+            method: 'human_review',
+          },
+          note: `Corrected from ${item.spendType} to ${selectedCategory}`,
+        }),
+      });
+      onReviewed();
+    } catch (error) {
+      console.error('Failed to correct:', error);
+    }
+    setIsSubmitting(false);
+  };
+
+  const formatSpendType = (type: string) => {
+    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  return (
+    <Card className="border-dashed">
+      <CardContent className="py-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-medium text-sm truncate">{item.vendor || 'Unknown Vendor'}</span>
+              <span className={`text-sm ${item.isRefund ? 'text-green-600' : 'text-muted-foreground'}`}>
+                {item.isRefund ? '+' : ''}{formatAmount(item.amount)}
+                {item.isRefund && <span className="ml-1 text-xs">(refund)</span>}
+              </span>
+              <span className="text-xs text-muted-foreground">{formatDate(item.date)}</span>
+            </div>
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="outline" className="text-xs">
+                {formatSpendType(item.spendType)}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {Math.round(item.confidence * 100)}% confidence
+              </span>
+            </div>
+            {item.description && (
+              <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+            )}
+            {item.reasoning && (
+              <p className="text-xs text-muted-foreground/70 truncate italic">{item.reasoning}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={() => setIsExpanded(!isExpanded)}
+              data-testid={`button-expand-${item.id}`}
+            >
+              {isExpanded ? 'Close' : 'Review'}
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={handleApprove}
+              disabled={isSubmitting}
+              data-testid={`button-approve-${item.id}`}
+            >
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Approve
+            </Button>
+          </div>
+        </div>
+        
+        {isExpanded && (
+          <div className="mt-4 pt-4 border-t space-y-3">
+            <div>
+              <label className="text-xs font-medium mb-1 block">Correct Classification:</label>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-full" data-testid={`select-category-${item.id}`}>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CAC_CATEGORY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label} ({option.category})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                onClick={handleCorrect}
+                disabled={isSubmitting || selectedCategory === item.spendType}
+                data-testid={`button-submit-correction-${item.id}`}
+              >
+                Submit Correction
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function DataQualityBanner({ dataQuality }: { dataQuality: UnitEconomics['dataQuality'] }) {
   const issues: string[] = [];
   
@@ -329,10 +602,18 @@ export default function SaaSMetricsPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="revenue" data-testid="tab-revenue">Revenue</TabsTrigger>
           <TabsTrigger value="cac" data-testid="tab-cac">CAC Breakdown</TabsTrigger>
+          <TabsTrigger value="review" data-testid="tab-review">
+            Review Queue
+            {metrics.cacBreakdown.lowConfidenceCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
+                {metrics.cacBreakdown.lowConfidenceCount}
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-6">
@@ -598,14 +879,16 @@ export default function SaaSMetricsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="outline" asChild data-testid="button-review-transactions">
-                  <Link href="/app/transactions?filter=needs-review">
-                    Review Transactions
-                  </Link>
+                <Button variant="outline" onClick={() => setActiveTab('review')} data-testid="button-review-transactions">
+                  Go to Review Queue
                 </Button>
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="review" className="space-y-6 mt-6">
+          <ReviewQueueTab timeRange={timeRange} lowConfidenceCount={metrics.cacBreakdown.lowConfidenceCount} />
         </TabsContent>
       </Tabs>
 
