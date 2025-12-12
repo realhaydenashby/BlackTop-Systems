@@ -14,7 +14,6 @@ const mainPlans = [
     features: [
       "Connect bank, QuickBooks & Stripe",
       "Auto-categorized transactions",
-      "Dashboard with burn & runway",
       "Spend trends & revenue charts",
       "AI-generated insights (3-5 per sync)",
       "Subscription detection",
