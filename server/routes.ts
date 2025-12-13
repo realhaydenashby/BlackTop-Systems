@@ -7777,6 +7777,119 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
+  // ============================================
+  // Cash Flow Forecasting ML Routes
+  // ============================================
+
+  // Train cash flow forecast model
+  app.post("/api/ml/train-cashflow-model", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { monthsBack = 24 } = req.body;
+
+      const { trainCashFlowForecastModel } = await import("./ml/cashFlowForecastModel");
+      const result = await trainCashFlowForecastModel(dbUser.defaultOrganizationId, monthsBack);
+      
+      res.json({
+        success: result.success,
+        dataMonths: result.dataMonths,
+        avgNetCashFlow: result.avgNetCashFlow,
+        trendDirection: result.trendDirection,
+      });
+    } catch (error: any) {
+      console.error("Train cashflow model error:", error);
+      res.status(500).json({ message: "Failed to train cash flow model" });
+    }
+  });
+
+  // Get cash flow model stats
+  app.get("/api/ml/cashflow-stats", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { getCashFlowForecastStats } = await import("./ml/cashFlowForecastModel");
+      const stats = await getCashFlowForecastStats(dbUser.defaultOrganizationId);
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Get cashflow stats error:", error);
+      res.status(500).json({ message: "Failed to get cash flow stats" });
+    }
+  });
+
+  // Generate cash flow forecast
+  app.post("/api/ml/forecast-cashflow", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ success: false, message: "No organization found" });
+      }
+
+      const { months = 12 } = req.body;
+
+      const { generateCashFlowForecast } = await import("./ml/cashFlowForecastModel");
+      const forecast = await generateCashFlowForecast(dbUser.defaultOrganizationId, months);
+      
+      if (!forecast.success) {
+        return res.status(404).json({ success: false, message: forecast.error });
+      }
+      
+      res.json({
+        success: true,
+        forecasts: forecast.forecasts,
+        modelConfidence: forecast.modelConfidence,
+        historicalAccuracy: forecast.historicalAccuracy,
+        summary: forecast.summary,
+      });
+    } catch (error: any) {
+      console.error("Generate cashflow forecast error:", error);
+      res.status(500).json({ success: false, message: "Failed to generate cash flow forecast" });
+    }
+  });
+
+  // Get forecasted financial metrics
+  app.get("/api/ml/cashflow-metrics", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const months = parseInt(req.query.months as string) || 12;
+
+      const { getCashFlowMetrics } = await import("./ml/cashFlowForecastModel");
+      const metrics = await getCashFlowMetrics(dbUser.defaultOrganizationId, months);
+      
+      if (!metrics) {
+        return res.status(404).json({ message: "No trained model found. Train the model first." });
+      }
+      
+      res.json(metrics);
+    } catch (error: any) {
+      console.error("Get cashflow metrics error:", error);
+      res.status(500).json({ message: "Failed to get cash flow metrics" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
