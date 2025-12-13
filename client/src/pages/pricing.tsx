@@ -78,37 +78,6 @@ const mainPlans = [
 export default function Pricing() {
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation */}
-      <motion.nav 
-        className="border-b backdrop-blur-md bg-background/90 sticky top-0 z-50"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <div className="flex items-center justify-between w-full px-4 py-5 max-w-7xl mx-auto">
-          <Link href="/">
-            <div className="flex items-center gap-2 group cursor-pointer">
-              <img 
-                src="/logo.png" 
-                alt="BlackTop Systems" 
-                className="h-6 object-contain transition-transform group-hover:scale-105" 
-              />
-            </div>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link href="/demo/dashboard">
-              <Button variant="ghost" data-testid="link-demo">Try Demo</Button>
-            </Link>
-            <Link href="/pricing">
-              <Button variant="ghost" data-testid="link-pricing">Pricing</Button>
-            </Link>
-            <a href="/api/login">
-              <Button data-testid="button-login">Sign In</Button>
-            </a>
-          </div>
-        </div>
-      </motion.nav>
-
       {/* Hero Section */}
       <section className="px-6 py-16 md:py-20">
         <div className="max-w-7xl mx-auto">
@@ -225,7 +194,7 @@ export default function Pricing() {
             transition={{ duration: 0.6, delay: 0.4 }}
           >
             <div className="bg-muted/50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-2">14-day free trial. No credit card required.</h3>
+              <h3 className="text-lg font-semibold mb-2">7-day free trial. No credit card required.</h3>
               <p className="text-sm text-muted-foreground">
                 Connect your accounts in minutes and see your burn rate, runway, and AI insights instantly.
               </p>
@@ -292,30 +261,6 @@ export default function Pricing() {
         </motion.div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t px-6 py-12">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-6">
-              <img src="/logo.png" alt="BlackTop Systems" className="h-5 object-contain" />
-              <p className="text-sm text-muted-foreground">
-                &copy; 2025 BlackTop Systems. All rights reserved.
-              </p>
-            </div>
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <Link href="/company/security">
-                <span className="hover:text-foreground transition-colors cursor-pointer">Security</span>
-              </Link>
-              <Link href="/company/about">
-                <span className="hover:text-foreground transition-colors cursor-pointer">About</span>
-              </Link>
-              <Link href="/company/contact">
-                <span className="hover:text-foreground transition-colors cursor-pointer">Contact</span>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
