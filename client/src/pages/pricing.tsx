@@ -1,14 +1,22 @@
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Check, X, Users, Zap, Building2 } from "lucide-react";
+import { Check, Users, Zap, Building2, ArrowRight, Shield, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
+
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.6, ease: "easeOut" }
+};
 
 const mainPlans = [
   {
     name: "Blacktop Lite",
     price: "$99",
     period: "month",
-    tagline: "See your money clearly. Know your burn and runway at a glance.",
+    tagline: "See your money clearly. No spreadsheets, no CFO required.",
     seats: "1 seat",
     icon: Zap,
     features: [
@@ -19,7 +27,6 @@ const mainPlans = [
       "Subscription detection",
       "Email support",
     ],
-    omitted: [],
     cta: "Start Free Trial",
     tier: "lite",
   },
@@ -27,7 +34,7 @@ const mainPlans = [
     name: "Blacktop Core",
     price: "$199",
     period: "month",
-    tagline: "Plan, model, and show up prepared for investors. Your financial copilot.",
+    tagline: "Proactive insights that interrupt you with truth. Your financial co-pilot.",
     seats: "2-3 seats",
     icon: Users,
     features: [
@@ -41,7 +48,6 @@ const mainPlans = [
       "Department budgets",
       "Priority support",
     ],
-    omitted: [],
     cta: "Start Free Trial",
     tier: "core",
     popular: true,
@@ -50,7 +56,7 @@ const mainPlans = [
     name: "Blacktop Growth",
     price: null,
     period: null,
-    tagline: "Scale your finance ops with unlimited access and dedicated support.",
+    tagline: "Scale your finance ops. Unlimited access, dedicated support.",
     seats: "Unlimited seats",
     icon: Building2,
     features: [
@@ -64,7 +70,6 @@ const mainPlans = [
       "AI-drafted investor updates",
       "Dedicated onboarding session",
     ],
-    omitted: [],
     cta: "Contact Sales",
     tier: "growth",
   },
@@ -73,18 +78,64 @@ const mainPlans = [
 export default function Pricing() {
   return (
     <div className="min-h-screen bg-background">
-      <section className="px-6 py-16">
+      {/* Navigation */}
+      <motion.nav 
+        className="border-b backdrop-blur-md bg-background/90 sticky top-0 z-50"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <div className="flex items-center justify-between w-full px-4 py-5 max-w-7xl mx-auto">
+          <Link href="/">
+            <div className="flex items-center gap-2 group cursor-pointer">
+              <img 
+                src="/logo.png" 
+                alt="BlackTop Systems" 
+                className="h-6 object-contain transition-transform group-hover:scale-105" 
+              />
+            </div>
+          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/demo/dashboard">
+              <Button variant="ghost" data-testid="link-demo">Try Demo</Button>
+            </Link>
+            <Link href="/pricing">
+              <Button variant="ghost" data-testid="link-pricing">Pricing</Button>
+            </Link>
+            <a href="/api/login">
+              <Button data-testid="button-login">Sign In</Button>
+            </a>
+          </div>
+        </div>
+      </motion.nav>
+
+      {/* Hero Section */}
+      <section className="px-6 py-16 md:py-20">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold mb-4" data-testid="heading-pricing">
-              Simple, Transparent Pricing
+          <motion.div 
+            className="text-center mb-12"
+            {...fadeInUp}
+          >
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <Badge variant="outline" className="px-4 py-1.5 text-sm font-medium">
+                <Clock className="w-3.5 h-3.5 mr-2 text-primary" />
+                3-Minute Setup
+              </Badge>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent" data-testid="heading-pricing">
+              Simple Pricing. Instant Value.
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              From visibility to full financial command. Choose the plan that fits your stage.
+              From messy financial chaos to investor-ready clarity. No spreadsheets, no CFO fees, no 5-hour onboarding. Just connect and know.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
+          <motion.div 
+            className="grid md:grid-cols-3 gap-8 mb-12"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
             {mainPlans.map((plan) => (
               <Card 
                 key={plan.tier} 
@@ -138,19 +189,6 @@ export default function Pricing() {
                       </li>
                     ))}
                   </ul>
-                  {plan.omitted && plan.omitted.length > 0 && (
-                    <div className="mt-6 pt-4 border-t border-border">
-                      <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wider">Not included:</p>
-                      <ul className="space-y-2">
-                        {plan.omitted.map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-muted-foreground">
-                            <X className="w-4 h-4 mt-0.5 flex-shrink-0 opacity-50" />
-                            <span className="text-xs">{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </CardContent>
                 <CardFooter>
                   {plan.tier === "growth" ? (
@@ -177,18 +215,107 @@ export default function Pricing() {
                 </CardFooter>
               </Card>
             ))}
-          </div>
+          </motion.div>
 
-          <div className="max-w-3xl mx-auto text-center">
+          {/* Trial Info */}
+          <motion.div 
+            className="max-w-3xl mx-auto text-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
             <div className="bg-muted/50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-2">All plans include a 14-day free trial</h3>
+              <h3 className="text-lg font-semibold mb-2">14-day free trial. No credit card required.</h3>
               <p className="text-sm text-muted-foreground">
-                No credit card required. Connect your accounts and see your financial health in minutes.
+                Connect your accounts in minutes and see your burn rate, runway, and AI insights instantly.
               </p>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Trust Section */}
+      <section className="px-6 py-12 bg-muted/30">
+        <motion.div
+          className="max-w-4xl mx-auto text-center"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+        >
+          <div className="flex flex-wrap justify-center gap-8 mb-6">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium">Bank-Grade Security</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium">SOC 2 Compliant</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium">256-bit Encryption</span>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Your data is encrypted at rest and in transit. We never store your bank credentials—all connections are handled securely through Plaid.
+          </p>
+        </motion.div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="px-6 py-16">
+        <motion.div 
+          className="max-w-4xl mx-auto text-center"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+        >
+          <h2 className="text-3xl font-bold mb-4">Ready to Know Your Numbers?</h2>
+          <p className="text-lg text-muted-foreground mb-8">
+            Join founders who spend minutes, not hours, understanding their finances.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="/api/login">
+              <Button size="lg" className="group w-full sm:w-auto" data-testid="button-start-trial">
+                Start Free Trial
+                <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </a>
+            <Link href="/demo/dashboard">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto" data-testid="button-explore-demo">
+                Explore Demo First
+              </Button>
+            </Link>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t px-6 py-12">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-6">
+              <img src="/logo.png" alt="BlackTop Systems" className="h-5 object-contain" />
+              <p className="text-sm text-muted-foreground">
+                &copy; 2025 BlackTop Systems. All rights reserved.
+              </p>
+            </div>
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <Link href="/company/security">
+                <span className="hover:text-foreground transition-colors cursor-pointer">Security</span>
+              </Link>
+              <Link href="/company/about">
+                <span className="hover:text-foreground transition-colors cursor-pointer">About</span>
+              </Link>
+              <Link href="/company/contact">
+                <span className="hover:text-foreground transition-colors cursor-pointer">Contact</span>
+              </Link>
             </div>
           </div>
         </div>
-      </section>
+      </footer>
     </div>
   );
 }
