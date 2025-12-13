@@ -18,8 +18,12 @@ import {
 } from "@shared/schema";
 import { eq, and, ilike, sql, isNull, desc } from "drizzle-orm";
 import { AIOrchestrator } from "./ai/orchestrator";
+import { classifyAccountLocal } from "./ml/accountClassifier";
 
 const aiOrchestrator = new AIOrchestrator();
+
+// Guard to prevent repeated ML classifier error logging
+let mlClassifierErrorLogged = false;
 
 // ============================================
 // Canonical Account Definitions by Business Type
@@ -302,7 +306,7 @@ export interface MappingResult {
   canonicalCode: string;
   canonicalName: string;
   confidence: number;
-  source: "rule" | "ai" | "user" | "imported" | "default";
+  source: "rule" | "ai" | "user" | "imported" | "default" | "ml_local";
   matchedRule?: string;
 }
 
@@ -401,7 +405,33 @@ export async function mapAccountToCanonical(
     };
   }
   
-  // No existing mapping - try learned patterns first (from user corrections)
+  // Try local ML classifier first (proprietary model - no external API calls)
+  // The classifier internally enforces confidence thresholds and returns null for low confidence
+  try {
+    const mlResult = await classifyAccountLocal(organizationId, sourceAccountName);
+    if (mlResult) {
+      console.log(`[COA] Using local ML for "${sourceAccountName}" -> ${mlResult.canonicalCode} (${(mlResult.confidence * 100).toFixed(1)}%)`);
+      // Use the cached canonical account info from the model - no DB query needed
+      const result: MappingResult = {
+        canonicalAccountId: mlResult.canonicalAccountId,
+        canonicalCode: mlResult.canonicalCode,
+        canonicalName: mlResult.canonicalName,
+        confidence: mlResult.confidence,
+        source: "ml_local",
+        matchedRule: `ML matched: ${mlResult.matchedExamples.slice(0, 2).join(", ")}`,
+      };
+      await storeMapping(organizationId, sourceAccountName, sourceSystem, result);
+      return result;
+    }
+  } catch (mlError: any) {
+    // Log once and continue - don't let ML failures block core mapping flow
+    if (!mlClassifierErrorLogged) {
+      console.warn(`[COA] Local ML classification unavailable, falling back to patterns:`, mlError.message || mlError);
+      mlClassifierErrorLogged = true;
+    }
+  }
+  
+  // No existing mapping - try learned patterns (from user corrections)
   const learnedResult = await matchLearnedPattern(organizationId, sourceAccountName);
   if (learnedResult && learnedResult.confidence >= 0.7) {
     console.log(`[COA] Using learned pattern for "${sourceAccountName}" -> ${learnedResult.canonicalCode}`);

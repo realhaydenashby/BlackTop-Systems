@@ -7446,6 +7446,106 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
+  // ============================================
+  // ML Classifier Routes (Proprietary AI Engine)
+  // ============================================
+
+  // Train the ML classifier on user corrections
+  app.post("/api/ml/train-classifier", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { trainClassifier } = await import("./ml/accountClassifier");
+      const result = await trainClassifier(dbUser.defaultOrganizationId);
+      
+      res.json({
+        success: result.success,
+        message: result.success 
+          ? `Trained classifier with ${result.exampleCount} examples and ${result.vocabularySize} vocabulary terms`
+          : `Not enough training data (${result.exampleCount} examples, need 5+)`,
+        exampleCount: result.exampleCount,
+        vocabularySize: result.vocabularySize,
+      });
+    } catch (error: any) {
+      console.error("Train classifier error:", error);
+      res.status(500).json({ message: "Failed to train classifier" });
+    }
+  });
+
+  // Get ML classifier statistics
+  app.get("/api/ml/classifier-stats", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.json({
+          isLoaded: false,
+          version: null,
+          trainedAt: null,
+          exampleCount: 0,
+          vocabularySize: 0,
+          classCount: 0,
+        });
+      }
+
+      const { getClassifier } = await import("./ml/accountClassifier");
+      const classifier = await getClassifier(dbUser.defaultOrganizationId);
+      const stats = classifier.getStats();
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Get classifier stats error:", error);
+      res.status(500).json({ message: "Failed to get classifier stats" });
+    }
+  });
+
+  // Test classification on a sample account name
+  app.post("/api/ml/classify", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { sourceAccountName } = req.body;
+      if (!sourceAccountName) {
+        return res.status(400).json({ message: "sourceAccountName is required" });
+      }
+
+      const { classifyAccountLocal } = await import("./ml/accountClassifier");
+      const result = await classifyAccountLocal(dbUser.defaultOrganizationId, sourceAccountName);
+      
+      if (result) {
+        res.json({
+          success: true,
+          canonicalAccountId: result.canonicalAccountId,
+          canonicalCode: result.canonicalCode,
+          confidence: result.confidence,
+          matchedExamples: result.matchedExamples,
+        });
+      } else {
+        res.json({
+          success: false,
+          message: "No classification result (model may not be trained or confidence too low)",
+        });
+      }
+    } catch (error: any) {
+      console.error("Classify error:", error);
+      res.status(500).json({ message: "Failed to classify account" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
