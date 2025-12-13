@@ -895,6 +895,26 @@ export const aiContextNotes = pgTable("ai_context_notes", {
   index("idx_ai_context_type").on(table.feedbackType),
 ]);
 
+// Model Training History - Track ML model training for automated retraining pipeline
+export const modelTrainingHistory = pgTable("model_training_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  modelName: varchar("model_name", { length: 100 }).notNull(),
+  version: varchar("version", { length: 50 }).notNull(),
+  trainedAt: timestamp("trained_at").notNull().defaultNow(),
+  exampleCount: integer("example_count").default(0),
+  success: boolean("success").default(true),
+  durationMs: integer("duration_ms"),
+  metadata: jsonb("metadata"),
+}, (table) => [
+  index("idx_training_history_org_model").on(table.organizationId, table.modelName),
+  index("idx_training_history_trained").on(table.trainedAt),
+]);
+
+export type ModelTrainingHistory = typeof modelTrainingHistory.$inferSelect;
+export type InsertModelTrainingHistory = typeof modelTrainingHistory.$inferInsert;
+export const insertModelTrainingHistorySchema = createInsertSchema(modelTrainingHistory).omit({ id: true, trainedAt: true });
+
 // Action Decisions - Track user decisions on actionable insights
 export const actionDecisionStatusEnum = pgEnum("action_decision_status", [
   "pending", "approved", "dismissed", "completed", "snoozed"
