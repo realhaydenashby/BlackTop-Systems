@@ -1168,6 +1168,160 @@ export const actionItemsRelations = relations(actionItems, ({ one }) => ({
   }),
 }));
 
+// ============================================
+// Chart of Accounts (COA) Normalization Engine
+// ============================================
+
+// Account group enum - top-level P&L/BS groupings
+export const coaAccountGroupEnum = pgEnum("coa_account_group", [
+  "revenue",        // All income sources
+  "cogs",           // Cost of Goods Sold / Cost of Revenue
+  "opex",           // Operating Expenses
+  "non_operating",  // Interest, taxes, other non-operating
+  "assets",         // Balance sheet assets
+  "liabilities",    // Balance sheet liabilities
+  "equity",         // Balance sheet equity
+]);
+
+// Canonical Account Types - the standardized chart of accounts
+export const canonicalAccounts = pgTable("canonical_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessType: businessTypeEnum("business_type").notNull(),
+  accountGroup: coaAccountGroupEnum("account_group").notNull(),
+  code: varchar("code", { length: 20 }).notNull(), // e.g., "REV-ARR", "COGS-HOST"
+  name: varchar("name", { length: 100 }).notNull(), // e.g., "Annual Recurring Revenue"
+  description: text("description"),
+  parentCode: varchar("parent_code", { length: 20 }), // For hierarchy, e.g., "OPEX-RD" under "OPEX"
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_canonical_accounts_business_type").on(table.businessType),
+  index("idx_canonical_accounts_code").on(table.code),
+  unique("uq_canonical_account_type_code").on(table.businessType, table.code),
+]);
+
+// Mapping confidence level enum
+export const mappingConfidenceEnum = pgEnum("mapping_confidence", [
+  "high",     // 0.9+ - Auto-approved
+  "medium",   // 0.7-0.9 - May need review
+  "low",      // 0.5-0.7 - Needs review
+  "manual",   // User-provided mapping
+]);
+
+// Mapping source enum - where the mapping came from
+export const mappingSourceEnum = pgEnum("mapping_source", [
+  "rule",       // Rule-based matching
+  "ai",         // AI-suggested
+  "user",       // User-corrected
+  "imported",   // From QuickBooks/Xero COA
+  "default",    // Default fallback
+]);
+
+// Account Mappings - organization-specific mappings to canonical accounts
+export const accountMappings = pgTable("account_mappings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  canonicalAccountId: varchar("canonical_account_id").notNull().references(() => canonicalAccounts.id, { onDelete: "cascade" }),
+  
+  // What we're mapping FROM (the source account name/pattern)
+  sourceAccountName: varchar("source_account_name", { length: 255 }).notNull(), // Raw name from QuickBooks/Xero/etc
+  sourceAccountCode: varchar("source_account_code", { length: 50 }), // If available
+  sourceSystem: varchar("source_system", { length: 50 }), // quickbooks, xero, ramp, plaid, etc
+  
+  // Mapping metadata
+  confidence: mappingConfidenceEnum("confidence").default("medium"),
+  confidenceScore: numeric("confidence_score", { precision: 4, scale: 3 }), // 0.000 to 1.000
+  source: mappingSourceEnum("source").default("rule"),
+  
+  // Usage tracking for learning
+  usageCount: integer("usage_count").default(0), // How many times this mapping was used
+  lastUsedAt: timestamp("last_used_at"),
+  
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_account_mappings_org").on(table.organizationId),
+  index("idx_account_mappings_source_name").on(table.sourceAccountName),
+  unique("uq_account_mapping_org_source").on(table.organizationId, table.sourceAccountName, table.sourceSystem),
+]);
+
+// Mapping feedback status enum
+export const feedbackStatusEnum = pgEnum("feedback_status", [
+  "pending",   // Awaiting user review
+  "approved",  // User confirmed mapping is correct
+  "rejected",  // User said mapping is wrong
+  "corrected", // User provided correct mapping
+]);
+
+// Mapping Feedback - user corrections for learning loop
+export const mappingFeedback = pgTable("mapping_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  accountMappingId: varchar("account_mapping_id").references(() => accountMappings.id, { onDelete: "set null" }),
+  
+  // The mapping that was shown/suggested
+  suggestedCanonicalAccountId: varchar("suggested_canonical_account_id").references(() => canonicalAccounts.id, { onDelete: "set null" }),
+  
+  // User's correction (if any)
+  correctedCanonicalAccountId: varchar("corrected_canonical_account_id").references(() => canonicalAccounts.id, { onDelete: "set null" }),
+  
+  // Context
+  sourceAccountName: varchar("source_account_name", { length: 255 }).notNull(),
+  sourceSystem: varchar("source_system", { length: 50 }),
+  originalConfidence: numeric("original_confidence", { precision: 4, scale: 3 }),
+  
+  status: feedbackStatusEnum("status").default("pending"),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  notes: text("notes"), // User explanation
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+}, (table) => [
+  index("idx_mapping_feedback_org").on(table.organizationId),
+  index("idx_mapping_feedback_status").on(table.status),
+]);
+
+// Relations for COA tables
+export const canonicalAccountsRelations = relations(canonicalAccounts, ({ many }) => ({
+  mappings: many(accountMappings),
+}));
+
+export const accountMappingsRelations = relations(accountMappings, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [accountMappings.organizationId],
+    references: [organizations.id],
+  }),
+  canonicalAccount: one(canonicalAccounts, {
+    fields: [accountMappings.canonicalAccountId],
+    references: [canonicalAccounts.id],
+  }),
+}));
+
+export const mappingFeedbackRelations = relations(mappingFeedback, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [mappingFeedback.organizationId],
+    references: [organizations.id],
+  }),
+  accountMapping: one(accountMappings, {
+    fields: [mappingFeedback.accountMappingId],
+    references: [accountMappings.id],
+  }),
+  suggestedCanonicalAccount: one(canonicalAccounts, {
+    fields: [mappingFeedback.suggestedCanonicalAccountId],
+    references: [canonicalAccounts.id],
+  }),
+  correctedCanonicalAccount: one(canonicalAccounts, {
+    fields: [mappingFeedback.correctedCanonicalAccountId],
+    references: [canonicalAccounts.id],
+  }),
+  user: one(users, {
+    fields: [mappingFeedback.userId],
+    references: [users.id],
+  }),
+}));
+
 // Zod schemas for inserts
 export const upsertUserSchema = createInsertSchema(users).omit({ createdAt: true, updatedAt: true }); // Keep id for upsert
 export const insertOrganizationSchema = createInsertSchema(organizations).omit({ id: true, createdAt: true, updatedAt: true });
@@ -1195,6 +1349,11 @@ export const insertQuickbooksTokenSchema = createInsertSchema(quickbooksTokens).
 export const insertXeroTokenSchema = createInsertSchema(xeroTokens).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRampTokenSchema = createInsertSchema(rampTokens).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertWaitlistSchema = createInsertSchema(waitlist).omit({ id: true, createdAt: true, approvedAt: true, approvedBy: true });
+
+// COA insert schemas
+export const insertCanonicalAccountSchema = createInsertSchema(canonicalAccounts).omit({ id: true, createdAt: true });
+export const insertAccountMappingSchema = createInsertSchema(accountMappings).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMappingFeedbackSchema = createInsertSchema(mappingFeedback).omit({ id: true, createdAt: true, reviewedAt: true });
 
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
@@ -1251,6 +1410,14 @@ export type InsertRampToken = z.infer<typeof insertRampTokenSchema>;
 // Waitlist types
 export type WaitlistEntry = typeof waitlist.$inferSelect;
 export type InsertWaitlistEntry = z.infer<typeof insertWaitlistSchema>;
+
+// COA types
+export type CanonicalAccount = typeof canonicalAccounts.$inferSelect;
+export type InsertCanonicalAccount = z.infer<typeof insertCanonicalAccountSchema>;
+export type AccountMapping = typeof accountMappings.$inferSelect;
+export type InsertAccountMapping = z.infer<typeof insertAccountMappingSchema>;
+export type MappingFeedback = typeof mappingFeedback.$inferSelect;
+export type InsertMappingFeedback = z.infer<typeof insertMappingFeedbackSchema>;
 
 // Extended types with relations
 export type TransactionWithRelations = Transaction & {
