@@ -364,35 +364,6 @@ export default function Features() {
         </div>
       </section>
 
-      {/* Trust Section */}
-      <section className="px-6 py-12 bg-muted/30">
-        <motion.div
-          className="max-w-4xl mx-auto text-center"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
-          <div className="flex flex-wrap justify-center gap-8 mb-6">
-            <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" />
-              <span className="text-sm font-medium">Bank-Grade Security</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" />
-              <span className="text-sm font-medium">256-bit Encryption</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" />
-              <span className="text-sm font-medium">Plaid-Powered Connections</span>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Your data is encrypted at rest and in transit. We never store your bank credentials—all connections are handled securely through Plaid.
-          </p>
-        </motion.div>
-      </section>
-
       {/* Final CTA */}
       <section className="px-6 py-24">
         <motion.div 
