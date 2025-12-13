@@ -4,7 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
@@ -74,6 +76,12 @@ interface XeroStatus {
   status?: string;
 }
 
+interface RampStatus {
+  connected: boolean;
+  lastSynced?: string;
+  status?: string;
+}
+
 export default function Connect() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -82,6 +90,9 @@ export default function Connect() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [plaidReady, setPlaidReady] = useState(false);
   const plaidHandlerRef = useRef<any>(null);
+  const [showRampDialog, setShowRampDialog] = useState(false);
+  const [rampClientId, setRampClientId] = useState("");
+  const [rampClientSecret, setRampClientSecret] = useState("");
 
   // Load Plaid Link script
   useEffect(() => {
@@ -137,6 +148,11 @@ export default function Connect() {
   // Fetch Xero connection status
   const { data: xeroStatus, isLoading: xeroLoading } = useQuery<XeroStatus>({
     queryKey: ["/api/xero/status"],
+  });
+
+  // Fetch Ramp connection status
+  const { data: rampStatus, isLoading: rampLoading } = useQuery<RampStatus>({
+    queryKey: ["/api/ramp/status"],
   });
 
   // Fetch connected bank accounts
@@ -274,6 +290,77 @@ export default function Connect() {
       toast({
         title: "Disconnected",
         description: "Xero has been disconnected.",
+      });
+    },
+  });
+
+  // Connect to Ramp
+  const connectRampMutation = useMutation({
+    mutationFn: async ({ clientId, clientSecret }: { clientId: string; clientSecret: string }) => {
+      const res = await apiRequest("POST", "/api/ramp/connect", { clientId, clientSecret });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        queryClient.invalidateQueries({ queryKey: ["/api/ramp/status"] });
+        setShowRampDialog(false);
+        setRampClientId("");
+        setRampClientSecret("");
+        toast({
+          title: "Ramp Connected",
+          description: "Your Ramp account has been successfully connected.",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: data.message || "Unable to connect to Ramp.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Unable to connect to Ramp.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Sync Ramp transactions
+  const syncRampMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/ramp/sync");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ramp/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/live/transactions"] });
+      toast({
+        title: "Sync Complete",
+        description: `Synced ${data.synced} transactions (${data.errors} errors).`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Unable to sync Ramp data.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Disconnect Ramp
+  const disconnectRampMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/ramp/disconnect");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ramp/status"] });
+      toast({
+        title: "Disconnected",
+        description: "Ramp has been disconnected.",
       });
     },
   });
@@ -522,7 +609,7 @@ export default function Connect() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  const isLoading = qbLoading || xeroLoading || bankLoading;
+  const isLoading = qbLoading || xeroLoading || rampLoading || bankLoading;
 
   return (
     <div className="p-6 space-y-8">
@@ -707,7 +794,143 @@ export default function Connect() {
             )}
           </CardContent>
         </Card>
+
+        {/* Ramp Card */}
+        <Card data-testid="card-ramp" className="hover:shadow-glow transition-all duration-base">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+            <div className="flex items-center gap-4">
+              <div className="rounded-xl bg-[#F5A623]/10 border border-[#F5A623]/20 p-3">
+                <CreditCard className="h-6 w-6 text-[#F5A623]" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Ramp</CardTitle>
+                <CardDescription>
+                  {rampStatus?.connected 
+                    ? "Connected - syncing card transactions"
+                    : "Sync your corporate card spend from Ramp"}
+                </CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {rampLoading ? (
+                <Skeleton className="h-6 w-20" />
+              ) : rampStatus?.connected ? (
+                <Badge variant="default" className="bg-[#F5A623]/10 text-[#F5A623] border-[#F5A623]/20">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="secondary">
+                  Not Connected
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {rampStatus?.connected ? (
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  {rampStatus.lastSynced && (
+                    <span>Last synced: {new Date(rampStatus.lastSynced).toLocaleDateString()}</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncRampMutation.mutate()}
+                    disabled={syncRampMutation.isPending}
+                    data-testid="button-sync-ramp"
+                  >
+                    {syncRampMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Sync Now
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => disconnectRampMutation.mutate()}
+                    disabled={disconnectRampMutation.isPending}
+                    data-testid="button-disconnect-ramp"
+                  >
+                    <Unlink className="h-4 w-4 mr-2" />
+                    Disconnect
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                onClick={() => setShowRampDialog(true)}
+                className="bg-[#F5A623] hover:bg-[#E09515]"
+                data-testid="button-connect-ramp"
+              >
+                <LinkIcon className="h-4 w-4 mr-2" />
+                Connect Ramp
+              </Button>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Ramp Connect Dialog */}
+      <Dialog open={showRampDialog} onOpenChange={setShowRampDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Connect Ramp</DialogTitle>
+            <DialogDescription>
+              Enter your Ramp API credentials. You can find these in your Ramp Developer Settings.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="ramp-client-id">Client ID</Label>
+              <Input
+                id="ramp-client-id"
+                placeholder="Enter your Ramp Client ID"
+                value={rampClientId}
+                onChange={(e) => setRampClientId(e.target.value)}
+                data-testid="input-ramp-client-id"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ramp-client-secret">Client Secret</Label>
+              <Input
+                id="ramp-client-secret"
+                type="password"
+                placeholder="Enter your Ramp Client Secret"
+                value={rampClientSecret}
+                onChange={(e) => setRampClientSecret(e.target.value)}
+                data-testid="input-ramp-client-secret"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRampDialog(false)}
+              data-testid="button-cancel-ramp"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => connectRampMutation.mutate({ clientId: rampClientId, clientSecret: rampClientSecret })}
+              disabled={connectRampMutation.isPending || !rampClientId || !rampClientSecret}
+              className="bg-[#F5A623] hover:bg-[#E09515]"
+              data-testid="button-submit-ramp"
+            >
+              {connectRampMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <LinkIcon className="h-4 w-4 mr-2" />
+              )}
+              Connect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Bank Accounts Section */}
       <div className="space-y-4">

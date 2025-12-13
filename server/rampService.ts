@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { rampTokens, transactions, vendors, categories, organizations } from "@shared/schema";
+import { rampTokens, transactions } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { addHours, isAfter, subDays } from "date-fns";
 
@@ -238,48 +238,6 @@ export class RampService {
 
         if (existingTx) continue;
 
-        let vendorId: string | null = null;
-        if (tx.merchant_name) {
-          const existingVendor = await db.query.vendors.findFirst({
-            where: and(
-              eq(vendors.organizationId, organizationId),
-              eq(vendors.name, tx.merchant_name)
-            ),
-          });
-
-          if (existingVendor) {
-            vendorId = existingVendor.id;
-          } else {
-            const [newVendor] = await db.insert(vendors).values({
-              organizationId,
-              name: tx.merchant_name,
-              normalizedName: tx.merchant_name,
-            }).returning();
-            vendorId = newVendor.id;
-          }
-        }
-
-        let categoryId: string | null = null;
-        if (tx.category) {
-          const existingCategory = await db.query.categories.findFirst({
-            where: and(
-              eq(categories.organizationId, organizationId),
-              eq(categories.name, tx.category)
-            ),
-          });
-
-          if (existingCategory) {
-            categoryId = existingCategory.id;
-          } else {
-            const [newCategory] = await db.insert(categories).values({
-              organizationId,
-              name: tx.category,
-              type: "expense",
-            }).returning();
-            categoryId = newCategory.id;
-          }
-        }
-
         const amountInDollars = tx.amount / 100;
 
         await db.insert(transactions).values({
@@ -288,17 +246,15 @@ export class RampService {
           date: new Date(tx.user_transaction_time),
           amount: (-Math.abs(amountInDollars)).toString(),
           currency: tx.currency_code || "USD",
-          vendorId,
           vendorOriginal: tx.merchant_name || tx.merchant_descriptor,
-          vendorNormalized: tx.merchant_name,
-          categoryId,
-          description: tx.memo,
+          description: tx.memo || tx.merchant_name,
           source: "ramp",
           metadata: {
             ramp_merchant_id: tx.merchant_id,
             ramp_card_id: tx.card_id,
             ramp_user_id: tx.user_id,
             ramp_mcc: tx.merchant_category_code,
+            ramp_category: tx.category,
           },
         });
 
@@ -312,6 +268,17 @@ export class RampService {
     await db.update(rampTokens)
       .set({ lastSyncedAt: new Date(), updatedAt: new Date() })
       .where(eq(rampTokens.id, token.id));
+
+    // Run normalization pipeline on the newly synced transactions
+    if (synced > 0) {
+      try {
+        const { transformOrganizationTransactions } = await import("./plaidTransformService");
+        await transformOrganizationTransactions(organizationId);
+        console.log(`[Ramp] Ran normalization pipeline for ${synced} new transactions`);
+      } catch (err) {
+        console.error("[Ramp] Normalization pipeline error:", err);
+      }
+    }
 
     return { synced, errors };
   }
