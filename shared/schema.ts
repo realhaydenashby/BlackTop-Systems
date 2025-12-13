@@ -1357,6 +1357,103 @@ export const insertCanonicalAccountSchema = createInsertSchema(canonicalAccounts
 export const insertAccountMappingSchema = createInsertSchema(accountMappings).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMappingFeedbackSchema = createInsertSchema(mappingFeedback).omit({ id: true, createdAt: true, reviewedAt: true });
 
+// ============================================
+// Cross-Organization Pattern Database
+// Anonymized financial patterns that improve all customers
+// ============================================
+
+export const patternTypeEnum = pgEnum("pattern_type", [
+  "spending_profile",     // Aggregated spending patterns by category/business type
+  "vendor_behavior",      // Common vendor patterns (payment frequency, price changes)
+  "seasonal_trend",       // Industry-specific seasonal patterns
+  "benchmark_metric",     // Anonymized metric benchmarks (burn rate, runway, margins)
+  "category_distribution", // Typical expense distributions by business type
+  "growth_trajectory",    // Common growth patterns by stage
+]);
+
+export const crossOrgPatterns = pgTable("cross_org_patterns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patternType: patternTypeEnum("pattern_type").notNull(),
+  businessType: businessTypeEnum("business_type").notNull(),
+  companyStage: varchar("company_stage", { length: 50 }), // seed, series-a, series-b, growth
+  patternKey: varchar("pattern_key", { length: 100 }).notNull(), // e.g., "burn_rate_median", "software_spend_pct"
+  patternValue: jsonb("pattern_value").notNull(), // Flexible JSON for different pattern types
+  sampleSize: integer("sample_size").default(0), // Number of orgs contributing to this pattern
+  confidenceScore: numeric("confidence_score", { precision: 5, scale: 4 }), // 0-1 statistical confidence
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_cross_org_patterns_type").on(table.patternType, table.businessType),
+  index("idx_cross_org_patterns_key").on(table.patternKey),
+  unique("uq_cross_org_pattern").on(table.patternType, table.businessType, table.companyStage, table.patternKey),
+]);
+
+export const industryBenchmarks = pgTable("industry_benchmarks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessType: businessTypeEnum("business_type").notNull(),
+  companyStage: varchar("company_stage", { length: 50 }),
+  metricName: varchar("metric_name", { length: 100 }).notNull(), // e.g., "burn_rate", "gross_margin"
+  p10: numeric("p10", { precision: 18, scale: 4 }), // 10th percentile
+  p25: numeric("p25", { precision: 18, scale: 4 }), // 25th percentile (Q1)
+  p50: numeric("p50", { precision: 18, scale: 4 }), // Median
+  p75: numeric("p75", { precision: 18, scale: 4 }), // 75th percentile (Q3)
+  p90: numeric("p90", { precision: 18, scale: 4 }), // 90th percentile
+  mean: numeric("mean", { precision: 18, scale: 4 }),
+  stdDev: numeric("std_dev", { precision: 18, scale: 4 }),
+  sampleSize: integer("sample_size").default(0),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+}, (table) => [
+  index("idx_benchmarks_type_metric").on(table.businessType, table.metricName),
+  unique("uq_benchmark").on(table.businessType, table.companyStage, table.metricName),
+]);
+
+export const vendorPatterns = pgTable("vendor_patterns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  normalizedName: varchar("normalized_name", { length: 255 }).notNull(), // Cleaned vendor name
+  category: varchar("category", { length: 100 }), // Software, Marketing, etc.
+  avgBillingFrequency: varchar("avg_billing_frequency", { length: 50 }), // monthly, annual, one-time
+  typicalPriceRange: jsonb("typical_price_range"), // { min, max, median }
+  priceIncreaseRate: numeric("price_increase_rate", { precision: 5, scale: 4 }), // Annual increase %
+  prevalence: integer("prevalence").default(0), // How many orgs use this vendor
+  businessTypes: text("business_types").array(), // Which business types commonly use
+  lastUpdated: timestamp("last_updated").defaultNow(),
+}, (table) => [
+  index("idx_vendor_patterns_name").on(table.normalizedName),
+  index("idx_vendor_patterns_category").on(table.category),
+]);
+
+export const seasonalPatterns = pgTable("seasonal_patterns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessType: businessTypeEnum("business_type").notNull(),
+  metricName: varchar("metric_name", { length: 100 }).notNull(),
+  seasonalIndices: jsonb("seasonal_indices").notNull(), // 12 monthly indices
+  peakMonths: text("peak_months").array(), // e.g., ["11", "12"] for Q4 spikes
+  troughMonths: text("trough_months").array(),
+  seasonalStrength: numeric("seasonal_strength", { precision: 5, scale: 4 }), // 0-1
+  sampleSize: integer("sample_size").default(0),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+}, (table) => [
+  unique("uq_seasonal_pattern").on(table.businessType, table.metricName),
+]);
+
+export const patternContributions = pgTable("pattern_contributions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  patternType: patternTypeEnum("pattern_type").notNull(),
+  contributedAt: timestamp("contributed_at").defaultNow(),
+  dataHash: varchar("data_hash", { length: 64 }), // Hash of contributed data for dedup
+}, (table) => [
+  index("idx_pattern_contributions_org").on(table.organizationId),
+  unique("uq_pattern_contribution").on(table.organizationId, table.patternType, table.dataHash),
+]);
+
+// Cross-org pattern insert schemas
+export const insertCrossOrgPatternSchema = createInsertSchema(crossOrgPatterns).omit({ id: true, createdAt: true, lastUpdated: true });
+export const insertIndustryBenchmarkSchema = createInsertSchema(industryBenchmarks).omit({ id: true, lastUpdated: true });
+export const insertVendorPatternSchema = createInsertSchema(vendorPatterns).omit({ id: true, lastUpdated: true });
+export const insertSeasonalPatternSchema = createInsertSchema(seasonalPatterns).omit({ id: true, lastUpdated: true });
+export const insertPatternContributionSchema = createInsertSchema(patternContributions).omit({ id: true, contributedAt: true });
+
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -1420,6 +1517,18 @@ export type AccountMapping = typeof accountMappings.$inferSelect;
 export type InsertAccountMapping = z.infer<typeof insertAccountMappingSchema>;
 export type MappingFeedback = typeof mappingFeedback.$inferSelect;
 export type InsertMappingFeedback = z.infer<typeof insertMappingFeedbackSchema>;
+
+// Cross-org pattern types
+export type CrossOrgPattern = typeof crossOrgPatterns.$inferSelect;
+export type InsertCrossOrgPattern = z.infer<typeof insertCrossOrgPatternSchema>;
+export type IndustryBenchmark = typeof industryBenchmarks.$inferSelect;
+export type InsertIndustryBenchmark = z.infer<typeof insertIndustryBenchmarkSchema>;
+export type VendorPattern = typeof vendorPatterns.$inferSelect;
+export type InsertVendorPattern = z.infer<typeof insertVendorPatternSchema>;
+export type SeasonalPattern = typeof seasonalPatterns.$inferSelect;
+export type InsertSeasonalPattern = z.infer<typeof insertSeasonalPatternSchema>;
+export type PatternContribution = typeof patternContributions.$inferSelect;
+export type InsertPatternContribution = z.infer<typeof insertPatternContributionSchema>;
 
 // Extended types with relations
 export type TransactionWithRelations = Transaction & {

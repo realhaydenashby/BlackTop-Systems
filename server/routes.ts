@@ -7890,6 +7890,143 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
+  // ============================================
+  // Cross-Organization Pattern Database API
+  // ============================================
+
+  // Contribute patterns from current org (called after syncs)
+  app.post("/api/ml/contribute-patterns", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ success: false, message: "No organization found" });
+      }
+
+      const { contributeOrgPatterns } = await import("./ml/crossOrgPatterns");
+      const result = await contributeOrgPatterns(dbUser.defaultOrganizationId);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Contribute patterns error:", error);
+      res.status(500).json({ success: false, message: "Failed to contribute patterns" });
+    }
+  });
+
+  // Get industry benchmarks
+  app.get("/api/ml/benchmarks", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const org = await storage.getOrganization(dbUser.defaultOrganizationId);
+      const businessType = org?.businessType || "other";
+      const companyStage = req.query.stage as string | undefined;
+
+      const { getIndustryBenchmarks } = await import("./ml/crossOrgPatterns");
+      const benchmarks = await getIndustryBenchmarks(businessType, companyStage);
+      
+      res.json({ benchmarks, businessType });
+    } catch (error: any) {
+      console.error("Get benchmarks error:", error);
+      res.status(500).json({ message: "Failed to get industry benchmarks" });
+    }
+  });
+
+  // Compare org metrics to industry
+  app.post("/api/ml/compare-to-industry", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { metrics } = req.body;
+      if (!metrics || typeof metrics !== "object") {
+        return res.status(400).json({ message: "Metrics object required" });
+      }
+
+      const { compareMetricsToIndustry } = await import("./ml/crossOrgPatterns");
+      const comparisons = await compareMetricsToIndustry(dbUser.defaultOrganizationId, metrics);
+      
+      res.json({ comparisons });
+    } catch (error: any) {
+      console.error("Compare to industry error:", error);
+      res.status(500).json({ message: "Failed to compare to industry" });
+    }
+  });
+
+  // Get seasonal patterns for business type
+  app.get("/api/ml/seasonal-patterns", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const org = await storage.getOrganization(dbUser.defaultOrganizationId);
+      const businessType = org?.businessType || "other";
+
+      const { getSeasonalPatternsForType } = await import("./ml/crossOrgPatterns");
+      const patterns = await getSeasonalPatternsForType(businessType);
+      
+      res.json({ patterns, businessType });
+    } catch (error: any) {
+      console.error("Get seasonal patterns error:", error);
+      res.status(500).json({ message: "Failed to get seasonal patterns" });
+    }
+  });
+
+  // Get common vendors for business type
+  app.get("/api/ml/common-vendors", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const org = await storage.getOrganization(dbUser.defaultOrganizationId);
+      const businessType = org?.businessType || "other";
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      const { getCommonVendorsForType } = await import("./ml/crossOrgPatterns");
+      const vendors = await getCommonVendorsForType(businessType, limit);
+      
+      res.json({ vendors, businessType });
+    } catch (error: any) {
+      console.error("Get common vendors error:", error);
+      res.status(500).json({ message: "Failed to get common vendors" });
+    }
+  });
+
+  // Get cross-org pattern database stats
+  app.get("/api/ml/pattern-stats", isAuthenticated, async (req, res) => {
+    try {
+      const { getCrossOrgPatternStats } = await import("./ml/crossOrgPatterns");
+      const stats = await getCrossOrgPatternStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Get pattern stats error:", error);
+      res.status(500).json({ message: "Failed to get pattern stats" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
