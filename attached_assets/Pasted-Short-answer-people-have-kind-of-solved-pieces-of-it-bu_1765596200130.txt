@@ -1,0 +1,21 @@
+Short answer: people have kind of solved pieces of it, but no one has actually owned the problem end-to-end. And there’s a reason.
+
+Why it hasn’t really been solved
+	1.	It’s unsexy plumbing. Investors like shiny dashboards, not “ledger normalization.” Founders don’t wake up thinking “boy I’d love to fix my chart of accounts.” So most companies build on top of the mess instead of fixing it.
+	2.	Accountants protect the mess. Cleaning charts of accounts is billable human labor. Automating it threatens services revenue, so the incumbents have zero incentive to go hard here.
+	3.	Harder than it looks. This isn’t just relabeling accounts. You have to infer intent. Is this contractor cost fixed or variable? Is this software COGS or OpEx? That requires context, patterns, and judgment, not simple rules.
+	4.	Founders tolerate pain… until suddenly they can’t. Early-stage startups limp along with ugly books. The pain only becomes obvious when fundraising, board pressure, or cash stress hits. By then they hire a human to clean it instead of buying new software.
+	5.	Most tools assume “clean input.” Parallel, Mosaic, Cube, etc. quietly assume someone else did the dirty work. They optimize forecasting, not data integrity.
+
+Has anyone partially done it?
+	•	QuickBooks, Xero: Provide structure, but they don’t enforce consistency. Garbage in, nicely formatted garbage out.
+	•	Pilot, Bench: Humans clean it. Expensive, slow, not scalable.
+	•	Parallel/Mosaic: Great once data is clean. Not built to make it clean.
+	•	ERP systems: Overkill and still require heavy setup and humans.
+
+Why Blacktop is actually different
+You’re not saying “here’s a prettier dashboard.” You’re saying “the forecasting layer is broken because the foundation is broken, so let’s fix the foundation automatically.”
+
+That’s why it hasn’t been solved. It lives in the uncomfortable middle between accounting judgment and software automation. Everyone steps around it. You’re stepping on it.
+
+Annoying problem. Massive leverage. Exactly the kind people avoid until someone finally doesn’t.

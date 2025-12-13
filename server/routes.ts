@@ -2615,6 +2615,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Ramp Integration endpoints
+  app.post("/api/ramp/connect", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const { clientId, clientSecret, organizationId } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+
+      if (!clientId || !clientSecret) {
+        return res.status(400).json({ message: "Ramp Client ID and Client Secret are required" });
+      }
+
+      const orgId = organizationId || user.organizationId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      const { rampService } = await import("./rampService");
+      const result = await rampService.connect(userId, orgId, clientId, clientSecret);
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error: any) {
+      console.error("Ramp connect error:", error);
+      res.status(500).json({ message: error.message || "Failed to connect Ramp" });
+    }
+  });
+
+  app.get("/api/ramp/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const organizationId = (req.query.organizationId as string) || user.organizationId;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+
+      if (!organizationId) {
+        return res.json({ connected: false });
+      }
+
+      const { rampService } = await import("./rampService");
+      const connection = await rampService.getConnection(userId, organizationId);
+      
+      res.json({
+        connected: !!connection,
+        status: connection?.status,
+        businessName: connection?.businessName,
+        lastSyncedAt: connection?.lastSyncedAt,
+      });
+    } catch (error: any) {
+      console.error("Ramp status error:", error);
+      res.status(500).json({ message: error.message || "Failed to get connection status" });
+    }
+  });
+
+  app.post("/api/ramp/sync", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const { organizationId } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+
+      const orgId = organizationId || user.organizationId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      const { rampService } = await import("./rampService");
+      const result = await rampService.syncTransactions(userId, orgId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Ramp sync error:", error);
+      res.status(500).json({ message: error.message || "Failed to sync transactions" });
+    }
+  });
+
+  app.post("/api/ramp/disconnect", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const { organizationId } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid. Please log out and log back in." });
+      }
+
+      const orgId = organizationId || user.organizationId;
+      if (!orgId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      const { rampService } = await import("./rampService");
+      await rampService.disconnect(userId, orgId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Ramp disconnect error:", error);
+      res.status(500).json({ message: error.message || "Failed to disconnect" });
+    }
+  });
+
   // AI endpoints
   app.post("/api/ai/:provider", isAuthenticated, async (req, res) => {
     try {

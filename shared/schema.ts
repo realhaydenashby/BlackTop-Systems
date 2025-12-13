@@ -268,8 +268,8 @@ export const bankAccounts = pgTable("bank_accounts", {
   index("idx_bank_accounts_plaid").on(table.plaidAccountId),
 ]);
 
-// Transaction source enum for distinguishing Yodlee vs Plaid vs CSV vs manual
-export const transactionSourceEnum = pgEnum("transaction_source", ["yodlee", "plaid", "csv", "manual", "stripe"]);
+// Transaction source enum for distinguishing Yodlee vs Plaid vs CSV vs manual vs Ramp
+export const transactionSourceEnum = pgEnum("transaction_source", ["yodlee", "plaid", "csv", "manual", "stripe", "ramp"]);
 
 // Transactions (updated with Yodlee/Plaid fields)
 export const transactions = pgTable("transactions", {
@@ -279,6 +279,7 @@ export const transactions = pgTable("transactions", {
   bankAccountId: varchar("bank_account_id").references(() => bankAccounts.id, { onDelete: "set null" }), // Link to bank account
   yodleeTransactionId: varchar("yodlee_transaction_id"), // Yodlee's transaction ID (for deduplication)
   plaidTransactionId: varchar("plaid_transaction_id"), // Plaid's transaction ID (for deduplication)
+  rampTransactionId: varchar("ramp_transaction_id"), // Ramp's transaction ID (for deduplication)
   date: timestamp("date").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).default("USD"),
@@ -302,6 +303,7 @@ export const transactions = pgTable("transactions", {
   index("idx_transactions_category").on(table.categoryId),
   index("idx_transactions_yodlee").on(table.yodleeTransactionId),
   index("idx_transactions_plaid").on(table.plaidTransactionId),
+  index("idx_transactions_ramp").on(table.rampTransactionId),
   index("idx_transactions_bank_account").on(table.bankAccountId),
 ]);
 
@@ -510,6 +512,26 @@ export const xeroTokens = pgTable("xero_tokens", {
 }, (table) => [
   index("idx_xero_tokens_user").on(table.userId),
   index("idx_xero_tokens_tenant").on(table.tenantId),
+]);
+
+// Ramp API Tokens (OAuth2 Client Credentials)
+export const rampTokens = pgTable("ramp_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  clientId: varchar("client_id", { length: 255 }).notNull(), // Ramp API client ID
+  clientSecret: text("client_secret").notNull(), // Ramp API client secret (encrypted)
+  accessToken: text("access_token"), // Current access token
+  accessTokenExpiresAt: timestamp("access_token_expires_at"), // Token expiration
+  scope: text("scope").default("transactions:read receipts:read bills:read"), // Granted scopes
+  businessName: varchar("business_name", { length: 255 }), // Ramp business name
+  lastSyncedAt: timestamp("last_synced_at"),
+  status: varchar("status", { length: 50 }).default("active"), // active, expired, revoked
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_ramp_tokens_user").on(table.userId),
+  index("idx_ramp_tokens_org").on(table.organizationId),
 ]);
 
 // Subscription Plans
@@ -1171,6 +1193,7 @@ export const insertBurnMetricSchema = createInsertSchema(burnMetrics).omit({ id:
 export const insertRaiseRecommendationSchema = createInsertSchema(raiseRecommendations).omit({ id: true, createdAt: true });
 export const insertQuickbooksTokenSchema = createInsertSchema(quickbooksTokens).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertXeroTokenSchema = createInsertSchema(xeroTokens).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertRampTokenSchema = createInsertSchema(rampTokens).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertWaitlistSchema = createInsertSchema(waitlist).omit({ id: true, createdAt: true, approvedAt: true, approvedBy: true });
 
 // Types
@@ -1222,6 +1245,8 @@ export type QuickbooksToken = typeof quickbooksTokens.$inferSelect;
 export type InsertQuickbooksToken = z.infer<typeof insertQuickbooksTokenSchema>;
 export type XeroToken = typeof xeroTokens.$inferSelect;
 export type InsertXeroToken = z.infer<typeof insertXeroTokenSchema>;
+export type RampToken = typeof rampTokens.$inferSelect;
+export type InsertRampToken = z.infer<typeof insertRampTokenSchema>;
 
 // Waitlist types
 export type WaitlistEntry = typeof waitlist.$inferSelect;
