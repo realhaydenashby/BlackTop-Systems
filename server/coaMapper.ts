@@ -11,11 +11,12 @@ import {
   accountMappings, 
   mappingFeedback,
   organizations,
+  transactions,
   type CanonicalAccount,
   type AccountMapping,
   type InsertAccountMapping,
 } from "@shared/schema";
-import { eq, and, ilike, sql } from "drizzle-orm";
+import { eq, and, ilike, sql, isNull, desc } from "drizzle-orm";
 
 // ============================================
 // Canonical Account Definitions by Business Type
@@ -649,4 +650,225 @@ export async function initializeCOA(organizationId: string): Promise<{ accountsS
   console.log(`[COA] Initialized COA for org ${organizationId} (type: ${businessType})`);
   
   return { accountsSeeded };
+}
+
+// ============================================
+// Retroactive Batch Processor
+// ============================================
+
+export interface BatchProcessResult {
+  totalProcessed: number;
+  successCount: number;
+  errorCount: number;
+  lowConfidenceCount: number;
+  errors: Array<{ transactionId: string; error: string }>;
+}
+
+/**
+ * Process historical transactions and assign canonical account IDs
+ * Processes in batches to avoid memory issues
+ */
+export async function processHistoricalTransactions(
+  organizationId: string,
+  options: {
+    batchSize?: number;
+    onlyUnmapped?: boolean;
+    limit?: number;
+  } = {}
+): Promise<BatchProcessResult> {
+  const { batchSize = 100, onlyUnmapped = true, limit } = options;
+  
+  // Get organization business type
+  const [org] = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, organizationId));
+  
+  if (!org) {
+    throw new Error("Organization not found");
+  }
+  
+  const businessType = org.businessType || "other";
+  
+  // Ensure canonical accounts are seeded
+  const existingAccounts = await getCanonicalAccounts(businessType);
+  if (existingAccounts.length === 0) {
+    await seedCanonicalAccounts(businessType);
+  }
+  
+  const result: BatchProcessResult = {
+    totalProcessed: 0,
+    successCount: 0,
+    errorCount: 0,
+    lowConfidenceCount: 0,
+    errors: [],
+  };
+  
+  let offset = 0;
+  let hasMore = true;
+  
+  while (hasMore) {
+    // Build query for transactions
+    let query = db
+      .select()
+      .from(transactions)
+      .where(
+        onlyUnmapped
+          ? and(
+              eq(transactions.organizationId, organizationId),
+              isNull(transactions.canonicalAccountId)
+            )
+          : eq(transactions.organizationId, organizationId)
+      )
+      .orderBy(desc(transactions.date))
+      .limit(batchSize)
+      .offset(offset);
+    
+    const batch = await query;
+    
+    if (batch.length === 0) {
+      hasMore = false;
+      break;
+    }
+    
+    // Process each transaction in the batch
+    for (const txn of batch) {
+      if (limit && result.totalProcessed >= limit) {
+        hasMore = false;
+        break;
+      }
+      
+      try {
+        // Determine source account name from available fields
+        const sourceAccountName = txn.vendorNormalized || 
+                                   txn.vendorOriginal || 
+                                   txn.description || 
+                                   "Unknown";
+        
+        // Get source system
+        const sourceSystem = txn.source || "unknown";
+        
+        // Map to canonical account
+        const mapping = await mapAccountToCanonical(
+          organizationId,
+          sourceAccountName,
+          sourceSystem,
+          businessType
+        );
+        
+        // Update transaction with canonical account ID
+        await db
+          .update(transactions)
+          .set({
+            canonicalAccountId: mapping.canonicalAccountId,
+            updatedAt: new Date(),
+          })
+          .where(eq(transactions.id, txn.id));
+        
+        result.successCount++;
+        
+        if (mapping.confidence < 0.7) {
+          result.lowConfidenceCount++;
+        }
+      } catch (error) {
+        result.errorCount++;
+        result.errors.push({
+          transactionId: txn.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      
+      result.totalProcessed++;
+    }
+    
+    offset += batchSize;
+    
+    // Log progress every 500 transactions
+    if (result.totalProcessed % 500 === 0) {
+      console.log(`[COA] Processed ${result.totalProcessed} transactions...`);
+    }
+  }
+  
+  console.log(`[COA] Batch processing complete: ${result.successCount} success, ${result.errorCount} errors, ${result.lowConfidenceCount} low confidence`);
+  
+  return result;
+}
+
+/**
+ * Get processing status/stats for an organization
+ */
+export async function getProcessingStats(organizationId: string): Promise<{
+  totalTransactions: number;
+  mappedTransactions: number;
+  unmappedTransactions: number;
+  percentMapped: number;
+}> {
+  const [stats] = await db.execute<{
+    total: string;
+    mapped: string;
+    unmapped: string;
+  }>(sql`
+    SELECT 
+      COUNT(*)::text as total,
+      COUNT(canonical_account_id)::text as mapped,
+      (COUNT(*) - COUNT(canonical_account_id))::text as unmapped
+    FROM transactions
+    WHERE organization_id = ${organizationId}
+  `);
+  
+  const total = parseInt(stats?.total || "0", 10);
+  const mapped = parseInt(stats?.mapped || "0", 10);
+  const unmapped = parseInt(stats?.unmapped || "0", 10);
+  
+  return {
+    totalTransactions: total,
+    mappedTransactions: mapped,
+    unmappedTransactions: unmapped,
+    percentMapped: total > 0 ? Math.round((mapped / total) * 100) : 0,
+  };
+}
+
+/**
+ * Get transaction breakdown by canonical account group
+ */
+export async function getTransactionsByAccountGroup(
+  organizationId: string,
+  startDate?: Date,
+  endDate?: Date
+): Promise<Array<{
+  accountGroup: string;
+  accountCode: string;
+  accountName: string;
+  transactionCount: number;
+  totalAmount: string;
+}>> {
+  const results = await db.execute<{
+    account_group: string;
+    code: string;
+    name: string;
+    transaction_count: string;
+    total_amount: string;
+  }>(sql`
+    SELECT 
+      ca.account_group,
+      ca.code,
+      ca.name,
+      COUNT(t.id)::text as transaction_count,
+      COALESCE(SUM(t.amount), 0)::text as total_amount
+    FROM transactions t
+    JOIN canonical_accounts ca ON t.canonical_account_id = ca.id
+    WHERE t.organization_id = ${organizationId}
+      ${startDate ? sql`AND t.date >= ${startDate}` : sql``}
+      ${endDate ? sql`AND t.date <= ${endDate}` : sql``}
+    GROUP BY ca.account_group, ca.code, ca.name
+    ORDER BY ca.account_group, ca.code
+  `);
+  
+  return results.map(r => ({
+    accountGroup: r.account_group,
+    accountCode: r.code,
+    accountName: r.name,
+    transactionCount: parseInt(r.transaction_count, 10),
+    totalAmount: r.total_amount,
+  }));
 }

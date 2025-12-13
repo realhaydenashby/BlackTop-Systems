@@ -287,6 +287,7 @@ export const transactions = pgTable("transactions", {
   vendorOriginal: varchar("vendor_original", { length: 255 }), // Raw vendor string from bank
   vendorNormalized: varchar("vendor_normalized", { length: 255 }), // AI-cleaned vendor name
   categoryId: varchar("category_id").references(() => categories.id, { onDelete: "set null" }),
+  canonicalAccountId: varchar("canonical_account_id"), // COA normalized account (references canonical_accounts.id)
   departmentId: varchar("department_id").references(() => departments.id, { onDelete: "set null" }),
   description: text("description"),
   tags: text("tags").array(),
@@ -305,6 +306,7 @@ export const transactions = pgTable("transactions", {
   index("idx_transactions_plaid").on(table.plaidTransactionId),
   index("idx_transactions_ramp").on(table.rampTransactionId),
   index("idx_transactions_bank_account").on(table.bankAccountId),
+  index("idx_transactions_canonical_account").on(table.canonicalAccountId),
 ]);
 
 // Planned Hires (for runway calculations)
