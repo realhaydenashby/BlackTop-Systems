@@ -5,8 +5,8 @@ import { db } from "./db";
 import { isAuthenticated } from "./replitAuth";
 import { ObjectStorageService } from "./objectStorage";
 import { z } from "zod";
-import { User, insertOrganizationSchema, insertDocumentSchema, insertTransactionSchema, organizationMembers, transactions } from "@shared/schema";
-import { eq, and, gte, lt, sql } from "drizzle-orm";
+import { User, insertOrganizationSchema, insertDocumentSchema, insertTransactionSchema, organizationMembers, transactions, accountMappings, mappingFeedback } from "@shared/schema";
+import { eq, and, gte, lt, sql, desc } from "drizzle-orm";
 import * as pdfParse from "pdf-parse";
 import Papa from "papaparse";
 import { subDays, startOfMonth, endOfMonth, addMonths } from "date-fns";
@@ -7213,6 +7213,236 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     } catch (error: any) {
       console.error("Waitlist status error:", error);
       res.status(500).json({ message: "Failed to check waitlist status" });
+    }
+  });
+
+  // ============================================
+  // COA (CHART OF ACCOUNTS) MAPPING ENDPOINTS
+  // ============================================
+
+  // Get low-confidence mappings that need review
+  app.get("/api/coa/low-confidence-mappings", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.json([]);
+      }
+
+      const { getLowConfidenceMappings, getCanonicalAccounts } = await import("./coaMapper");
+      const mappings = await getLowConfidenceMappings(dbUser.defaultOrganizationId);
+      
+      // Get canonical accounts for enrichment
+      const organization = await storage.getOrganization(dbUser.defaultOrganizationId);
+      const businessType = organization?.businessType || "saas";
+      const canonicalAccounts = await getCanonicalAccounts(businessType);
+      const accountsMap = new Map(canonicalAccounts.map(a => [a.id, a]));
+      
+      // Enrich mappings with canonical account details
+      const enrichedMappings = mappings.map(m => ({
+        ...m,
+        canonicalAccount: accountsMap.get(m.canonicalAccountId) || null,
+      }));
+      
+      res.json(enrichedMappings);
+    } catch (error: any) {
+      console.error("Get low-confidence mappings error:", error);
+      res.status(500).json({ message: "Failed to get mappings" });
+    }
+  });
+
+  // Get all mappings for organization (with pagination)
+  app.get("/api/coa/mappings", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.json({ mappings: [], total: 0 });
+      }
+
+      const { getCanonicalAccounts } = await import("./coaMapper");
+      
+      // Get all mappings for organization
+      const allMappings = await db
+        .select()
+        .from(accountMappings)
+        .where(eq(accountMappings.organizationId, dbUser.defaultOrganizationId))
+        .orderBy(desc(accountMappings.lastUsedAt));
+      
+      // Get canonical accounts for enrichment
+      const organization = await storage.getOrganization(dbUser.defaultOrganizationId);
+      const businessType = organization?.businessType || "saas";
+      const canonicalAccounts = await getCanonicalAccounts(businessType);
+      const accountsMap = new Map(canonicalAccounts.map(a => [a.id, a]));
+      
+      // Enrich mappings with canonical account details
+      const enrichedMappings = allMappings.map(m => ({
+        ...m,
+        canonicalAccount: accountsMap.get(m.canonicalAccountId) || null,
+      }));
+      
+      res.json({ mappings: enrichedMappings, total: enrichedMappings.length });
+    } catch (error: any) {
+      console.error("Get mappings error:", error);
+      res.status(500).json({ message: "Failed to get mappings" });
+    }
+  });
+
+  // Get canonical accounts for business type
+  app.get("/api/coa/canonical-accounts", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.json([]);
+      }
+
+      const { getCanonicalAccounts, seedCanonicalAccounts } = await import("./coaMapper");
+      
+      const organization = await storage.getOrganization(dbUser.defaultOrganizationId);
+      const businessType = organization?.businessType || "saas";
+      
+      // Ensure canonical accounts exist
+      let accounts = await getCanonicalAccounts(businessType);
+      if (accounts.length === 0) {
+        await seedCanonicalAccounts(businessType);
+        accounts = await getCanonicalAccounts(businessType);
+      }
+      
+      res.json(accounts);
+    } catch (error: any) {
+      console.error("Get canonical accounts error:", error);
+      res.status(500).json({ message: "Failed to get canonical accounts" });
+    }
+  });
+
+  // Correct a mapping
+  app.post("/api/coa/correct-mapping", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const { mappingId, canonicalAccountId, notes } = req.body;
+      
+      if (!mappingId || !canonicalAccountId) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const { correctMapping } = await import("./coaMapper");
+      await correctMapping(mappingId, canonicalAccountId, userId, notes);
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Correct mapping error:", error);
+      res.status(500).json({ message: error.message || "Failed to correct mapping" });
+    }
+  });
+
+  // Approve a mapping (mark as reviewed, increase confidence)
+  app.post("/api/coa/approve-mapping", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      const { mappingId } = req.body;
+      
+      if (!mappingId) {
+        return res.status(400).json({ message: "Missing mapping ID" });
+      }
+
+      // Get the mapping
+      const [mapping] = await db
+        .select()
+        .from(accountMappings)
+        .where(eq(accountMappings.id, mappingId));
+      
+      if (!mapping) {
+        return res.status(404).json({ message: "Mapping not found" });
+      }
+      
+      // Record feedback as approved
+      await db.insert(mappingFeedback).values({
+        organizationId: mapping.organizationId,
+        accountMappingId: mappingId,
+        suggestedCanonicalAccountId: mapping.canonicalAccountId,
+        correctedCanonicalAccountId: mapping.canonicalAccountId,
+        sourceAccountName: mapping.sourceAccountName,
+        sourceSystem: mapping.sourceSystem,
+        originalConfidence: mapping.confidenceScore,
+        status: "approved",
+        userId,
+        reviewedAt: new Date(),
+      });
+      
+      // Update mapping to high confidence
+      await db
+        .update(accountMappings)
+        .set({
+          confidence: "high",
+          confidenceScore: "0.950",
+          source: "user",
+          updatedAt: new Date(),
+        })
+        .where(eq(accountMappings.id, mappingId));
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Approve mapping error:", error);
+      res.status(500).json({ message: "Failed to approve mapping" });
+    }
+  });
+
+  // Apply learned patterns to improve low-confidence mappings
+  app.post("/api/coa/apply-learned-patterns", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { applyLearnedPatterns } = await import("./coaMapper");
+      const result = await applyLearnedPatterns(dbUser.defaultOrganizationId);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Apply learned patterns error:", error);
+      res.status(500).json({ message: "Failed to apply learned patterns" });
+    }
+  });
+
+  // Get COA mapping statistics
+  app.get("/api/coa/stats", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.json({
+          totalMappings: 0,
+          highConfidence: 0,
+          mediumConfidence: 0,
+          lowConfidence: 0,
+          manualMappings: 0,
+          needsReview: 0,
+        });
+      }
+
+      const { getProcessingStats } = await import("./coaMapper");
+      const stats = await getProcessingStats(dbUser.defaultOrganizationId);
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Get COA stats error:", error);
+      res.status(500).json({ message: "Failed to get statistics" });
     }
   });
 

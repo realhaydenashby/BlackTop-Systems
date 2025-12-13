@@ -17,6 +17,9 @@ import {
   type InsertAccountMapping,
 } from "@shared/schema";
 import { eq, and, ilike, sql, isNull, desc } from "drizzle-orm";
+import { AIOrchestrator } from "./ai/orchestrator";
+
+const aiOrchestrator = new AIOrchestrator();
 
 // ============================================
 // Canonical Account Definitions by Business Type
@@ -398,8 +401,24 @@ export async function mapAccountToCanonical(
     };
   }
   
-  // No existing mapping - use rules engine
-  const result = await mapUsingRules(sourceAccountName, businessType);
+  // No existing mapping - try learned patterns first (from user corrections)
+  const learnedResult = await matchLearnedPattern(organizationId, sourceAccountName);
+  if (learnedResult && learnedResult.confidence >= 0.7) {
+    console.log(`[COA] Using learned pattern for "${sourceAccountName}" -> ${learnedResult.canonicalCode}`);
+    await storeMapping(organizationId, sourceAccountName, sourceSystem, learnedResult);
+    return learnedResult;
+  }
+  
+  // Fall back to rules engine
+  let result = await mapUsingRules(sourceAccountName, businessType);
+  
+  // If confidence is low, try AI-assisted mapping
+  if (result.confidence < 0.7 && aiOrchestrator.hasAnyProviderAvailable()) {
+    const aiResult = await mapUsingAI(sourceAccountName, businessType);
+    if (aiResult && aiResult.confidence > result.confidence) {
+      result = aiResult;
+    }
+  }
   
   // Store the new mapping
   await storeMapping(organizationId, sourceAccountName, sourceSystem, result);
@@ -498,6 +517,110 @@ function findAccountByCodePrefix(
   }
   
   return undefined;
+}
+
+/**
+ * Use AI to suggest canonical account mapping for ambiguous accounts
+ */
+async function mapUsingAI(
+  sourceAccountName: string,
+  businessType: string
+): Promise<MappingResult | null> {
+  try {
+    const accounts = await getCanonicalAccounts(businessType);
+    if (accounts.length === 0) {
+      return null;
+    }
+    
+    const accountsMap = new Map(accounts.map(a => [a.code, a]));
+    
+    const accountOptions = accounts.map(a => ({
+      code: a.code,
+      name: a.name,
+      description: a.description,
+      group: a.accountGroup,
+    }));
+    
+    const systemPrompt = `You are a financial categorization expert. Your task is to map source account names to canonical chart of accounts categories.
+
+Business Type: ${businessType}
+
+Available canonical accounts:
+${JSON.stringify(accountOptions, null, 2)}
+
+Rules:
+1. Match based on the semantic meaning of the account name
+2. Consider industry-specific terminology
+3. If the name suggests revenue/income, map to a REV-* account
+4. If the name suggests direct costs of delivering service/product, map to COGS-*
+5. If the name suggests operating expenses, map to OPEX-*
+6. If the name suggests interest, taxes, or other non-operating items, map to NONOP-*
+7. When uncertain, prefer OPEX-GA-ADMIN or OPEX-ADMIN as a safe default
+8. Provide a confidence score between 0 and 1
+
+Respond in JSON format only:
+{
+  "code": "ACCOUNT_CODE",
+  "confidence": 0.8,
+  "reasoning": "Brief explanation of why this mapping was chosen"
+}`;
+
+    const prompt = `Map this account name to the most appropriate canonical account:
+
+Source Account Name: "${sourceAccountName}"
+
+Analyze the account name and return the best matching canonical account code with your confidence level.`;
+
+    let response;
+    const providers = ["openai", "groq", "gemini"] as const;
+    
+    for (const provider of providers) {
+      try {
+        response = await aiOrchestrator.callSingleProvider(provider, {
+          prompt,
+          systemPrompt,
+          taskType: "categorization",
+          jsonMode: provider !== "gemini",
+          maxTokens: 200,
+          temperature: 0.2,
+        });
+        break;
+      } catch (providerError) {
+        console.warn(`[COA AI] Provider ${provider} failed, trying next...`);
+        continue;
+      }
+    }
+    
+    if (!response) {
+      console.warn(`[COA AI] All AI providers failed for "${sourceAccountName}"`);
+      return null;
+    }
+
+    const parsed = JSON.parse(response.content);
+    const matchedCode = parsed.code;
+    const aiConfidence = Math.min(Math.max(parsed.confidence || 0.6, 0), 1);
+    
+    const account = accountsMap.get(matchedCode) || findAccountByCodePrefix(accountsMap, matchedCode);
+    
+    if (!account) {
+      console.warn(`[COA AI] AI suggested unknown code ${matchedCode} for "${sourceAccountName}"`);
+      return null;
+    }
+    
+    console.log(`[COA AI] Mapped "${sourceAccountName}" -> ${account.code} (confidence: ${aiConfidence})`);
+    
+    return {
+      canonicalAccountId: account.id,
+      canonicalCode: account.code,
+      canonicalName: account.name,
+      confidence: aiConfidence * 0.95,
+      source: "ai",
+      matchedRule: parsed.reasoning,
+    };
+  } catch (error) {
+    console.error(`[COA AI] Error mapping "${sourceAccountName}":`, error);
+    return null;
+  }
 }
 
 /**
@@ -798,34 +921,283 @@ export async function processHistoricalTransactions(
  * Get processing status/stats for an organization
  */
 export async function getProcessingStats(organizationId: string): Promise<{
-  totalTransactions: number;
-  mappedTransactions: number;
-  unmappedTransactions: number;
-  percentMapped: number;
+  totalMappings: number;
+  highConfidence: number;
+  mediumConfidence: number;
+  lowConfidence: number;
+  manualMappings: number;
+  needsReview: number;
 }> {
   const [stats] = await db.execute<{
     total: string;
-    mapped: string;
-    unmapped: string;
+    high: string;
+    medium: string;
+    low: string;
+    manual: string;
   }>(sql`
     SELECT 
       COUNT(*)::text as total,
-      COUNT(canonical_account_id)::text as mapped,
-      (COUNT(*) - COUNT(canonical_account_id))::text as unmapped
-    FROM transactions
+      COUNT(*) FILTER (WHERE confidence = 'high')::text as high,
+      COUNT(*) FILTER (WHERE confidence = 'medium')::text as medium,
+      COUNT(*) FILTER (WHERE confidence = 'low')::text as low,
+      COUNT(*) FILTER (WHERE confidence = 'manual' OR source = 'user')::text as manual
+    FROM account_mappings
     WHERE organization_id = ${organizationId}
   `);
   
   const total = parseInt(stats?.total || "0", 10);
-  const mapped = parseInt(stats?.mapped || "0", 10);
-  const unmapped = parseInt(stats?.unmapped || "0", 10);
+  const high = parseInt(stats?.high || "0", 10);
+  const medium = parseInt(stats?.medium || "0", 10);
+  const low = parseInt(stats?.low || "0", 10);
+  const manual = parseInt(stats?.manual || "0", 10);
   
   return {
-    totalTransactions: total,
-    mappedTransactions: mapped,
-    unmappedTransactions: unmapped,
-    percentMapped: total > 0 ? Math.round((mapped / total) * 100) : 0,
+    totalMappings: total,
+    highConfidence: high,
+    mediumConfidence: medium,
+    lowConfidence: low,
+    manualMappings: manual,
+    needsReview: low,
   };
+}
+
+// ============================================
+// Learning Loop - Improve Mappings from Corrections
+// ============================================
+
+interface LearnedPattern {
+  pattern: string;
+  canonicalAccountId: string;
+  canonicalCode: string;
+  confidence: number;
+  correctionCount: number;
+}
+
+/**
+ * Learn mapping patterns from user corrections
+ * Analyzes feedback history to find patterns in corrected mappings
+ */
+export async function learnFromCorrections(organizationId: string): Promise<LearnedPattern[]> {
+  // Get all corrections for this organization
+  const corrections = await db
+    .select()
+    .from(mappingFeedback)
+    .where(
+      and(
+        eq(mappingFeedback.organizationId, organizationId),
+        eq(mappingFeedback.status, "corrected")
+      )
+    );
+  
+  if (corrections.length === 0) {
+    return [];
+  }
+  
+  // Build pattern map from corrections
+  const patternMap = new Map<string, {
+    canonicalAccountId: string;
+    count: number;
+    sourceNames: string[];
+  }>();
+  
+  for (const correction of corrections) {
+    if (!correction.sourceAccountName || !correction.correctedCanonicalAccountId) continue;
+    
+    // Extract common patterns from source account name
+    const patterns = extractPatterns(correction.sourceAccountName);
+    
+    for (const pattern of patterns) {
+      const key = `${pattern}:${correction.correctedCanonicalAccountId}`;
+      const existing = patternMap.get(key);
+      
+      if (existing) {
+        existing.count++;
+        if (!existing.sourceNames.includes(correction.sourceAccountName)) {
+          existing.sourceNames.push(correction.sourceAccountName);
+        }
+      } else {
+        patternMap.set(key, {
+          canonicalAccountId: correction.correctedCanonicalAccountId,
+          count: 1,
+          sourceNames: [correction.sourceAccountName],
+        });
+      }
+    }
+  }
+  
+  // Get canonical accounts for enrichment
+  const allAccounts = await db.select().from(canonicalAccounts);
+  const accountsMap = new Map(allAccounts.map(a => [a.id, a]));
+  
+  // Convert to learned patterns (only keep patterns with multiple corrections)
+  const learnedPatterns: LearnedPattern[] = [];
+  
+  for (const [key, data] of patternMap) {
+    if (data.count < 2) continue; // Need at least 2 corrections to learn a pattern
+    
+    const [pattern] = key.split(":");
+    const account = accountsMap.get(data.canonicalAccountId);
+    
+    if (account) {
+      learnedPatterns.push({
+        pattern,
+        canonicalAccountId: data.canonicalAccountId,
+        canonicalCode: account.code,
+        confidence: Math.min(0.9, 0.7 + (data.count * 0.05)), // Increase confidence with more corrections
+        correctionCount: data.count,
+      });
+    }
+  }
+  
+  console.log(`[COA LEARNING] Found ${learnedPatterns.length} patterns from ${corrections.length} corrections`);
+  
+  return learnedPatterns;
+}
+
+/**
+ * Extract common patterns from an account name for learning
+ */
+function extractPatterns(accountName: string): string[] {
+  const patterns: string[] = [];
+  const normalized = accountName.toLowerCase().trim();
+  
+  // Add full normalized name
+  patterns.push(normalized);
+  
+  // Extract significant words (remove common words)
+  const stopWords = new Set(["the", "a", "an", "and", "or", "of", "for", "to", "in", "on", "at", "by"]);
+  const words = normalized
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !stopWords.has(w));
+  
+  // Add individual significant words
+  for (const word of words) {
+    if (word.length >= 4) {
+      patterns.push(word);
+    }
+  }
+  
+  // Add 2-word combinations
+  for (let i = 0; i < words.length - 1; i++) {
+    patterns.push(`${words[i]} ${words[i + 1]}`);
+  }
+  
+  return patterns;
+}
+
+/**
+ * Check if a source account matches any learned patterns
+ */
+export async function matchLearnedPattern(
+  organizationId: string,
+  sourceAccountName: string
+): Promise<MappingResult | null> {
+  const patterns = await learnFromCorrections(organizationId);
+  
+  if (patterns.length === 0) {
+    return null;
+  }
+  
+  const normalized = sourceAccountName.toLowerCase().trim();
+  const sourcePatterns = extractPatterns(sourceAccountName);
+  
+  // Find best matching pattern
+  let bestMatch: LearnedPattern | null = null;
+  let bestScore = 0;
+  
+  for (const learned of patterns) {
+    // Exact match
+    if (normalized === learned.pattern) {
+      bestMatch = learned;
+      bestScore = 1.0;
+      break;
+    }
+    
+    // Substring match
+    if (normalized.includes(learned.pattern) || learned.pattern.includes(normalized)) {
+      const score = learned.confidence * 0.9;
+      if (score > bestScore) {
+        bestMatch = learned;
+        bestScore = score;
+      }
+    }
+    
+    // Pattern overlap
+    for (const srcPattern of sourcePatterns) {
+      if (srcPattern === learned.pattern) {
+        const score = learned.confidence * 0.95;
+        if (score > bestScore) {
+          bestMatch = learned;
+          bestScore = score;
+        }
+      }
+    }
+  }
+  
+  if (bestMatch && bestScore >= 0.7) {
+    // Get the canonical account details
+    const [account] = await db
+      .select()
+      .from(canonicalAccounts)
+      .where(eq(canonicalAccounts.id, bestMatch.canonicalAccountId))
+      .limit(1);
+    
+    if (account) {
+      console.log(`[COA LEARNING] Matched "${sourceAccountName}" to learned pattern "${bestMatch.pattern}" -> ${account.code}`);
+      
+      return {
+        canonicalAccountId: account.id,
+        canonicalCode: account.code,
+        canonicalName: account.name,
+        confidence: bestScore,
+        source: "user", // Mark as user since it's based on user corrections
+        matchedRule: `Learned from ${bestMatch.correctionCount} corrections`,
+      };
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Apply learned patterns to existing low-confidence mappings
+ * This retroactively improves mappings based on accumulated user corrections
+ */
+export async function applyLearnedPatterns(organizationId: string): Promise<{
+  improved: number;
+  unchanged: number;
+}> {
+  const lowConfMappings = await getLowConfidenceMappings(organizationId);
+  
+  let improved = 0;
+  let unchanged = 0;
+  
+  for (const mapping of lowConfMappings) {
+    const learnedResult = await matchLearnedPattern(organizationId, mapping.sourceAccountName);
+    
+    if (learnedResult && learnedResult.confidence > parseFloat(mapping.confidenceScore || "0")) {
+      // Update mapping with learned result
+      await db
+        .update(accountMappings)
+        .set({
+          canonicalAccountId: learnedResult.canonicalAccountId,
+          confidence: learnedResult.confidence >= 0.9 ? "high" : "medium",
+          confidenceScore: learnedResult.confidence.toFixed(3),
+          source: "user",
+          updatedAt: new Date(),
+        })
+        .where(eq(accountMappings.id, mapping.id));
+      
+      improved++;
+    } else {
+      unchanged++;
+    }
+  }
+  
+  console.log(`[COA LEARNING] Applied patterns: ${improved} improved, ${unchanged} unchanged`);
+  
+  return { improved, unchanged };
 }
 
 /**
