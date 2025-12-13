@@ -6,6 +6,7 @@ import { OrganizationFeatureStore, createFeatureStore, FeatureSet } from "../ana
 import { saasMetricsService, UnitEconomics } from "../services/saasMetricsService";
 import { storage } from "../storage";
 import type { InsertAIContextNote } from "@shared/schema";
+import { ProprietaryAIEngine, ProprietaryInsight, buildLLMSummaryPrompt } from "../ml/proprietaryAIEngine";
 
 export interface HybridAnalysisResult {
   metrics: FinancialMetrics;
@@ -55,6 +56,7 @@ export class HybridAIPipeline {
   private anomalyDetector: AnomalyDetector;
   private forecastEngine: ForecastEngine;
   private featureStore: OrganizationFeatureStore;
+  private proprietaryEngine: ProprietaryAIEngine;
 
   constructor(organizationId: string) {
     this.organizationId = organizationId;
@@ -62,33 +64,43 @@ export class HybridAIPipeline {
     this.anomalyDetector = createAnomalyDetector(organizationId);
     this.forecastEngine = createForecastEngine(organizationId);
     this.featureStore = createFeatureStore(organizationId);
+    this.proprietaryEngine = new ProprietaryAIEngine();
   }
 
   async runFullAnalysis(currentCash?: number): Promise<HybridAnalysisResult> {
-    const [metrics, anomalies, featureSet] = await Promise.all([
+    console.log("[HybridPipeline] Running full analysis with proprietary ML models");
+    
+    // Run proprietary analysis and traditional metrics in parallel
+    const [proprietaryAnalysis, metrics, anomalies, featureSet] = await Promise.all([
+      this.proprietaryEngine.runFullAnalysis(this.organizationId, currentCash),
       this.metricsEngine.computeAllMetrics(currentCash),
       this.anomalyDetector.analyzeTransactionAnomalies(),
       this.featureStore.computeAndStoreFeatures(),
     ]);
 
-    const algorithmConfidence = this.computeAlgorithmConfidence(metrics, anomalies);
+    const algorithmConfidence = Math.max(
+      this.computeAlgorithmConfidence(metrics, anomalies),
+      proprietaryAnalysis.overallConfidence
+    );
 
-    const orgContext = await this.featureStore.getContextForAI();
-    const aiInsights = await this.generateAIInsights(metrics, anomalies, orgContext);
+    // LLM only summarizes proprietary analysis results (no analytical work)
+    const summaryPrompt = buildLLMSummaryPrompt(proprietaryAnalysis, "founder");
+    const aiSummary = await this.generateLLMSummary(summaryPrompt);
 
-    const validationResult = this.validateAIOutput(aiInsights, metrics, anomalies);
+    const validationResult = this.validateAIOutput(aiSummary, metrics, anomalies);
 
+    // Confidence is primarily from proprietary models
     const combinedConfidence = validationResult.passed
-      ? (algorithmConfidence + aiInsights.confidence) / 2
-      : algorithmConfidence * 0.8;
+      ? (algorithmConfidence * 0.8 + aiSummary.confidence * 0.2)
+      : algorithmConfidence;
 
     return {
       metrics,
       anomalies,
-      aiInsights: aiInsights.content,
+      aiInsights: aiSummary.content,
       combinedConfidence,
       algorithmConfidence,
-      aiConfidence: aiInsights.confidence,
+      aiConfidence: aiSummary.confidence,
       validationPassed: validationResult.passed,
       validationDetails: validationResult,
     };
@@ -106,41 +118,56 @@ export class HybridAIPipeline {
   }
 
   async generateInsights(): Promise<InsightGenerationResult> {
+    console.log("[HybridPipeline] Generating insights using proprietary ML models");
+    
+    // Use proprietary engine for analysis (no LLM)
+    const proprietaryResult = await this.proprietaryEngine.getProprietaryInsights(this.organizationId);
+    
+    // Also get traditional algorithm insights for compatibility
     const [metrics, anomalies, saasMetrics] = await Promise.all([
       this.metricsEngine.computeAllMetrics(),
       this.anomalyDetector.analyzeTransactionAnomalies(),
       this.getSaaSMetrics(),
     ]);
-
     const algorithmInsights = this.generateAlgorithmInsights(metrics, anomalies, saasMetrics);
 
-    if (algorithmInsights.length >= 3 && algorithmInsights.every((i) => i.confidence > 0.8)) {
-      return {
-        insights: algorithmInsights,
-        confidence: algorithmInsights.reduce((sum, i) => sum + i.confidence, 0) / algorithmInsights.length,
-        source: "algorithm",
-      };
-    }
+    // Convert proprietary insights to GeneratedInsight format
+    const proprietaryAsGenerated: GeneratedInsight[] = proprietaryResult.insights.map(pi => ({
+      title: pi.title,
+      description: pi.description,
+      severity: pi.severity === "high" ? "critical" : pi.severity === "medium" ? "warning" : "info",
+      category: pi.type,
+      metricValue: pi.dataPoints.value,
+      recommendation: this.generateRecommendation(pi),
+      confidence: pi.confidence,
+      source: "algorithm" as const, // Proprietary models count as algorithm
+    }));
 
-    try {
-      const orgContext = await this.featureStore.getContextForAI();
-      const aiResult = await this.callAIForInsights(metrics, anomalies, algorithmInsights, orgContext, saasMetrics);
+    // Merge all insights (proprietary + algorithm)
+    const allInsights = this.mergeInsights(algorithmInsights, proprietaryAsGenerated);
+    const avgConfidence = allInsights.length > 0
+      ? allInsights.reduce((sum, i) => sum + i.confidence, 0) / allInsights.length
+      : proprietaryResult.confidence;
 
-      const hybridInsights = this.mergeInsights(algorithmInsights, aiResult.insights);
+    return {
+      insights: allInsights,
+      confidence: avgConfidence,
+      source: "algorithm", // All insights now come from proprietary/algorithm sources
+    };
+  }
 
-      return {
-        insights: hybridInsights,
-        confidence: (aiResult.confidence + 
-          algorithmInsights.reduce((sum, i) => sum + i.confidence, 0) / Math.max(1, algorithmInsights.length)) / 2,
-        source: "hybrid",
-      };
-    } catch (error) {
-      console.warn("[HybridPipeline] AI failed, using algorithm-only insights:", error);
-      return {
-        insights: algorithmInsights,
-        confidence: algorithmInsights.reduce((sum, i) => sum + i.confidence, 0) / Math.max(1, algorithmInsights.length),
-        source: "algorithm",
-      };
+  private generateRecommendation(insight: ProprietaryInsight): string {
+    switch (insight.type) {
+      case "anomaly":
+        return `Investigate this spending anomaly. Expected range: $${insight.dataPoints.expectedMin?.toLocaleString() || 'N/A'} - $${insight.dataPoints.expectedMax?.toLocaleString() || 'N/A'}`;
+      case "warning":
+        return "Review runway projections and consider expense optimization or fundraising";
+      case "risk":
+        return "Monitor this risk factor closely and develop contingency plans";
+      case "opportunity":
+        return "Evaluate this opportunity to improve financial performance";
+      default:
+        return "Review this insight and take appropriate action";
     }
   }
 
@@ -284,105 +311,6 @@ export class HybridAIPipeline {
     return insights;
   }
 
-  private async callAIForInsights(
-    metrics: FinancialMetrics,
-    anomalies: AnomalyResult[],
-    algorithmInsights: GeneratedInsight[],
-    orgContext: string,
-    saasMetrics?: UnitEconomics | null
-  ): Promise<{ insights: GeneratedInsight[]; confidence: number }> {
-    // Build SaaS metrics context if available
-    const saasContext = saasMetrics ? `
-## SaaS Unit Economics:
-- MRR: $${saasMetrics.saasMetrics.mrr.toLocaleString()}
-- ARR: $${saasMetrics.saasMetrics.arr.toLocaleString()}
-- CAC (Customer Acquisition Cost): $${saasMetrics.cac.toLocaleString()}
-- LTV (Customer Lifetime Value): $${saasMetrics.ltv.toLocaleString()}
-- LTV:CAC Ratio: ${saasMetrics.ltvToCacRatio.toFixed(2)}x ${saasMetrics.ltvToCacRatio >= 3 ? '(Healthy)' : saasMetrics.ltvToCacRatio >= 2 ? '(Below target)' : '(Critical)'}
-- CAC Payback Period: ${saasMetrics.paybackPeriodMonths.toFixed(1)} months
-- Monthly Churn Rate: ${saasMetrics.ltvMetrics.monthlyChurnRate.toFixed(1)}%
-- ARPU: $${saasMetrics.saasMetrics.arpu.toLocaleString()}
-- Active Customers: ${saasMetrics.saasMetrics.activeCustomers}
-- Health Score: ${saasMetrics.healthScore.toUpperCase()}${saasMetrics.healthReason !== 'All key metrics are within healthy ranges' ? ` (${saasMetrics.healthReason})` : ''}
-` : '';
-
-    const prompt = `You are a financial analyst AI. Based on the following data, generate 2-4 additional actionable insights that complement the algorithm-generated insights.
-
-${orgContext}
-
-## Algorithm-Generated Insights (already identified):
-${algorithmInsights.map((i) => `- ${i.title}: ${i.description}`).join("\n")}
-
-## Key Metrics:
-- Burn Rate: $${metrics.burnRate.value.toLocaleString()}/month (${metrics.burnRate.trend})
-- Runway: ${metrics.runway.value} months
-- Revenue Growth: ${metrics.revenueGrowth.value.toFixed(1)}%
-- Expense Growth: ${metrics.expenseGrowth.value.toFixed(1)}%
-- Gross Margin: ${metrics.grossMargin.value.toFixed(1)}%
-${saasContext}
-## Detected Anomalies:
-${anomalies.slice(0, 5).map((a) => `- ${a.title}: ${a.description}`).join("\n") || "None detected"}
-
-Generate insights that are NOT duplicates of the algorithm-generated ones. Focus on:
-1. Hidden patterns or correlations between metrics${saasMetrics ? ' (especially SaaS unit economics relationships)' : ''}
-2. Strategic recommendations${saasMetrics ? ' for improving LTV:CAC ratio or reducing churn' : ''}
-3. Future risks not captured by current metrics
-
-Return a JSON array:
-[
-  {
-    "title": "string",
-    "description": "string",
-    "severity": "critical" | "warning" | "info",
-    "category": "string",
-    "recommendation": "string"
-  }
-]`;
-
-    const request: AIRequest = {
-      prompt,
-      systemPrompt: "You are a financial intelligence AI. Provide actionable, specific insights based on data.",
-      taskType: "insight_generation",
-      jsonMode: true,
-      organizationId: this.organizationId,
-      temperature: 0.6,
-    };
-
-    const response = await orchestrator.callWithFallback(request);
-
-    try {
-      const parsed = JSON.parse(response.content);
-      
-      // Handle various response formats from AI
-      let insightsArray: any[] = [];
-      if (Array.isArray(parsed)) {
-        insightsArray = parsed;
-      } else if (parsed && Array.isArray(parsed.insights)) {
-        insightsArray = parsed.insights;
-      } else if (parsed && typeof parsed === 'object') {
-        // If it's a single insight object, wrap in array
-        if (parsed.title && parsed.description) {
-          insightsArray = [parsed];
-        }
-      }
-      
-      const aiInsights: GeneratedInsight[] = insightsArray.map((i: any) => ({
-        title: i.title || "Insight",
-        description: i.description || "",
-        severity: i.severity || "info",
-        category: i.category || "general",
-        recommendation: i.recommendation || "",
-        confidence: response.confidence,
-        source: "ai" as const,
-      }));
-
-      return { insights: aiInsights, confidence: response.confidence };
-    } catch (error) {
-      console.error("[HybridPipeline] Failed to parse AI insights:", error);
-      return { insights: [], confidence: 0 };
-    }
-  }
-
   private mergeInsights(algorithmInsights: GeneratedInsight[], aiInsights: GeneratedInsight[]): GeneratedInsight[] {
     const merged = [...algorithmInsights];
 
@@ -408,68 +336,30 @@ Return a JSON array:
       .slice(0, 7);
   }
 
-  private async generateAIInsights(
-    metrics: FinancialMetrics,
-    anomalies: AnomalyResult[],
-    orgContext: string
+  private async generateLLMSummary(
+    summaryPrompt: string
   ): Promise<{ content: string; confidence: number }> {
-    const prompt = `Analyze the following financial data and provide a concise executive summary with key insights:
-
-${orgContext}
-
-## Key Metrics:
-- Monthly Burn Rate: $${metrics.burnRate.value.toLocaleString()} (${metrics.burnRate.trend})
-- Runway: ${metrics.runway.value} months
-- Net Burn: $${metrics.netBurn.value.toLocaleString()}
-- Revenue Growth: ${metrics.revenueGrowth.value.toFixed(1)}%
-- Expense Growth: ${metrics.expenseGrowth.value.toFixed(1)}%
-- Gross Margin: ${metrics.grossMargin.value.toFixed(1)}%
-- Operating Margin: ${metrics.operatingMargin.value.toFixed(1)}%
-
-## Detected Anomalies (${anomalies.length} total):
-${anomalies.slice(0, 5).map((a) => `- [${a.severity.toUpperCase()}] ${a.title}`).join("\n") || "None"}
-
-Provide a 3-4 sentence executive summary highlighting the most important findings and recommendations.`;
-
     const request: AIRequest = {
-      prompt,
-      systemPrompt: "You are a concise financial analyst. Provide clear, actionable summaries.",
-      taskType: "insight_generation",
+      prompt: summaryPrompt,
+      systemPrompt: "You are a translator. Convert the structured financial analysis into clear, founder-friendly language. Do NOT add new analysis - only explain the provided results.",
+      taskType: "summarization" as any,
       organizationId: this.organizationId,
-      temperature: 0.5,
-      maxTokens: 500,
+      temperature: 0.3,
+      maxTokens: 600,
     };
 
     try {
       const response = await orchestrator.callWithFallback(request);
       return { content: response.content, confidence: response.confidence };
     } catch (error) {
+      console.warn("[HybridPipeline] LLM summary failed, using fallback:", error);
       return {
-        content: this.generateFallbackSummary(metrics, anomalies),
+        content: "Analysis complete. Please review the structured insights for detailed findings.",
         confidence: 0.5,
       };
     }
   }
 
-  private generateFallbackSummary(metrics: FinancialMetrics, anomalies: AnomalyResult[]): string {
-    const parts: string[] = [];
-
-    if (metrics.runway.value < 12) {
-      parts.push(`Runway of ${metrics.runway.value} months requires attention.`);
-    } else {
-      parts.push(`Runway of ${metrics.runway.value} months provides good cushion.`);
-    }
-
-    if (metrics.burnRate.trend === "increasing") {
-      parts.push(`Burn rate is trending upward at $${metrics.burnRate.value.toLocaleString()}/month.`);
-    }
-
-    if (anomalies.length > 0) {
-      parts.push(`${anomalies.length} spending anomalies detected requiring review.`);
-    }
-
-    return parts.join(" ");
-  }
 
   private computeAlgorithmConfidence(metrics: FinancialMetrics, anomalies: AnomalyResult[]): number {
     const metricConfidences = [

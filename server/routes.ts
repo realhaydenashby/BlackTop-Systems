@@ -8027,6 +8027,73 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
+  // ============================================
+  // Proprietary AI Engine Routes
+  // LLM is interface only - proprietary models do the work
+  // ============================================
+
+  // Run full proprietary analysis (all ML models)
+  app.post("/api/ml/proprietary-analysis", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { currentCash } = req.body;
+      const { runProprietaryAnalysis } = await import("./ml/proprietaryAIEngine");
+      const analysis = await runProprietaryAnalysis(dbUser.defaultOrganizationId, currentCash);
+      
+      res.json(analysis);
+    } catch (error: any) {
+      console.error("Proprietary analysis error:", error);
+      res.status(500).json({ message: "Failed to run proprietary analysis" });
+    }
+  });
+
+  // Get proprietary insights (structured insights from ML models)
+  app.get("/api/ml/proprietary-insights", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { getProprietaryInsights } = await import("./ml/proprietaryAIEngine");
+      const insights = await getProprietaryInsights(dbUser.defaultOrganizationId);
+      
+      res.json(insights);
+    } catch (error: any) {
+      console.error("Proprietary insights error:", error);
+      res.status(500).json({ message: "Failed to get proprietary insights" });
+    }
+  });
+
+  // Build LLM summary prompt from proprietary analysis (for interface layer)
+  app.post("/api/ml/build-llm-prompt", isAuthenticated, async (req, res) => {
+    try {
+      const { analysis, audience = "founder" } = req.body;
+      
+      if (!analysis) {
+        return res.status(400).json({ message: "Analysis results required" });
+      }
+
+      const { buildLLMSummaryPrompt } = await import("./ml/proprietaryAIEngine");
+      const prompt = buildLLMSummaryPrompt(analysis, audience);
+      
+      res.json({ prompt, note: "LLM only explains - it does not analyze" });
+    } catch (error: any) {
+      console.error("Build LLM prompt error:", error);
+      res.status(500).json({ message: "Failed to build LLM prompt" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
