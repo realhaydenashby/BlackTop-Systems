@@ -7676,6 +7676,107 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
+  // ============================================
+  // Spending Anomaly Detection ML Routes
+  // ============================================
+
+  // Train spending anomaly model
+  app.post("/api/ml/train-anomaly-model", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { daysBack = 180 } = req.body;
+
+      const { trainSpendingAnomalyModel } = await import("./ml/spendingAnomalyModel");
+      const result = await trainSpendingAnomalyModel(dbUser.defaultOrganizationId, daysBack);
+      
+      res.json({
+        success: result.success,
+        transactionCount: result.transactionCount,
+        categoryCount: result.categoryCount,
+        vendorCount: result.vendorCount,
+      });
+    } catch (error: any) {
+      console.error("Train anomaly model error:", error);
+      res.status(500).json({ message: "Failed to train anomaly model" });
+    }
+  });
+
+  // Get anomaly model stats
+  app.get("/api/ml/anomaly-stats", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { getSpendingAnomalyStats } = await import("./ml/spendingAnomalyModel");
+      const stats = await getSpendingAnomalyStats(dbUser.defaultOrganizationId);
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Get anomaly stats error:", error);
+      res.status(500).json({ message: "Failed to get anomaly stats" });
+    }
+  });
+
+  // Detect spending anomalies
+  app.post("/api/ml/detect-anomalies", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { daysBack = 30 } = req.body;
+
+      const { detectSpendingAnomalies } = await import("./ml/spendingAnomalyModel");
+      const anomalies = await detectSpendingAnomalies(dbUser.defaultOrganizationId, daysBack);
+      
+      res.json({
+        success: true,
+        count: anomalies.length,
+        anomalies,
+      });
+    } catch (error: any) {
+      console.error("Detect anomalies error:", error);
+      res.status(500).json({ message: "Failed to detect anomalies" });
+    }
+  });
+
+  // Get learned spending patterns
+  app.get("/api/ml/spending-patterns", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { getSpendingPatterns } = await import("./ml/spendingAnomalyModel");
+      const patterns = await getSpendingPatterns(dbUser.defaultOrganizationId);
+      
+      res.json(patterns);
+    } catch (error: any) {
+      console.error("Get spending patterns error:", error);
+      res.status(500).json({ message: "Failed to get spending patterns" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
