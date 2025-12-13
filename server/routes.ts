@@ -7546,6 +7546,136 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
+  // ============================================
+  // Vendor Embedding Routes (Proprietary AI Engine)
+  // ============================================
+
+  // Train the vendor embedding model
+  app.post("/api/ml/train-vendor-model", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { trainVendorModel } = await import("./ml/vendorEmbeddings");
+      const result = await trainVendorModel(dbUser.defaultOrganizationId);
+      
+      res.json({
+        success: result.success,
+        message: result.success 
+          ? `Trained vendor model with ${result.exampleCount} examples, ${result.clusterCount} vendor clusters`
+          : `Not enough training data (${result.exampleCount} examples, need 10+)`,
+        exampleCount: result.exampleCount,
+        clusterCount: result.clusterCount,
+        vocabularySize: result.vocabularySize,
+      });
+    } catch (error: any) {
+      console.error("Train vendor model error:", error);
+      res.status(500).json({ message: "Failed to train vendor model" });
+    }
+  });
+
+  // Get vendor model statistics
+  app.get("/api/ml/vendor-stats", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.json({
+          isLoaded: false,
+          version: null,
+          trainedAt: null,
+          exampleCount: 0,
+          clusterCount: 0,
+          vocabularySize: 0,
+          topVendors: [],
+        });
+      }
+
+      const { getVendorModel } = await import("./ml/vendorEmbeddings");
+      const model = await getVendorModel(dbUser.defaultOrganizationId);
+      const stats = model.getStats();
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Get vendor stats error:", error);
+      res.status(500).json({ message: "Failed to get vendor stats" });
+    }
+  });
+
+  // Normalize a vendor name using ML
+  app.post("/api/ml/normalize-vendor", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { vendorName } = req.body;
+      if (!vendorName) {
+        return res.status(400).json({ message: "vendorName is required" });
+      }
+
+      const { normalizeVendorLocal } = await import("./ml/vendorEmbeddings");
+      const result = await normalizeVendorLocal(dbUser.defaultOrganizationId, vendorName);
+      
+      if (result) {
+        res.json({
+          success: true,
+          normalizedName: result.normalizedName,
+          confidence: result.confidence,
+          matchedVariants: result.matchedVariants,
+        });
+      } else {
+        res.json({
+          success: false,
+          message: "No normalization result (model may not be trained or confidence too low)",
+        });
+      }
+    } catch (error: any) {
+      console.error("Normalize vendor error:", error);
+      res.status(500).json({ message: "Failed to normalize vendor" });
+    }
+  });
+
+  // Find similar vendors
+  app.post("/api/ml/similar-vendors", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { vendorName, topK = 5 } = req.body;
+      if (!vendorName) {
+        return res.status(400).json({ message: "vendorName is required" });
+      }
+
+      const { findSimilarVendors } = await import("./ml/vendorEmbeddings");
+      const results = await findSimilarVendors(dbUser.defaultOrganizationId, vendorName, topK);
+      
+      res.json({
+        success: true,
+        results,
+      });
+    } catch (error: any) {
+      console.error("Find similar vendors error:", error);
+      res.status(500).json({ message: "Failed to find similar vendors" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

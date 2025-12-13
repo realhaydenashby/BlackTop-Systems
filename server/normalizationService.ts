@@ -233,12 +233,15 @@ const VENDOR_MAPPINGS: Record<string, string> = {
   'expedia': 'Expedia',
 };
 
+// Guard to prevent repeated ML vendor error logging
+let mlVendorErrorLogged = false;
+
 export class NormalizationService {
   /**
-   * Normalize a raw vendor name using rules first, then AI as fallback
+   * Normalize a raw vendor name using rules first, then ML, then AI as fallback
    * Cleans up transaction descriptions like "AMZN MKTP US*2J3K4L" -> "Amazon"
    */
-  async normalizeVendorName(rawDescription: string): Promise<NormalizedVendor> {
+  async normalizeVendorName(rawDescription: string, organizationId?: string): Promise<NormalizedVendor> {
     // First, try rule-based normalization for known vendors
     const ruleBasedResult = this.ruleBasedNormalize(rawDescription);
     if (ruleBasedResult) {
@@ -249,7 +252,28 @@ export class NormalizationService {
       };
     }
     
-    // Try AI normalization with fallback between providers
+    // Second, try local ML model if organizationId is provided
+    if (organizationId) {
+      try {
+        const { normalizeVendorLocal } = await import("./ml/vendorEmbeddings");
+        const mlResult = await normalizeVendorLocal(organizationId, rawDescription);
+        if (mlResult) {
+          console.log(`[normalization] ML normalized "${rawDescription}" -> "${mlResult.normalizedName}" (${(mlResult.confidence * 100).toFixed(1)}%)`);
+          return {
+            cleanName: mlResult.normalizedName,
+            confidence: mlResult.confidence,
+            method: 'rules', // Report as rules for compatibility
+          };
+        }
+      } catch (error: any) {
+        if (!mlVendorErrorLogged) {
+          console.warn(`[normalization] ML vendor model unavailable:`, error.message || error);
+          mlVendorErrorLogged = true;
+        }
+      }
+    }
+    
+    // Third, try AI normalization with fallback between providers
     const prompt = `Extract the clean vendor/merchant name from this transaction description. Return ONLY the business name, no other text.
 
 Transaction description: "${rawDescription}"
