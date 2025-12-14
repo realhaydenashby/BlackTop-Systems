@@ -16,18 +16,11 @@
  *   - CrossOrgPatternDatabase: Industry benchmarks and patterns
  */
 
-import { AccountClassifier, classifyTransaction, classifyTransactionBatch } from "./accountClassifier";
-import { VendorEmbeddingModel, findSimilarVendors, matchVendorToKnown, normalizeVendorName } from "./vendorEmbeddings";
-import { SpendingAnomalyModel, detectTransactionAnomalies, detectAnomaliesForOrg } from "./spendingAnomalyModel";
-import { CashFlowForecastModel, forecastCashFlow, computeRunwayProbabilities } from "./cashFlowForecastModel";
-import { 
-  CrossOrgPatternDatabase, 
-  contributeOrgPatterns, 
-  getIndustryBenchmarks, 
-  compareMetricsToIndustry,
-  getSeasonalPatternsForType,
-  getCommonVendorsForType,
-} from "./crossOrgPatterns";
+import { AccountClassifier, getClassifier, classifyAccountLocal } from "./accountClassifier";
+import { VendorEmbeddingModel, getVendorModel, normalizeVendorLocal, findSimilarVendors } from "./vendorEmbeddings";
+import { SpendingAnomalyModel } from "./spendingAnomalyModel";
+import { CashFlowForecastModel } from "./cashFlowForecastModel";
+import { CrossOrgPatternDatabase, getIndustryBenchmarks } from "./crossOrgPatterns";
 import { db } from "../db";
 import { organizations, transactions, vendors } from "@shared/schema";
 import { eq, and, gte, desc } from "drizzle-orm";
@@ -253,15 +246,20 @@ export class ProprietaryAIEngine {
       )
       .limit(500);
     
-    // Classify transactions
+    // Classify transactions using class instance
     const classifications = await Promise.all(
       txns.map(async (txn) => {
-        const result = await classifyTransaction(
-          txn.description || txn.vendorName || "",
-          parseFloat(txn.amount),
-          txn.categoryId || undefined
-        );
-        return { txn, classification: result };
+        const result = this.accountClassifier.classify(txn.description || txn.vendorName || "");
+        return { 
+          txn, 
+          classification: result || { 
+            canonicalAccountId: "uncategorized", 
+            confidence: 0.3,
+            canonicalCode: "OTHER",
+            canonicalName: "Uncategorized",
+            matchedExamples: []
+          }
+        };
       })
     );
     
@@ -277,13 +275,13 @@ export class ProprietaryAIEngine {
         lowConfidence.push({
           transactionId: txn.id,
           vendorName: txn.vendorName || txn.description || "",
-          suggestedAccount: classification.accountId,
+          suggestedAccount: classification.canonicalAccountId,
           confidence: classification.confidence,
         });
       }
       
-      accountDistribution[classification.accountId] = 
-        (accountDistribution[classification.accountId] || 0) + 1;
+      accountDistribution[classification.canonicalAccountId] = 
+        (accountDistribution[classification.canonicalAccountId] || 0) + 1;
     }
     
     const executionTime = Date.now() - startTime;
@@ -332,10 +330,10 @@ export class ProprietaryAIEngine {
         category: v.category,
       }));
     
-    // Check each vendor for known matches
+    // Check each vendor for known matches using class instance
     for (const vendor of orgVendors) {
-      const match = await matchVendorToKnown(vendor.originalName);
-      if (match.confidence > 0.8) {
+      const match = this.vendorEmbeddings.normalize(vendor.originalName);
+      if (match && match.confidence > 0.8) {
         matchesToKnown++;
       } else {
         newVendors++;
@@ -370,7 +368,7 @@ export class ProprietaryAIEngine {
   }> {
     const startTime = Date.now();
     
-    const anomalies = await detectAnomaliesForOrg(organizationId);
+    const anomalies = await this.anomalyModel.detectAllAnomalies(30);
     
     // Aggregate by severity
     const bySeverity = { high: 0, medium: 0, low: 0 };
@@ -422,11 +420,26 @@ export class ProprietaryAIEngine {
   }> {
     const startTime = Date.now();
     
-    const forecast = await forecastCashFlow(organizationId, 12);
-    const runway = await computeRunwayProbabilities(
-      organizationId,
-      currentCash || 100000
-    );
+    const forecastResult = this.forecastModel.forecast(12);
+    const forecast = forecastResult || { 
+      forecasts: [], 
+      modelConfidence: 0.5,
+      historicalAccuracy: 0.5,
+      summary: { avgProjectedInflows: 0, avgProjectedOutflows: 0, avgProjectedNetCashFlow: 0, trendDirection: "stable" as const, seasonalStrength: 0 }
+    };
+    
+    // Compute runway from forecast data
+    const avgMonthlyBurn = Math.abs(forecast.summary.avgProjectedNetCashFlow);
+    const runwayMonths = avgMonthlyBurn > 0 ? (currentCash || 100000) / avgMonthlyBurn : 24;
+    const runway = {
+      p10RunwayMonths: Math.max(1, runwayMonths * 0.6),
+      p50RunwayMonths: runwayMonths,
+      p90RunwayMonths: runwayMonths * 1.5,
+      survivalProbabilities: {
+        "6_months": runwayMonths >= 6 ? 0.95 : 0.5,
+        "12_months": runwayMonths >= 12 ? 0.85 : 0.3,
+      }
+    };
     
     // Determine burn rate trend from forecasts
     let burnRateTrend: ForecastResult["burnRateTrend"] = "stable";
@@ -502,7 +515,7 @@ export class ProprietaryAIEngine {
       gross_margin: 65,
     };
     
-    const comparisons = await compareMetricsToIndustry(organizationId, orgMetrics);
+    const comparisons = await this.patternDb.compareToIndustry(organizationId, orgMetrics);
     
     // Identify strengths and areas for improvement
     const strengths: string[] = [];
