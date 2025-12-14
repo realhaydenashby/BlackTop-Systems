@@ -2615,6 +2615,211 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // Auto-Reconciliation Engine API
+  // ============================================
+
+  app.post("/api/reconciliation/sync-invoices", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const { source, organizationId, startDate, endDate } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid" });
+      }
+
+      if (!organizationId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      const start = startDate ? new Date(startDate) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      const end = endDate ? new Date(endDate) : new Date();
+
+      const { reconciliationEngine } = await import("./ml/reconciliationEngine");
+      
+      let result;
+      if (source === "quickbooks") {
+        result = await reconciliationEngine.syncInvoicesFromQuickBooks(organizationId, userId, start, end);
+      } else if (source === "xero") {
+        result = await reconciliationEngine.syncInvoicesFromXero(organizationId, userId, start, end);
+      } else {
+        return res.status(400).json({ message: "Invalid source. Use 'quickbooks' or 'xero'" });
+      }
+
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error("Sync invoices error:", error);
+      res.status(500).json({ message: error.message || "Failed to sync invoices" });
+    }
+  });
+
+  app.post("/api/reconciliation/run", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const { organizationId, startDate, endDate } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid" });
+      }
+
+      if (!organizationId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      const start = startDate ? new Date(startDate) : undefined;
+      const end = endDate ? new Date(endDate) : undefined;
+
+      const { reconciliationEngine } = await import("./ml/reconciliationEngine");
+      const result = await reconciliationEngine.runReconciliation(organizationId, start, end);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Run reconciliation error:", error);
+      res.status(500).json({ message: error.message || "Failed to run reconciliation" });
+    }
+  });
+
+  app.get("/api/reconciliation/summary", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const organizationId = req.query.organizationId as string;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid" });
+      }
+
+      if (!organizationId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      const { reconciliationEngine } = await import("./ml/reconciliationEngine");
+      const summary = await reconciliationEngine.getReconciliationSummary(organizationId);
+
+      res.json(summary);
+    } catch (error: any) {
+      console.error("Reconciliation summary error:", error);
+      res.status(500).json({ message: error.message || "Failed to get summary" });
+    }
+  });
+
+  app.get("/api/reconciliation/pending-matches", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const organizationId = req.query.organizationId as string;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid" });
+      }
+
+      if (!organizationId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      const { reconciliationEngine } = await import("./ml/reconciliationEngine");
+      const matches = await reconciliationEngine.getPendingMatches(organizationId);
+
+      res.json(matches);
+    } catch (error: any) {
+      console.error("Pending matches error:", error);
+      res.status(500).json({ message: error.message || "Failed to get pending matches" });
+    }
+  });
+
+  app.get("/api/reconciliation/discrepancies", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const organizationId = req.query.organizationId as string;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid" });
+      }
+
+      if (!organizationId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      const { reconciliationEngine } = await import("./ml/reconciliationEngine");
+      const discrepancies = await reconciliationEngine.getOpenDiscrepancies(organizationId);
+
+      res.json(discrepancies);
+    } catch (error: any) {
+      console.error("Discrepancies error:", error);
+      res.status(500).json({ message: error.message || "Failed to get discrepancies" });
+    }
+  });
+
+  app.post("/api/reconciliation/matches/:matchId/confirm", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const { matchId } = req.params;
+      const { notes } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid" });
+      }
+
+      const { reconciliationEngine } = await import("./ml/reconciliationEngine");
+      await reconciliationEngine.confirmMatch(matchId, userId, notes);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Confirm match error:", error);
+      res.status(500).json({ message: error.message || "Failed to confirm match" });
+    }
+  });
+
+  app.post("/api/reconciliation/matches/:matchId/reject", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const { matchId } = req.params;
+      const { notes } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid" });
+      }
+
+      const { reconciliationEngine } = await import("./ml/reconciliationEngine");
+      await reconciliationEngine.rejectMatch(matchId, userId, notes);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Reject match error:", error);
+      res.status(500).json({ message: error.message || "Failed to reject match" });
+    }
+  });
+
+  app.post("/api/reconciliation/discrepancies/:discrepancyId/resolve", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userId = getUserId(user);
+      const { discrepancyId } = req.params;
+      const { resolution, notes } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ message: "User session invalid" });
+      }
+
+      if (!resolution || !["resolved", "ignored"].includes(resolution)) {
+        return res.status(400).json({ message: "Resolution must be 'resolved' or 'ignored'" });
+      }
+
+      const { reconciliationEngine } = await import("./ml/reconciliationEngine");
+      await reconciliationEngine.resolveDiscrepancy(discrepancyId, userId, resolution, notes);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Resolve discrepancy error:", error);
+      res.status(500).json({ message: error.message || "Failed to resolve discrepancy" });
+    }
+  });
+
   // Ramp Integration endpoints
   app.post("/api/ramp/connect", isAuthenticated, async (req, res) => {
     try {

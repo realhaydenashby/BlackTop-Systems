@@ -1684,3 +1684,212 @@ export type TransactionWithRelations = Transaction & {
   category?: Category | null;
   department?: Department | null;
 };
+
+// ============================================
+// Auto-Reconciliation Engine
+// Match bank transactions to invoices/bills
+// ============================================
+
+// Source of invoice/bill data
+export const invoiceSourceEnum = pgEnum("invoice_source", ["quickbooks", "xero", "manual"]);
+
+// Type of document (invoice = receivable, bill = payable)
+export const invoiceTypeEnum = pgEnum("invoice_type", ["invoice", "bill"]);
+
+// Status of the invoice/bill
+export const invoiceStatusEnum = pgEnum("invoice_status", ["open", "paid", "partial", "overdue", "void"]);
+
+// Imported invoices and bills from accounting software
+export const invoicesAndBills = pgTable("invoices_and_bills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  
+  // Source identification
+  source: invoiceSourceEnum("source").notNull(),
+  externalId: varchar("external_id", { length: 100 }).notNull(), // ID from QB/Xero
+  
+  // Type and status
+  type: invoiceTypeEnum("type").notNull(),
+  status: invoiceStatusEnum("status").default("open").notNull(),
+  
+  // Core fields
+  number: varchar("number", { length: 100 }), // Invoice/Bill number
+  date: timestamp("date").notNull(),
+  dueDate: timestamp("due_date"),
+  
+  // Amounts
+  totalAmount: numeric("total_amount", { precision: 15, scale: 2 }).notNull(),
+  amountPaid: numeric("amount_paid", { precision: 15, scale: 2 }).default("0"),
+  balance: numeric("balance", { precision: 15, scale: 2 }), // Remaining amount
+  currency: varchar("currency", { length: 3 }).default("USD"),
+  
+  // Counterparty
+  counterpartyName: varchar("counterparty_name", { length: 255 }), // Customer or vendor name
+  counterpartyId: varchar("counterparty_id", { length: 100 }), // External ID
+  
+  // Metadata
+  lineItems: jsonb("line_items"), // Array of line items
+  metadata: jsonb("metadata"), // Extra data from source
+  
+  // Timestamps
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_invoices_org").on(table.organizationId),
+  index("idx_invoices_source_external").on(table.source, table.externalId),
+  index("idx_invoices_date").on(table.date),
+  index("idx_invoices_status").on(table.status),
+  index("idx_invoices_counterparty").on(table.counterpartyName),
+  unique("uq_invoice_source_external").on(table.organizationId, table.source, table.externalId),
+]);
+
+// Match status for reconciliation
+export const reconciliationMatchStatusEnum = pgEnum("reconciliation_match_status", [
+  "matched",       // Exact or near-exact match found
+  "partial",       // Partial match (amount difference)
+  "suggested",     // AI-suggested match, needs review
+  "confirmed",     // User confirmed the match
+  "rejected",      // User rejected the suggested match
+  "unmatched"      // No match found
+]);
+
+// Confidence level of the match
+export const matchConfidenceEnum = pgEnum("match_confidence", [
+  "high",    // >90% confidence, exact match
+  "medium",  // 70-90% confidence
+  "low"      // <70% confidence
+]);
+
+// Reconciliation matches - links bank transactions to invoices/bills
+export const reconciliationMatches = pgTable("reconciliation_matches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  
+  // Links
+  transactionId: varchar("transaction_id").notNull().references(() => transactions.id, { onDelete: "cascade" }),
+  invoiceId: varchar("invoice_id").references(() => invoicesAndBills.id, { onDelete: "set null" }),
+  
+  // Match details
+  status: reconciliationMatchStatusEnum("status").default("suggested").notNull(),
+  confidence: matchConfidenceEnum("confidence").default("medium").notNull(),
+  confidenceScore: numeric("confidence_score", { precision: 4, scale: 3 }), // 0.000 to 1.000
+  
+  // Match criteria that were used
+  matchedOn: text("matched_on").array(), // e.g., ["amount", "date", "vendor"]
+  
+  // Amounts
+  transactionAmount: numeric("transaction_amount", { precision: 15, scale: 2 }),
+  invoiceAmount: numeric("invoice_amount", { precision: 15, scale: 2 }),
+  amountDifference: numeric("amount_difference", { precision: 15, scale: 2 }),
+  
+  // User actions
+  confirmedBy: varchar("confirmed_by").references(() => users.id, { onDelete: "set null" }),
+  confirmedAt: timestamp("confirmed_at"),
+  notes: text("notes"),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_recon_matches_org").on(table.organizationId),
+  index("idx_recon_matches_transaction").on(table.transactionId),
+  index("idx_recon_matches_invoice").on(table.invoiceId),
+  index("idx_recon_matches_status").on(table.status),
+  unique("uq_recon_transaction_invoice").on(table.transactionId, table.invoiceId),
+]);
+
+// Discrepancy types
+export const discrepancyTypeEnum = pgEnum("discrepancy_type", [
+  "amount_mismatch",     // Transaction amount differs from invoice
+  "missing_invoice",     // Bank transaction with no matching invoice
+  "missing_payment",     // Invoice marked paid but no bank transaction
+  "duplicate_payment",   // Multiple transactions for same invoice
+  "date_mismatch",       // Payment date significantly different from invoice date
+  "vendor_mismatch",     // Vendor name doesn't match
+  "currency_mismatch"    // Currency differences
+]);
+
+// Discrepancy severity
+export const discrepancySeverityEnum = pgEnum("discrepancy_severity", [
+  "critical",  // Large amount, needs immediate attention
+  "warning",   // Moderate issue
+  "info"       // Minor discrepancy
+]);
+
+// Discrepancy resolution status
+export const discrepancyResolutionEnum = pgEnum("discrepancy_resolution", [
+  "open",          // Needs attention
+  "investigating", // Being looked at
+  "resolved",      // Fixed
+  "ignored"        // Marked as acceptable
+]);
+
+// Reconciliation discrepancies
+export const reconciliationDiscrepancies = pgTable("reconciliation_discrepancies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  
+  // Related entities (at least one should be set)
+  transactionId: varchar("transaction_id").references(() => transactions.id, { onDelete: "set null" }),
+  invoiceId: varchar("invoice_id").references(() => invoicesAndBills.id, { onDelete: "set null" }),
+  matchId: varchar("match_id").references(() => reconciliationMatches.id, { onDelete: "set null" }),
+  
+  // Discrepancy details
+  type: discrepancyTypeEnum("type").notNull(),
+  severity: discrepancySeverityEnum("severity").default("warning").notNull(),
+  
+  // Description
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  
+  // Amounts involved
+  expectedAmount: numeric("expected_amount", { precision: 15, scale: 2 }),
+  actualAmount: numeric("actual_amount", { precision: 15, scale: 2 }),
+  difference: numeric("difference", { precision: 15, scale: 2 }),
+  
+  // AI-suggested action
+  suggestedAction: text("suggested_action"),
+  
+  // Resolution
+  resolution: discrepancyResolutionEnum("resolution").default("open").notNull(),
+  resolvedBy: varchar("resolved_by").references(() => users.id, { onDelete: "set null" }),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionNotes: text("resolution_notes"),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_discrepancies_org").on(table.organizationId),
+  index("idx_discrepancies_type").on(table.type),
+  index("idx_discrepancies_severity").on(table.severity),
+  index("idx_discrepancies_resolution").on(table.resolution),
+  index("idx_discrepancies_transaction").on(table.transactionId),
+  index("idx_discrepancies_invoice").on(table.invoiceId),
+]);
+
+// Insert schemas
+export const insertInvoiceAndBillSchema = createInsertSchema(invoicesAndBills).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export const insertReconciliationMatchSchema = createInsertSchema(reconciliationMatches).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export const insertReconciliationDiscrepancySchema = createInsertSchema(reconciliationDiscrepancies).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+// Types
+export type InvoiceAndBill = typeof invoicesAndBills.$inferSelect;
+export type InsertInvoiceAndBill = z.infer<typeof insertInvoiceAndBillSchema>;
+export type ReconciliationMatch = typeof reconciliationMatches.$inferSelect;
+export type InsertReconciliationMatch = z.infer<typeof insertReconciliationMatchSchema>;
+export type ReconciliationDiscrepancy = typeof reconciliationDiscrepancies.$inferSelect;
+export type InsertReconciliationDiscrepancy = z.infer<typeof insertReconciliationDiscrepancySchema>;
