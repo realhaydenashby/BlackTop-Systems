@@ -278,6 +278,13 @@ export class XeroService {
     return response.body.organisations?.[0];
   }
 
+  async getAccounts(userId: string): Promise<any[]> {
+    const { client, tenantId } = await this.getValidAccessToken(userId);
+    
+    const response = await client.accountingApi.getAccounts(tenantId);
+    return response.body.accounts || [];
+  }
+
   async getBankAccounts(userId: string): Promise<any[]> {
     const { client, tenantId } = await this.getValidAccessToken(userId);
     

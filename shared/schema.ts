@@ -1305,9 +1305,45 @@ export const mappingFeedback = pgTable("mapping_feedback", {
   index("idx_mapping_feedback_status").on(table.status),
 ]);
 
+// Imported COA - Organization-specific accounts imported from QuickBooks/Xero
+export const importedCOA = pgTable("imported_coa", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  sourceSystem: varchar("source_system", { length: 50 }).notNull(), // quickbooks, xero
+  sourceAccountId: varchar("source_account_id", { length: 100 }).notNull(), // Original ID from source
+  accountName: varchar("account_name", { length: 255 }).notNull(),
+  accountCode: varchar("account_code", { length: 50 }),
+  accountType: varchar("account_type", { length: 100 }), // Source system's account type
+  classification: varchar("classification", { length: 100 }), // Asset, Liability, Equity, Revenue, Expense
+  currentBalance: numeric("current_balance", { precision: 15, scale: 2 }),
+  parentAccountId: varchar("parent_account_id", { length: 100 }),
+  isActive: boolean("is_active").default(true),
+  mappedCanonicalAccountId: varchar("mapped_canonical_account_id").references(() => canonicalAccounts.id, { onDelete: "set null" }),
+  mappingConfidence: numeric("mapping_confidence", { precision: 4, scale: 3 }),
+  mappingStatus: varchar("mapping_status", { length: 20 }).default("pending"), // pending, auto_mapped, manual, needs_review
+  importedAt: timestamp("imported_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_imported_coa_org").on(table.organizationId),
+  index("idx_imported_coa_source").on(table.sourceSystem, table.sourceAccountId),
+  unique("uq_imported_coa_source").on(table.organizationId, table.sourceSystem, table.sourceAccountId),
+]);
+
 // Relations for COA tables
 export const canonicalAccountsRelations = relations(canonicalAccounts, ({ many }) => ({
   mappings: many(accountMappings),
+  importedAccounts: many(importedCOA),
+}));
+
+export const importedCOARelations = relations(importedCOA, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [importedCOA.organizationId],
+    references: [organizations.id],
+  }),
+  mappedCanonicalAccount: one(canonicalAccounts, {
+    fields: [importedCOA.mappedCanonicalAccountId],
+    references: [canonicalAccounts.id],
+  }),
 }));
 
 export const accountMappingsRelations = relations(accountMappings, ({ one }) => ({
@@ -1376,6 +1412,7 @@ export const insertWaitlistSchema = createInsertSchema(waitlist).omit({ id: true
 export const insertCanonicalAccountSchema = createInsertSchema(canonicalAccounts).omit({ id: true, createdAt: true });
 export const insertAccountMappingSchema = createInsertSchema(accountMappings).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMappingFeedbackSchema = createInsertSchema(mappingFeedback).omit({ id: true, createdAt: true, reviewedAt: true });
+export const insertImportedCOASchema = createInsertSchema(importedCOA).omit({ id: true, importedAt: true, updatedAt: true });
 
 // ============================================
 // Cross-Organization Pattern Database
@@ -1537,6 +1574,8 @@ export type AccountMapping = typeof accountMappings.$inferSelect;
 export type InsertAccountMapping = z.infer<typeof insertAccountMappingSchema>;
 export type MappingFeedback = typeof mappingFeedback.$inferSelect;
 export type InsertMappingFeedback = z.infer<typeof insertMappingFeedbackSchema>;
+export type ImportedCOA = typeof importedCOA.$inferSelect;
+export type InsertImportedCOA = z.infer<typeof insertImportedCOASchema>;
 
 // Cross-org pattern types
 export type CrossOrgPattern = typeof crossOrgPatterns.$inferSelect;
