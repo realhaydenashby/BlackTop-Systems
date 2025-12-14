@@ -1589,6 +1589,93 @@ export type InsertSeasonalPattern = z.infer<typeof insertSeasonalPatternSchema>;
 export type PatternContribution = typeof patternContributions.$inferSelect;
 export type InsertPatternContribution = z.infer<typeof insertPatternContributionSchema>;
 
+// ============================================
+// Transaction Review Queue
+// Confidence-based routing for human review
+// ============================================
+
+export const reviewQueueStatusEnum = pgEnum("review_queue_status", [
+  "pending",      // Awaiting human review
+  "approved",     // User approved the AI suggestion
+  "rejected",     // User rejected and provided correction
+  "skipped",      // User skipped for now
+  "auto_resolved" // System resolved based on new patterns
+]);
+
+export const reviewQueuePriorityEnum = pgEnum("review_queue_priority", [
+  "high",    // Low confidence or high-value transaction
+  "medium",  // Medium confidence
+  "low"      // Slightly below threshold
+]);
+
+export const transactionReviewQueue = pgTable("transaction_review_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  transactionId: varchar("transaction_id").notNull().references(() => transactions.id, { onDelete: "cascade" }),
+  
+  // AI's suggestion
+  suggestedCanonicalAccountId: varchar("suggested_canonical_account_id").references(() => canonicalAccounts.id, { onDelete: "set null" }),
+  suggestedCategoryId: varchar("suggested_category_id").references(() => categories.id, { onDelete: "set null" }),
+  aiConfidence: numeric("ai_confidence", { precision: 4, scale: 3 }).notNull(), // 0.000 to 1.000
+  aiReasoning: text("ai_reasoning"), // Why the AI suggested this
+  alternativeSuggestions: jsonb("alternative_suggestions"), // Array of other possible mappings
+  
+  // Review metadata
+  status: reviewQueueStatusEnum("status").default("pending").notNull(),
+  priority: reviewQueuePriorityEnum("priority").default("medium").notNull(),
+  
+  // User's action
+  reviewedBy: varchar("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  finalCanonicalAccountId: varchar("final_canonical_account_id").references(() => canonicalAccounts.id, { onDelete: "set null" }),
+  finalCategoryId: varchar("final_category_id").references(() => categories.id, { onDelete: "set null" }),
+  reviewNotes: text("review_notes"),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+  expiresAt: timestamp("expires_at"), // Auto-resolve after X days if not reviewed
+}, (table) => [
+  index("idx_review_queue_org").on(table.organizationId),
+  index("idx_review_queue_status").on(table.status),
+  index("idx_review_queue_priority").on(table.priority, table.createdAt),
+  index("idx_review_queue_transaction").on(table.transactionId),
+  unique("uq_review_queue_transaction").on(table.transactionId), // One queue entry per transaction
+]);
+
+// Relations
+export const transactionReviewQueueRelations = relations(transactionReviewQueue, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [transactionReviewQueue.organizationId],
+    references: [organizations.id],
+  }),
+  transaction: one(transactions, {
+    fields: [transactionReviewQueue.transactionId],
+    references: [transactions.id],
+  }),
+  suggestedCanonicalAccount: one(canonicalAccounts, {
+    fields: [transactionReviewQueue.suggestedCanonicalAccountId],
+    references: [canonicalAccounts.id],
+  }),
+  suggestedCategory: one(categories, {
+    fields: [transactionReviewQueue.suggestedCategoryId],
+    references: [categories.id],
+  }),
+  reviewer: one(users, {
+    fields: [transactionReviewQueue.reviewedBy],
+    references: [users.id],
+  }),
+}));
+
+// Insert schema and types
+export const insertTransactionReviewQueueSchema = createInsertSchema(transactionReviewQueue).omit({ 
+  id: true, 
+  createdAt: true, 
+  reviewedAt: true 
+});
+
+export type TransactionReviewQueue = typeof transactionReviewQueue.$inferSelect;
+export type InsertTransactionReviewQueue = z.infer<typeof insertTransactionReviewQueueSchema>;
+
 // Extended types with relations
 export type TransactionWithRelations = Transaction & {
   vendor?: Vendor | null;
