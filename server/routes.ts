@@ -8655,6 +8655,117 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
+  // ============================================
+  // Classification Accuracy Dashboard
+  // ============================================
+
+  // Get full classification dashboard
+  app.get("/api/classification/dashboard", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { classificationMetricsEngine } = await import("./ml/classificationMetrics");
+      const dashboard = await classificationMetricsEngine.getDashboard(dbUser.defaultOrganizationId);
+      
+      res.json(dashboard);
+    } catch (error: any) {
+      console.error("Classification dashboard error:", error);
+      res.status(500).json({ message: "Failed to get classification dashboard" });
+    }
+  });
+
+  // Get current metrics only
+  app.get("/api/classification/metrics", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { classificationMetricsEngine } = await import("./ml/classificationMetrics");
+      const metrics = await classificationMetricsEngine.getCurrentMetrics(dbUser.defaultOrganizationId);
+      
+      res.json(metrics);
+    } catch (error: any) {
+      console.error("Classification metrics error:", error);
+      res.status(500).json({ message: "Failed to get classification metrics" });
+    }
+  });
+
+  // Get metrics history
+  app.get("/api/classification/history", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const days = parseInt(req.query.days as string) || 30;
+      
+      const { classificationMetricsEngine } = await import("./ml/classificationMetrics");
+      const history = await classificationMetricsEngine.getMetricsHistory(dbUser.defaultOrganizationId, days);
+      
+      res.json({ history });
+    } catch (error: any) {
+      console.error("Classification history error:", error);
+      res.status(500).json({ message: "Failed to get classification history" });
+    }
+  });
+
+  // Get per-category breakdown
+  app.get("/api/classification/categories", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { classificationMetricsEngine } = await import("./ml/classificationMetrics");
+      const categories = await classificationMetricsEngine.getCategoryMetrics(dbUser.defaultOrganizationId);
+      
+      res.json({ categories });
+    } catch (error: any) {
+      console.error("Classification categories error:", error);
+      res.status(500).json({ message: "Failed to get category metrics" });
+    }
+  });
+
+  // Get confidence distribution
+  app.get("/api/classification/confidence-distribution", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { classificationMetricsEngine } = await import("./ml/classificationMetrics");
+      const distribution = await classificationMetricsEngine.getConfidenceDistribution(dbUser.defaultOrganizationId);
+      
+      res.json({ distribution });
+    } catch (error: any) {
+      console.error("Confidence distribution error:", error);
+      res.status(500).json({ message: "Failed to get confidence distribution" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
