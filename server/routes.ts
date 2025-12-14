@@ -8497,6 +8497,56 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     }
   });
 
+  // ============================================
+  // Instant Answers Engine Routes
+  // Natural language queries for financial data
+  // ============================================
+
+  // Query endpoint - process natural language financial questions
+  app.post("/api/answers/query", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { question } = req.body;
+      
+      if (!question || typeof question !== "string") {
+        return res.status(400).json({ message: "Question is required" });
+      }
+
+      const { instantAnswersEngine } = await import("./ml/instantAnswers");
+      const result = await instantAnswersEngine.query(dbUser.defaultOrganizationId, question);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Instant answers query error:", error);
+      res.status(500).json({ message: "Failed to process question" });
+    }
+  });
+
+  // Example questions endpoint - provide sample queries
+  app.get("/api/answers/examples", isAuthenticated, (req, res) => {
+    res.json({
+      examples: [
+        { question: "What did we spend on AWS last quarter?", category: "vendor" },
+        { question: "How much runway do we have?", category: "runway" },
+        { question: "Show me recurring subscriptions", category: "recurring" },
+        { question: "What are our top 5 vendors by spend?", category: "top" },
+        { question: "How has our burn rate changed over the last 6 months?", category: "trend" },
+        { question: "What's our current cash balance?", category: "cash" },
+        { question: "Compare spending this month vs last month", category: "comparison" },
+        { question: "How much did we spend on software last quarter?", category: "category" },
+        { question: "What's our monthly burn rate?", category: "burn" },
+        { question: "Show me Google spending this year", category: "vendor" },
+      ],
+    });
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
