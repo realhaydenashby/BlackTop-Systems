@@ -753,5 +753,3 @@ export async function runProprietaryAnalysis(organizationId: string, currentCash
 export async function getProprietaryInsights(organizationId: string) {
   return proprietaryEngine.getProprietaryInsights(organizationId);
 }
-
-export { ProprietaryAIEngine };

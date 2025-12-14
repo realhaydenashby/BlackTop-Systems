@@ -723,5 +723,3 @@ export async function getCommonVendorsForType(businessType: string, limit?: numb
 export async function getCrossOrgPatternStats() {
   return patternDatabase.getStats();
 }
-
-export { CrossOrgPatternDatabase };
