@@ -91,6 +91,60 @@ Growth-tier persistent pattern learning and drift detection:
 - **Drift Analysis:** Metric changes compared to historical baselines
 - **Risk Indicators:** Volatility warnings, concentration risks, vendor inflation
 
+### Financial Automation Layer (Recently Added)
+
+#### COA Intelligence Layer (`server/ml/coaIntelligence.ts`)
+Smart chart of accounts initialization and management:
+- **Industry Seeding:** Pre-populates canonical accounts based on business type
+- **Import Integration:** Imports COA from QuickBooks/Xero on connect
+- **Smart Mappings:** AI-powered initial account mappings with confidence scoring
+
+#### Confidence-Based Routing (`server/ml/confidenceRouter.ts`)
+Intelligent transaction classification routing:
+- **Auto-Classification:** Transactions above 85% confidence auto-classify
+- **Human Review Queue:** Low-confidence items routed to review queue with AI suggestions
+- **Learning Loop:** User corrections feed back into classification improvement
+
+#### Cross-Org Learning Network (`server/ml/crossOrgLearning.ts`)
+Anonymized pattern sharing across organizations:
+- **Pattern Database:** Aggregated patterns from similar companies
+- **Privacy-Safe:** Only statistical patterns shared, no raw data
+- **Accuracy Boost:** New organizations benefit from existing pattern library
+
+#### Auto-Reconciliation Engine (`server/ml/autoReconciliation.ts`)
+Automatic transaction matching and discrepancy detection:
+- **Invoice Matching:** Bank transactions matched to invoices/bills
+- **Discrepancy Flagging:** Unmatched or suspicious items flagged for review
+- **Confidence Scoring:** Match quality scores for audit trail
+
+#### Real-Time Financial Sync (`server/ml/realTimeSync.ts`)
+Continuous data freshness from connected sources:
+- **Polling Engine:** Sub-hour data refresh from Plaid/accounting software
+- **Change Detection:** Only syncs changed/new data
+- **Status Tracking:** Real-time connection health monitoring
+
+#### Instant Answers Engine (`server/ml/instantAnswers.ts`)
+Natural language financial queries:
+- **Query Examples:** "What did we spend on AWS last quarter?"
+- **Context-Aware:** Understands date ranges, vendors, categories
+- **Immediate Response:** Sub-second answers from indexed data
+
+#### One-Click Month-End Close (`server/ml/monthEndClose.ts`)
+Automated month-end close workflow:
+- **Checklist Generation:** Auto-creates close checklist items
+- **Duplicate Detection:** Finds same date/amount/vendor transaction groups
+- **Recurring Anomalies:** Detects price changes from same vendor
+- **Variance Detection:** Flags unexpected deviations from prior periods
+- **Journal Entry Suggestions:** AI-generated adjusting entries
+
+#### Classification Accuracy Dashboard (`server/ml/classificationMetrics.ts`)
+ML model performance tracking:
+- **Precision/Recall Metrics:** Per-category accuracy tracking using canonicalAccounts
+- **Trend Analysis:** Weekly snapshots showing improvement over time
+- **Confidence Distribution:** Visualization of classification confidence levels
+- **AI Insights:** Auto-generated recommendations for model improvement
+- **API Endpoints:** Dashboard, metrics, history, categories, confidence distribution
+
 ### Plan-Based Feature Gating
 A three-tier pricing model (Lite, Core, Growth) gates features on both the frontend (using `usePlanAccess` hook and `FeatureGate` components) and backend (using `requireFeature` middleware) to control access to advanced functionalities like the AI Copilot, scenario modeling, and shareable reports.
 
