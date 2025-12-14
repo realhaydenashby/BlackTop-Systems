@@ -1893,3 +1893,166 @@ export type ReconciliationMatch = typeof reconciliationMatches.$inferSelect;
 export type InsertReconciliationMatch = z.infer<typeof insertReconciliationMatchSchema>;
 export type ReconciliationDiscrepancy = typeof reconciliationDiscrepancies.$inferSelect;
 export type InsertReconciliationDiscrepancy = z.infer<typeof insertReconciliationDiscrepancySchema>;
+
+// ============================================
+// Real-Time Financial Sync System (Task 5)
+// ============================================
+
+// Sync source types
+export const syncSourceEnum = pgEnum("sync_source", [
+  "plaid",
+  "quickbooks",
+  "xero",
+  "stripe",
+  "ramp"
+]);
+
+// Sync job status
+export const syncJobStatusEnum = pgEnum("sync_job_status", [
+  "pending",
+  "running",
+  "completed",
+  "failed",
+  "cancelled"
+]);
+
+// Sync trigger types
+export const syncTriggerEnum = pgEnum("sync_trigger", [
+  "scheduled",
+  "webhook",
+  "manual",
+  "on_connect"
+]);
+
+// Sync schedules - configurable polling intervals per connection
+export const syncSchedules = pgTable("sync_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  source: syncSourceEnum("source").notNull(),
+  connectionId: varchar("connection_id").notNull(), // Reference to plaidItems.id or token table IDs
+  
+  // Polling configuration
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  intervalMinutes: integer("interval_minutes").default(30).notNull(), // Default 30-min polling
+  priorityLevel: integer("priority_level").default(1).notNull(), // Higher = more frequent
+  
+  // Last sync tracking
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSuccessAt: timestamp("last_success_at"),
+  lastErrorAt: timestamp("last_error_at"),
+  lastError: text("last_error"),
+  consecutiveFailures: integer("consecutive_failures").default(0).notNull(),
+  
+  // Next scheduled sync
+  nextScheduledAt: timestamp("next_scheduled_at"),
+  
+  // Sync state (for incremental syncs)
+  syncCursor: text("sync_cursor"), // Plaid cursor or last modified timestamp
+  syncState: jsonb("sync_state"), // Additional state data
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_sync_schedules_org").on(table.organizationId),
+  index("idx_sync_schedules_source").on(table.source),
+  index("idx_sync_schedules_next").on(table.nextScheduledAt),
+  index("idx_sync_schedules_enabled").on(table.isEnabled),
+]);
+
+// Sync jobs - individual sync execution records
+export const syncJobs = pgTable("sync_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  scheduleId: varchar("schedule_id").references(() => syncSchedules.id, { onDelete: "set null" }),
+  
+  source: syncSourceEnum("source").notNull(),
+  connectionId: varchar("connection_id").notNull(),
+  trigger: syncTriggerEnum("trigger").default("scheduled").notNull(),
+  
+  // Status tracking
+  status: syncJobStatusEnum("status").default("pending").notNull(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  
+  // Results
+  itemsSynced: integer("items_synced").default(0),
+  itemsCreated: integer("items_created").default(0),
+  itemsUpdated: integer("items_updated").default(0),
+  itemsSkipped: integer("items_skipped").default(0),
+  
+  // Error handling
+  errorCode: varchar("error_code", { length: 50 }),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").default(0),
+  
+  // Cursor/state before and after
+  cursorBefore: text("cursor_before"),
+  cursorAfter: text("cursor_after"),
+  
+  // Metadata
+  metadata: jsonb("metadata"),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_sync_jobs_org").on(table.organizationId),
+  index("idx_sync_jobs_schedule").on(table.scheduleId),
+  index("idx_sync_jobs_status").on(table.status),
+  index("idx_sync_jobs_source").on(table.source),
+  index("idx_sync_jobs_created").on(table.createdAt),
+]);
+
+// Webhook events - track incoming webhooks from providers
+export const syncWebhookEvents = pgTable("sync_webhook_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  source: syncSourceEnum("source").notNull(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  
+  // Connection info
+  connectionId: varchar("connection_id"),
+  organizationId: varchar("organization_id"),
+  
+  // Payload
+  rawPayload: jsonb("raw_payload"),
+  
+  // Processing status
+  processed: boolean("processed").default(false).notNull(),
+  processedAt: timestamp("processed_at"),
+  syncJobId: varchar("sync_job_id").references(() => syncJobs.id, { onDelete: "set null" }),
+  
+  // Error info
+  error: text("error"),
+  
+  // Timestamps
+  receivedAt: timestamp("received_at").defaultNow(),
+}, (table) => [
+  index("idx_webhook_events_source").on(table.source),
+  index("idx_webhook_events_processed").on(table.processed),
+  index("idx_webhook_events_connection").on(table.connectionId),
+]);
+
+// Insert schemas for sync tables
+export const insertSyncScheduleSchema = createInsertSchema(syncSchedules).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export const insertSyncJobSchema = createInsertSchema(syncJobs).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export const insertSyncWebhookEventSchema = createInsertSchema(syncWebhookEvents).omit({ 
+  id: true, 
+  receivedAt: true 
+});
+
+// Types for sync system
+export type SyncSchedule = typeof syncSchedules.$inferSelect;
+export type InsertSyncSchedule = z.infer<typeof insertSyncScheduleSchema>;
+export type SyncJob = typeof syncJobs.$inferSelect;
+export type InsertSyncJob = z.infer<typeof insertSyncJobSchema>;
+export type SyncWebhookEvent = typeof syncWebhookEvents.$inferSelect;
+export type InsertSyncWebhookEvent = z.infer<typeof insertSyncWebhookEventSchema>;

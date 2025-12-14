@@ -166,6 +166,15 @@ export default async function runApp(
   await initStripe();
   const server = await registerRoutes(app);
 
+  // Start the real-time sync engine for background polling
+  try {
+    const { syncEngine } = await import("./sync/syncEngine");
+    await syncEngine.start();
+    log("Real-time sync engine started", "sync");
+  } catch (error: any) {
+    log(`Sync engine init failed: ${error.message}`, "sync");
+  }
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

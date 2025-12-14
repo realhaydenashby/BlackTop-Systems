@@ -2820,6 +2820,204 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // Real-Time Financial Sync API (Task 5)
+  // ============================================
+
+  // Get sync status for all connections
+  app.get("/api/sync/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const organizationId = (req.query.organizationId as string) || user.organizationId;
+
+      if (!organizationId) {
+        return res.json({ sources: [], dataFreshness: { overallStatus: 'disconnected' } });
+      }
+
+      const { syncEngine } = await import("./sync/syncEngine");
+      const [status, freshness] = await Promise.all([
+        syncEngine.getSyncStatus(organizationId),
+        syncEngine.getDataFreshness(organizationId),
+      ]);
+
+      res.json({ sources: status, dataFreshness: freshness });
+    } catch (error: any) {
+      console.error("Sync status error:", error);
+      res.status(500).json({ message: error.message || "Failed to get sync status" });
+    }
+  });
+
+  // Get recent sync jobs
+  app.get("/api/sync/jobs", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const organizationId = (req.query.organizationId as string) || user.organizationId;
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      if (!organizationId) {
+        return res.json({ jobs: [] });
+      }
+
+      const { syncEngine } = await import("./sync/syncEngine");
+      const jobs = await syncEngine.getRecentJobs(organizationId, limit);
+
+      res.json({ jobs });
+    } catch (error: any) {
+      console.error("Sync jobs error:", error);
+      res.status(500).json({ message: error.message || "Failed to get sync jobs" });
+    }
+  });
+
+  // Trigger manual sync for a source
+  app.post("/api/sync/trigger", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { source, connectionId, organizationId: reqOrgId } = req.body;
+      const organizationId = reqOrgId || user.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      if (!source || !connectionId) {
+        return res.status(400).json({ message: "Source and connectionId are required" });
+      }
+
+      const validSources = ["plaid", "quickbooks", "xero", "stripe", "ramp"];
+      if (!validSources.includes(source)) {
+        return res.status(400).json({ message: `Source must be one of: ${validSources.join(", ")}` });
+      }
+
+      const { syncEngine } = await import("./sync/syncEngine");
+      const job = await syncEngine.triggerManualSync(organizationId, source, connectionId);
+
+      res.json({ success: true, job });
+    } catch (error: any) {
+      console.error("Manual sync trigger error:", error);
+      res.status(500).json({ message: error.message || "Failed to trigger sync" });
+    }
+  });
+
+  // Create or update sync schedule
+  app.post("/api/sync/schedules", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { source, connectionId, intervalMinutes, organizationId: reqOrgId } = req.body;
+      const organizationId = reqOrgId || user.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+
+      if (!source || !connectionId) {
+        return res.status(400).json({ message: "Source and connectionId are required" });
+      }
+
+      const { syncEngine } = await import("./sync/syncEngine");
+      const schedule = await syncEngine.createScheduleForConnection(
+        organizationId,
+        source,
+        connectionId,
+        intervalMinutes
+      );
+
+      res.json({ success: true, schedule });
+    } catch (error: any) {
+      console.error("Create schedule error:", error);
+      res.status(500).json({ message: error.message || "Failed to create schedule" });
+    }
+  });
+
+  // Update sync interval
+  app.patch("/api/sync/schedules/:scheduleId", isAuthenticated, async (req, res) => {
+    try {
+      const { scheduleId } = req.params;
+      const { intervalMinutes } = req.body;
+
+      if (!intervalMinutes || intervalMinutes < 5) {
+        return res.status(400).json({ message: "Interval must be at least 5 minutes" });
+      }
+
+      const { syncEngine } = await import("./sync/syncEngine");
+      await syncEngine.updateScheduleInterval(scheduleId, intervalMinutes);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Update schedule error:", error);
+      res.status(500).json({ message: error.message || "Failed to update schedule" });
+    }
+  });
+
+  // Pause sync schedule
+  app.post("/api/sync/schedules/:scheduleId/pause", isAuthenticated, async (req, res) => {
+    try {
+      const { scheduleId } = req.params;
+
+      const { syncEngine } = await import("./sync/syncEngine");
+      await syncEngine.pauseSchedule(scheduleId);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Pause schedule error:", error);
+      res.status(500).json({ message: error.message || "Failed to pause schedule" });
+    }
+  });
+
+  // Resume sync schedule
+  app.post("/api/sync/schedules/:scheduleId/resume", isAuthenticated, async (req, res) => {
+    try {
+      const { scheduleId } = req.params;
+
+      const { syncEngine } = await import("./sync/syncEngine");
+      await syncEngine.resumeSchedule(scheduleId);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Resume schedule error:", error);
+      res.status(500).json({ message: error.message || "Failed to resume schedule" });
+    }
+  });
+
+  // Webhook endpoint for Plaid
+  app.post("/api/webhooks/plaid", async (req, res) => {
+    try {
+      const { webhook_type, webhook_code, item_id } = req.body;
+      
+      console.log(`[Webhook] Plaid webhook received: ${webhook_type}/${webhook_code}`);
+
+      if (webhook_type === "TRANSACTIONS" && 
+          ["SYNC_UPDATES_AVAILABLE", "DEFAULT_UPDATE", "TRANSACTIONS_REMOVED"].includes(webhook_code)) {
+        const { syncEngine } = await import("./sync/syncEngine");
+        await syncEngine.handleWebhook("plaid", "TRANSACTIONS", req.body);
+      }
+
+      res.json({ received: true });
+    } catch (error: any) {
+      console.error("Plaid webhook error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get data freshness summary
+  app.get("/api/sync/freshness", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const organizationId = (req.query.organizationId as string) || user.organizationId;
+
+      if (!organizationId) {
+        return res.json({ overallStatus: 'disconnected', oldestDataMinutes: null, sources: [] });
+      }
+
+      const { syncEngine } = await import("./sync/syncEngine");
+      const freshness = await syncEngine.getDataFreshness(organizationId);
+
+      res.json(freshness);
+    } catch (error: any) {
+      console.error("Data freshness error:", error);
+      res.status(500).json({ message: error.message || "Failed to get data freshness" });
+    }
+  });
+
   // Ramp Integration endpoints
   app.post("/api/ramp/connect", isAuthenticated, async (req, res) => {
     try {
