@@ -1467,6 +1467,7 @@ export const industryBenchmarks = pgTable("industry_benchmarks", {
 export const vendorPatterns = pgTable("vendor_patterns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   normalizedName: varchar("normalized_name", { length: 255 }).notNull(), // Cleaned vendor name
+  canonicalAccountId: varchar("canonical_account_id"), // Most common account mapping (references canonical_accounts.id)
   category: varchar("category", { length: 100 }), // Software, Marketing, etc.
   avgBillingFrequency: varchar("avg_billing_frequency", { length: 50 }), // monthly, annual, one-time
   typicalPriceRange: jsonb("typical_price_range"), // { min, max, median }
@@ -1477,6 +1478,7 @@ export const vendorPatterns = pgTable("vendor_patterns", {
 }, (table) => [
   index("idx_vendor_patterns_name").on(table.normalizedName),
   index("idx_vendor_patterns_category").on(table.category),
+  index("idx_vendor_patterns_canonical").on(table.canonicalAccountId),
 ]);
 
 export const seasonalPatterns = pgTable("seasonal_patterns", {

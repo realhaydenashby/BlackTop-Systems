@@ -17,6 +17,7 @@ import {
 } from "@shared/schema";
 import { eq, and, desc, sql, asc, isNull, or } from "drizzle-orm";
 import { getClassifier, trainClassifier } from "./accountClassifier";
+import { crossOrgLearning } from "./crossOrgLearning";
 
 const AUTO_CLASSIFY_THRESHOLD = 0.85;
 const HIGH_PRIORITY_THRESHOLD = 0.50;
@@ -34,7 +35,7 @@ interface ClassificationResult {
     canonicalName: string;
     confidence: number;
   }>;
-  source: "pattern" | "ml" | "fallback";
+  source: "pattern" | "ml" | "cross_org" | "fallback";
 }
 
 interface RoutingResult {
@@ -232,6 +233,21 @@ export class ConfidenceRouter {
         reasoning: `ML classification based on similar transactions: ${mlResult.matchedExamples.slice(0, 2).join(", ")}`,
         alternatives,
         source: "ml",
+      };
+    }
+
+    // Try cross-org learning network for vendors seen at other companies
+    const crossOrgSuggestion = await crossOrgLearning.getVendorSuggestion(vendorName);
+    if (crossOrgSuggestion && crossOrgSuggestion.canonicalAccountId) {
+      return {
+        canonicalAccountId: crossOrgSuggestion.canonicalAccountId,
+        canonicalCode: null,
+        canonicalName: crossOrgSuggestion.canonicalAccountName,
+        categoryId: null,
+        confidence: crossOrgSuggestion.confidence,
+        reasoning: `Cross-org pattern: "${vendorName}" classified by ${crossOrgSuggestion.prevalence} other companies`,
+        alternatives,
+        source: "cross_org",
       };
     }
 
