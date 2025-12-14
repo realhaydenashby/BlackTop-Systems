@@ -8547,6 +8547,114 @@ You are the financial co-pilot every founder wishes they had. Be brilliant, be h
     });
   });
 
+  // ============================================
+  // Month-End Close Routes
+  // Automated checklist, variance detection, journal entries
+  // ============================================
+
+  // Get month-end close report
+  app.get("/api/month-end-close", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { month } = req.query;
+      let targetMonth: Date | undefined;
+      
+      if (month && typeof month === "string") {
+        targetMonth = new Date(month);
+      }
+
+      const { monthEndCloseEngine } = await import("./ml/monthEndClose");
+      const report = await monthEndCloseEngine.generateCloseReport(dbUser.defaultOrganizationId, targetMonth);
+      
+      res.json(report);
+    } catch (error: any) {
+      console.error("Month-end close error:", error);
+      res.status(500).json({ message: "Failed to generate month-end close report" });
+    }
+  });
+
+  // Get checklist items only
+  app.get("/api/month-end-close/checklist", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { monthEndCloseEngine } = await import("./ml/monthEndClose");
+      const report = await monthEndCloseEngine.generateCloseReport(dbUser.defaultOrganizationId);
+      
+      res.json({
+        month: report.month,
+        status: report.status,
+        completionPercent: report.completionPercent,
+        checklist: report.checklist,
+      });
+    } catch (error: any) {
+      console.error("Month-end checklist error:", error);
+      res.status(500).json({ message: "Failed to generate checklist" });
+    }
+  });
+
+  // Get variance analysis only
+  app.get("/api/month-end-close/variances", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { monthEndCloseEngine } = await import("./ml/monthEndClose");
+      const report = await monthEndCloseEngine.generateCloseReport(dbUser.defaultOrganizationId);
+      
+      res.json({
+        month: report.month,
+        variances: report.variances,
+        totalVariance: report.summary.totalVariance,
+      });
+    } catch (error: any) {
+      console.error("Variance analysis error:", error);
+      res.status(500).json({ message: "Failed to generate variance analysis" });
+    }
+  });
+
+  // Get journal entry suggestions only
+  app.get("/api/month-end-close/journal-entries", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const userId = getUserId(user);
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser?.defaultOrganizationId) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const { monthEndCloseEngine } = await import("./ml/monthEndClose");
+      const report = await monthEndCloseEngine.generateCloseReport(dbUser.defaultOrganizationId);
+      
+      res.json({
+        month: report.month,
+        suggestions: report.journalSuggestions,
+      });
+    } catch (error: any) {
+      console.error("Journal entries error:", error);
+      res.status(500).json({ message: "Failed to generate journal entry suggestions" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
